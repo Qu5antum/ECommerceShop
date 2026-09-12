@@ -1,0 +1,40 @@
+services:
+  backend:
+    image: ecommerce-backend
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+
+    ports:
+      - "5000:8080"
+
+    depends_on:
+      - shop.database
+
+    environment:
+      ASPNETCORE_URLS: "http://+:8080"
+
+      ConnectionStrings__DefaultConnection: "Host=shop.database;Port=5432;Database=shop_db;Username=admin;Password=shop1234"
+
+      Jwt__Key: "super-secret-key-for-ecommerce-api-2026"
+      Jwt__Issuer: "EcommerceApi"
+      Jwt__Audience: "EcommerceClient"
+
+  shop.database:
+    image: postgres:18
+    container_name: shop.database
+    restart: unless-stopped
+
+    environment:
+      POSTGRES_DB: shop_db
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: shop1234
+
+    ports:
+      - "5432:5432"
+
+    volumes:
+      - postgres_data:/var/lib/postgresql
+
+volumes:
+  postgres_data:
