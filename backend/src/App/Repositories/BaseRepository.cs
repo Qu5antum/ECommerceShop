@@ -10,7 +10,7 @@ public interface IBaseRepository<T> where T : BaseModel
     Task<T> CreateAsync(T entity);
     Task UpdateAsync(T entity);
     Task DeleteAsync(T entity);
-    Task<T?> GetByIdAsync(int id);
+    Task<T?> GetByIdAsync(Guid id);
     Task<List<T>> GetAllAsync();
 }
 
@@ -40,7 +40,7 @@ public class BaseRepository<T>(AppDbContext context) : IBaseRepository<T> where 
         await _context.SaveChangesAsync();
     }
 
-    public async Task<T?> GetByIdAsync(int id)
+    public async Task<T?> GetByIdAsync(Guid id)
     {
         return await _dbSet.FindAsync(id);
     }

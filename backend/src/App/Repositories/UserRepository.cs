@@ -1,4 +1,5 @@
 using App.Database;
+using App.Enum;
 using App.Models;
 using Microsoft.EntityFrameworkCore;
 
@@ -9,6 +10,7 @@ public interface IUserRepository : IBaseRepository<User>
 {
     Task<User?> GetUserByEmail(string Email);
     Task<User?> GetUserByUserName(string UserName);
+    Task<List<User>> GetAllUsersNotAdminAsync();
 }
 
 
@@ -38,5 +40,14 @@ public class UserRepository(AppDbContext context) : BaseRepository<User>(context
         }
 
         return user;
+    }
+
+    public async Task<List<User>> GetAllUsersNotAdminAsync()
+    {
+        var nonAdminUsers = await _context.Users
+            .Where(u => (u.Roles & UserRole.Admin) == 0)
+            .ToListAsync();
+
+        return nonAdminUsers;
     }
 }

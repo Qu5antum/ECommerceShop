@@ -30,6 +30,20 @@ public class AuthController : ControllerBase
         });
     }
 
+    [HttpPost("adminRegister")]
+    [ProducesResponseType(200)]
+    [ProducesResponseType(404)]
+    [ProducesResponseType(400)]
+    public async Task<IActionResult> CreateUserAdmin(RegisterRequest registerRequest)
+    {
+        await _authService.CreateUserAdmin(registerRequest);
+
+        return Ok(new
+        {
+            message = "Admin successfully created"
+        });
+    }
+
     [HttpPost("login")]
     [ProducesResponseType(200)]
     [ProducesResponseType(404)]

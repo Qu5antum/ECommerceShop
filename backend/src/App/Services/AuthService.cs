@@ -16,6 +16,7 @@ public interface IAuthService
 {
     Task<bool> RegisterUser(RegisterRequest registerRequest);
     Task<LoginResponse> LoginUser(LoginRequest loginRequest);
+    Task<bool> CreateUserAdmin(RegisterRequest registerRequest);
 }
 
 
@@ -61,6 +62,55 @@ public class AuthService : IAuthService
                 Password = HashPassword,
                 isActive = true
             };
+
+            _logger.LogInformation(
+                "Creating user: {Email}, IsActive: {IsActive}",
+                newUser.Email,
+                newUser.isActive
+            );
+
+            await _repository.CreateAsync(newUser);
+
+            return true;
+        }
+        catch (DbUpdateException ex)
+        {
+            _logger.LogError(ex, "A database error occurred while creating the user.");
+            throw new DatabaseException("Could not save the user to the database.");
+        }
+    }
+    
+    public async Task<bool> CreateUserAdmin(RegisterRequest registerRequest)
+    {
+        var userWithEmail = await _repository.GetUserByEmail(registerRequest.Email);
+
+        if (userWithEmail is not null)
+        {
+            _logger.LogWarning("User with this email already exists: {Email}", registerRequest.Email);
+            throw new AlreadyExistsException("User with this username already exists");
+        }
+
+        var userWithUsername = await _repository.GetUserByUserName(registerRequest.UserName);
+
+        if (userWithUsername is not null)
+        {
+            _logger.LogWarning("User with this username already exists: {UserName}", registerRequest.UserName);
+            throw new AlreadyExistsException("User with this username already exists");
+        }
+
+        try
+        {
+            string HashPassword = BCrypt.Net.BCrypt.HashPassword(registerRequest.Password);
+
+            var newUser = new User
+            {
+                UserName = registerRequest.UserName,
+                Email = registerRequest.Email,
+                Password = HashPassword,
+                isActive = true,
+            };
+
+            newUser.AddRole(UserRole.Admin);
 
             _logger.LogInformation(
                 "Creating user: {Email}, IsActive: {IsActive}",
