@@ -6,14 +6,12 @@ services:
       dockerfile: Dockerfile
 
     ports:
-      - "5000:8080"
+      - "8080:8080"
 
     depends_on:
       - shop.database
 
     environment:
-      ASPNETCORE_URLS: "http://+:8080"
-
       ConnectionStrings__DefaultConnection: "Host=shop.database;Port=5432;Database=shop_db;Username=admin;Password=shop1234"
 
       Jwt__Key: "super-secret-key-for-ecommerce-api-2026"
