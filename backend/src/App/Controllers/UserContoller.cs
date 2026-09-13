@@ -1,3 +1,4 @@
+using App.DTOs;
 using App.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -27,13 +28,23 @@ public class UserContoller : ControllerBase{
     }
 
     [Authorize]
-    [HttpGet("{id:guid}")]
+    [HttpGet("{userId:guid}")]
     [ProducesResponseType(200)]
     [ProducesResponseType(404)]
-    public async Task<IActionResult> GetUserProfile(Guid id)
+    public async Task<IActionResult> GetUserProfile(Guid userId)
     {
-        var user = await _userService.GetUserProfile(id);
+        var user = await _userService.GetUserProfile(userId);
 
         return Ok(user);
+    }
+
+    [Authorize]
+    [HttpPut("{userId:guid}")]
+    [ProducesResponseType(200)]
+    [ProducesResponseType(404)]
+    public async Task<IActionResult> UpdateUserProfile(Guid userId, UserUpdateDto userUpdateDto)
+    {
+        await _userService.UpdateUserProfile(userId, userUpdateDto);
+        return Ok("User successfully updated");
     }
 }

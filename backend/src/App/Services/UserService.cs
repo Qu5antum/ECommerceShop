@@ -9,6 +9,7 @@ public interface IUserService
 {
     Task<UserProfileResponseDto> GetUserProfile(Guid userId);
     Task<List<UserResponseDto>> GetAllUsersNotAdmin();
+    Task<bool> UpdateUserProfile(Guid userId, UserUpdateDto userUpdateDto);
 }
 
 public class UserService : IUserService
@@ -58,5 +59,35 @@ public class UserService : IUserService
             CreatedAt = user.CreatedAt,
             UpdatedAt = user.UpdatedAt
         }).ToList();
+    }
+
+    public async Task<bool> UpdateUserProfile(Guid userId, UserUpdateDto userUpdateDto)
+    {
+        var user = await _repository.GetByIdAsync(userId);
+
+        if (user is null)
+        {
+            _logger.LogWarning("User not found by id: {userId}", userId);
+            throw new NotFoundException("User not found");
+        }
+
+        if (userUpdateDto.UserName != null)
+        {
+            user.UserName = userUpdateDto.UserName;
+        }
+        if (userUpdateDto.Email != null)
+        {
+            user.Email = userUpdateDto.Email;
+        }
+        if (userUpdateDto.Password != null)
+        {
+            user.Password = BCrypt.Net.BCrypt.HashPassword(userUpdateDto.Password);
+        }
+
+        await _repository.UpdateAsync(user);
+
+        _logger.LogInformation("User successfully updated");
+
+        return true;
     }
 }
