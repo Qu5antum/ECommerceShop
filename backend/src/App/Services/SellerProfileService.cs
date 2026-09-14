@@ -12,6 +12,7 @@ public interface ISellerProfileService
 {
     Task<SellerProfileResponseDto> CreateSellerProfileAsync(Guid currentUserId, SellerProfileCreateDto profileCreateDto);
     Task<SellerProfileResponseDto> GetUserSellerProfileAsync(Guid userId);
+    Task<bool> UpdateSellerProfileAsync(Guid userId, Guid profileId, SellerProfileUpdateDto profileUpdateDto);
 }
 
 
@@ -83,6 +84,40 @@ public class SellerProfileService : ISellerProfileService
             _logger.LogError(ex, "A database error occurred while creating the seller profile.");
             throw new DatabaseException("Could not save the seller profile to the database.");
         }
+    }
+
+    public async Task<bool> UpdateSellerProfileAsync(Guid userId, Guid profileId, SellerProfileUpdateDto profileUpdateDto)
+    {
+        var user = await _userRepository.GetByIdAsync(userId);
+
+        if (user == null)
+        {
+            _logger.LogWarning("User not found by id: {userId}", userId);
+            throw new NotFoundException("User not found");
+        }
+
+        var sellerProfile = await _profileRepository.GetByIdAsync(profileId);
+
+        if (sellerProfile == null)
+        {
+            _logger.LogWarning("Seller profile not found by id: {profileId}", profileId);
+            throw new NotFoundException("Seller profile not found");
+        }
+
+        if (profileUpdateDto.StoreName != null)
+        {
+            sellerProfile.StoreName = profileUpdateDto.StoreName;
+        }
+        if(profileUpdateDto.Description != null)
+        {
+            sellerProfile.Description = profileUpdateDto.Description;
+        }
+
+        sellerProfile.UpdatedAt = DateTime.UtcNow;
+
+        await _profileRepository.UpdateAsync(sellerProfile);
+
+        return true;
     }
 
     public async Task<SellerProfileResponseDto> GetUserSellerProfileAsync(Guid userId)

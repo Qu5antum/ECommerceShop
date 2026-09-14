@@ -32,6 +32,18 @@ public class SellerProfileController : ControllerBase
         return Ok(sellerProfile);
     }
 
+    [HttpPut("{profileId:guid}")]
+    [ProducesResponseType(200)]
+    [ProducesResponseType(400)]
+    [ProducesResponseType(401)]
+    public async Task<IActionResult> UpdateSellerProfile(Guid profileId, SellerProfileUpdateDto profileUpdateDto)
+    {
+        Guid userId = _helper.GetUserId();
+        await _service.UpdateSellerProfileAsync(userId, profileId, profileUpdateDto);
+
+        return Ok("Seller profile successfully updated");
+    }
+
     [HttpGet]
     [ProducesResponseType(200)]
     [ProducesResponseType(400)]

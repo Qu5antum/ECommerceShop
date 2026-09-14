@@ -8,6 +8,13 @@ public class SellerProfileCreateDto
 }
 
 
+public class SellerProfileUpdateDto
+{
+    public string? StoreName { get; set; }
+    public string? Description { get; set; }
+}
+
+
 public class SellerProfileResponseDto
 {
     public Guid Id { get; set; }
