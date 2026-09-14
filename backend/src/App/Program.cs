@@ -1,9 +1,9 @@
 using System.Text;
+using App.Controllers;
 using App.Database;
 using App.Repositories;
 using App.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.AspNetCore.WebSockets;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
@@ -83,10 +83,15 @@ builder.Services.AddControllers();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<ICategoryService, CategoryService>();
+builder.Services.AddScoped<ISellerProfileService, SellerProfileService>();
 
 // Repositories
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<ICategoryRepsitory, CategoryRepository>();
+builder.Services.AddScoped<ISellerProfileRepository, SellerProfileRepository>();
+
+builder.Services.AddHttpContextAccessor(); 
+builder.Services.AddScoped<Helper>();
 
 var app = builder.Build();
 
