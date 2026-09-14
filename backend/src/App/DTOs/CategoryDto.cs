@@ -8,6 +8,13 @@ public class CategoryCreateDto
 }
 
 
+public class CategoryUpdateDto
+{
+    public string? Title { get; set; }
+    public string? Slug { get; set; }
+}
+
+
 public class CategoryResponseDto
 {
     public Guid Id { get; set; }

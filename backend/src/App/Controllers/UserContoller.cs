@@ -20,6 +20,7 @@ public class UserContoller : ControllerBase{
     [Authorize(Roles = "Admin")]
     [HttpGet("users/all")]
     [ProducesResponseType(200)]
+    [ProducesResponseType(401)]
     public async Task<IActionResult> GetAllUsersNotAdmin()
     {
         var users = await _userService.GetAllUsersNotAdmin();
@@ -31,6 +32,7 @@ public class UserContoller : ControllerBase{
     [HttpGet("{userId:guid}")]
     [ProducesResponseType(200)]
     [ProducesResponseType(404)]
+    [ProducesResponseType(401)]
     public async Task<IActionResult> GetUserProfile(Guid userId)
     {
         var user = await _userService.GetUserProfile(userId);
@@ -41,6 +43,7 @@ public class UserContoller : ControllerBase{
     [Authorize]
     [HttpPut("{userId:guid}")]
     [ProducesResponseType(200)]
+    [ProducesResponseType(401)]
     [ProducesResponseType(404)]
     public async Task<IActionResult> UpdateUserProfile(Guid userId, UserUpdateDto userUpdateDto)
     {

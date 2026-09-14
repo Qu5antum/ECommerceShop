@@ -84,6 +84,8 @@ public class UserService : IUserService
             user.Password = BCrypt.Net.BCrypt.HashPassword(userUpdateDto.Password);
         }
 
+        user.UpdatedAt = DateTime.UtcNow;
+
         await _repository.UpdateAsync(user);
 
         _logger.LogInformation("User successfully updated");

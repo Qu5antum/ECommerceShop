@@ -12,6 +12,8 @@ public interface ICategoryService
     Task<CategoryResponseDto> CreateCategoryAsync(CategoryCreateDto categoryCreateDto);
     Task<List<CategoryResponseDto>> GetAllCategoriesAsync();
     Task<CategoryResponseDto> GetCategoryByIdAsync(Guid categoryId);
+    Task<bool> UpdateCategoryByIdAsync(Guid categoryId, CategoryUpdateDto categoryUpdateDto);
+    Task<bool> DeleteCategoryByIdAsync(Guid categoryId);
 }
 
 
@@ -86,6 +88,51 @@ public class CategoryService : ICategoryService
             CreatedAt = category.CreatedAt,
             UpdatedAt = category.UpdatedAt
         }).ToList();
+    }
+
+    public async Task<bool> UpdateCategoryByIdAsync(Guid categoryId, CategoryUpdateDto categoryUpdateDto)
+    {
+        var category = await _repository.GetByIdAsync(categoryId);
+
+        if (category == null)
+        {
+            _logger.LogWarning("Category not found by id: {categoryId}", categoryId);
+            throw new NotFoundException("Category not found");
+        }
+
+        if (categoryUpdateDto.Title != null)
+        {
+            category.Title = categoryUpdateDto.Title;
+        }
+        if (categoryUpdateDto.Slug != null)
+        {
+            category.Slug = categoryUpdateDto.Slug;
+        }
+
+        category.UpdatedAt = DateTime.UtcNow;
+
+        await _repository.UpdateAsync(category);
+
+        _logger.LogInformation("Category successfully updated: {categoryId}", categoryId);
+
+        return true;
+    }
+
+    public async Task<bool> DeleteCategoryByIdAsync(Guid categoryId)
+    {
+        var category = await _repository.GetByIdAsync(categoryId);
+
+        if (category == null)
+        {
+            _logger.LogWarning("Category not found by id: {categoryId}", categoryId);
+            throw new NotFoundException("Category not found");
+        }
+
+        await _repository.DeleteAsync(category);
+
+        _logger.LogInformation("Category successfully updated: {categoryId}", categoryId);
+
+        return true;
     }
 
     public async Task<CategoryResponseDto> GetCategoryByIdAsync(Guid categoryId)

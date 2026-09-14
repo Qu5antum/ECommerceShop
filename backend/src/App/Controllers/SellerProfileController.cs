@@ -36,9 +36,20 @@ public class SellerProfileController : ControllerBase
     [ProducesResponseType(200)]
     [ProducesResponseType(400)]
     [ProducesResponseType(401)]
-    public async Task<IActionResult> GetUserSellerProfile()
+    public async Task<IActionResult> GetCurrentUserSellerProfile()
     {
         Guid userId = _helper.GetUserId();
+        var sellerProfile = await _service.GetUserSellerProfileAsync(userId);
+
+        return Ok(sellerProfile);
+    }
+
+    [HttpGet("{userId:guid}")]
+    [ProducesResponseType(200)]
+    [ProducesResponseType(400)]
+    [ProducesResponseType(401)]
+    public async Task<IActionResult> GetUserSellerProfile(Guid userId)
+    {
         var sellerProfile = await _service.GetUserSellerProfileAsync(userId);
 
         return Ok(sellerProfile);
