@@ -5,28 +5,28 @@ using App.Repositories;
 namespace App.Services;
 
 
-public interface IHelper
+public interface IHelperService
 {
     Task<User> GetUserOr404(Guid userId);
     Task<SellerProfile> GetSellerProfileOr404(Guid profileId);
     Task<Category> GetCategoryOr404(Guid categoryId);
     Task<Product> GetProductOr404(Guid productId);
 }
-public class Helper : IHelper
+public class HelperService : IHelperService
 {
     private readonly IUserRepository _userRepository;
     private readonly ICategoryRepsitory _categoryRepository;
     private readonly ISellerProfileRepository _sellerProfileRepository;
     private readonly IProductRepository _productRepository;
-    private readonly ILogger<Helper> _logger;
+    private readonly ILogger<HelperService> _logger;
 
-    public Helper
+    public HelperService
     (
         IUserRepository userRepository,
         ICategoryRepsitory categoryRepsitory,
         ISellerProfileRepository sellerProfileRepository,
         IProductRepository productRepository,
-        ILogger<Helper> logger
+        ILogger<HelperService> logger
     )
     {
         _userRepository = userRepository;

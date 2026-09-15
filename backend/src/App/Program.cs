@@ -84,11 +84,15 @@ builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<ICategoryService, CategoryService>();
 builder.Services.AddScoped<ISellerProfileService, SellerProfileService>();
+builder.Services.AddScoped<IFileStorageService, FileStorageService>();
+builder.Services.AddScoped<IProductService, ProductService>();
+builder.Services.AddScoped<IHelperService, HelperService>();
 
 // Repositories
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<ICategoryRepsitory, CategoryRepository>();
 builder.Services.AddScoped<ISellerProfileRepository, SellerProfileRepository>();
+builder.Services.AddScoped<IProductRepository, ProductRepository>();
 
 builder.Services.AddHttpContextAccessor(); 
 builder.Services.AddScoped<Helper>();

@@ -1,5 +1,4 @@
 using App.DTOs;
-using App.Exceptions;
 using App.Repositories;
 
 namespace App.Services;
@@ -16,22 +15,18 @@ public class UserService : IUserService
 {
     private readonly IUserRepository _repository;
     private readonly ILogger<UserService> _logger;
+    private readonly IHelperService _helper;
 
-    public UserService(IUserRepository repository, ILogger<UserService> logger)
+    public UserService(IUserRepository repository, ILogger<UserService> logger, IHelperService helper)
     {
         _repository = repository;
         _logger = logger;
+        _helper = helper;
     }
 
     public async Task<UserProfileResponseDto> GetUserProfile(Guid userId)
     {
-        var user = await _repository.GetByIdAsync(userId);
-
-        if (user is null)
-        {
-            _logger.LogWarning("User not found by id: {userId}", userId);
-            throw new NotFoundException("User not found");
-        }
+        var user = await _helper.GetUserOr404(userId);
 
         _logger.LogInformation("Successful response of user profile: {userId}", userId);
 
@@ -63,13 +58,7 @@ public class UserService : IUserService
 
     public async Task<bool> UpdateUserProfile(Guid userId, UserUpdateDto userUpdateDto)
     {
-        var user = await _repository.GetByIdAsync(userId);
-
-        if (user is null)
-        {
-            _logger.LogWarning("User not found by id: {userId}", userId);
-            throw new NotFoundException("User not found");
-        }
+        var user = await _helper.GetUserOr404(userId);
 
         if (userUpdateDto.UserName != null)
         {

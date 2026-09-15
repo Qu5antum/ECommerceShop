@@ -1,16 +1,20 @@
+using Microsoft.AspNetCore.StaticFiles;
+
 namespace App.Services;
 
 public interface IFileStorageService
 {
     Task<string> UploadFileAsync(IFormFile file);
     Task<bool> DeleteFileAsync(string fileUrl);
+    Task<(Stream FileStream, string ContentType)?> GetFileAsync(string fileUrl);
 }
 
 public class FileStorageService : IFileStorageService
 {
     private readonly IWebHostEnvironment _environment;
+    private readonly FileExtensionContentTypeProvider _contentTypeProvider;
 
-    private static readonly string ImageFolder = Path.Combine(AppContext.BaseDirectory, "backend", "images");
+    private const string ImageFolder = "images";
 
     private static readonly string[] AllowedExtensions =
     {
@@ -20,10 +24,12 @@ public class FileStorageService : IFileStorageService
         ".webp"
     };
 
-    private const long MaxFileSize = 5 * 1024 * 1024; 
+    private const long MaxFileSize = 5 * 1024 * 1024;
+
     public FileStorageService(IWebHostEnvironment environment)
     {
         _environment = environment;
+        _contentTypeProvider = new FileExtensionContentTypeProvider();
     }
 
     public async Task<string> UploadFileAsync(IFormFile file)
@@ -91,5 +97,38 @@ public class FileStorageService : IFileStorageService
         File.Delete(physicalPath);
 
         return Task.FromResult(true);
+    }
+
+    public Task<(Stream FileStream, string ContentType)?> GetFileAsync(string fileUrl)
+    {
+        if (string.IsNullOrWhiteSpace(fileUrl))
+        {
+            return Task.FromResult<(Stream, string)?>(null);
+        }
+
+        var relativePath = fileUrl.TrimStart('/');
+
+        var physicalPath = Path.Combine( _environment.WebRootPath, relativePath);
+
+        if (!File.Exists(physicalPath))
+        {
+            return Task.FromResult<(Stream, string)?>(null);
+        }
+
+        if (!_contentTypeProvider.TryGetContentType(physicalPath, out var contentType))
+        {
+            contentType = "application/octet-stream";
+        }
+
+        Stream fileStream = new FileStream(
+            physicalPath,
+            FileMode.Open,
+            FileAccess.Read,
+            FileShare.Read,
+            bufferSize: 4096,
+            useAsync: true
+        );
+
+        return Task.FromResult<(Stream, string)?>((fileStream, contentType));
     }
 }

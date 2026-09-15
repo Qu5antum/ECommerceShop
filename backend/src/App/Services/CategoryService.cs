@@ -21,9 +21,9 @@ public class CategoryService : ICategoryService
 {
     private readonly ICategoryRepsitory _repository;
     private readonly ILogger<CategoryService> _logger;
-    private readonly IHelper _helper;
+    private readonly IHelperService _helper;
 
-    public CategoryService(ICategoryRepsitory repsitory, ILogger<CategoryService> logger, IHelper helper)
+    public CategoryService(ICategoryRepsitory repsitory, ILogger<CategoryService> logger, IHelperService helper)
     {
         _repository = repsitory;
         _logger = logger;

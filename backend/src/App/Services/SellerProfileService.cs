@@ -21,9 +21,9 @@ public class SellerProfileService : ISellerProfileService
     private readonly ISellerProfileRepository _profileRepository;
     private readonly IUserRepository _userRepository;
     private readonly ILogger<SellerProfileService> _logger;
-    private readonly IHelper _helper;
+    private readonly IHelperService _helper;
 
-    public SellerProfileService(ISellerProfileRepository profileRepository, IUserRepository userRepository, ILogger<SellerProfileService> logger, IHelper helper)
+    public SellerProfileService(ISellerProfileRepository profileRepository, IUserRepository userRepository, ILogger<SellerProfileService> logger, IHelperService helper)
     {
         _profileRepository = profileRepository;
         _userRepository = userRepository;

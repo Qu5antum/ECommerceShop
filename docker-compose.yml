@@ -18,6 +18,9 @@ services:
       Jwt__Issuer: "EcommerceApi"
       Jwt__Audience: "EcommerceClient"
 
+    volumes:
+      - ./backend/src/App/wwwroot/images:/app/src/App/wwwroot/images
+
   shop.database:
     image: postgres:18
     container_name: shop.database

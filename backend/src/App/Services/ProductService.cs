@@ -9,11 +9,12 @@ namespace App.Services;
 
 public interface IProductService
 {
-    Task<ProductResponseDto> CreateProductAsync(Guid userId, Guid categoryId, ProductCreateDto productCreateDto);
-    Task<bool> UpdateProductAsync(Guid userId, Guid categoryId, Guid productId, ProductUpdateDto productUpdateDto);
+    Task<ProductResponseDto> CreateProductAsync(Guid userId, ProductCreateDto productCreateDto);
+    Task<bool> UpdateProductAsync(Guid userId, Guid productId, ProductUpdateDto productUpdateDto);
     Task<bool> DeleteProductAsync(Guid userId, Guid productId);
     Task<ProductResponseDto> GetProductByIdAsync(Guid productId);
     Task<List<ProductResponseDto>> GetProductsAsync();
+    Task<(Stream FileStream, string ContentType)?> GetProductImageAsync(Guid productId);
 }
 
 
@@ -23,7 +24,7 @@ public class ProductService : IProductService
     private readonly ISellerProfileRepository _profileRepository;
     private readonly IFileStorageService _fileService;
     private readonly ILogger<ProductService> _logger;
-    private readonly IHelper _helper;
+    private readonly IHelperService _helper;
 
     public ProductService
     (
@@ -31,7 +32,7 @@ public class ProductService : IProductService
         ISellerProfileRepository profileRepository,
         IFileStorageService fileService,
         ILogger<ProductService> logger,
-        IHelper helper
+        IHelperService helper
     )
     {
         _productRepository = productRepository;
@@ -41,13 +42,13 @@ public class ProductService : IProductService
         _helper = helper;
     }
 
-    public async Task<ProductResponseDto> CreateProductAsync(Guid userId, Guid categoryId, ProductCreateDto productCreateDto)
+    public async Task<ProductResponseDto> CreateProductAsync(Guid userId, ProductCreateDto productCreateDto)
     {
         string? ImageUrl = null;
 
         await _helper.GetUserOr404(userId);
 
-        await _helper.GetCategoryOr404(categoryId);
+        await _helper.GetCategoryOr404(productCreateDto.categoryId);
 
         var sellerProfile = await _profileRepository.GetSellerProfileByUserIdAsync(userId);
 
@@ -57,13 +58,13 @@ public class ProductService : IProductService
             throw new NotFoundException("Seller profile not found, you can't add product");
         }
 
-        if (productCreateDto.Image != null && productCreateDto.Image.Length > 0)
-        {
-            ImageUrl = await _fileService.UploadFileAsync(productCreateDto.Image);
-        }
-
         try
         {
+            if (productCreateDto.Image != null && productCreateDto.Image.Length > 0)
+            {
+                ImageUrl = await _fileService.UploadFileAsync(productCreateDto.Image);
+            }
+
             var newProduct = new Product
             {
                 Name = productCreateDto.Name,
@@ -73,7 +74,7 @@ public class ProductService : IProductService
                 Stock = productCreateDto.Stock,
                 ImageUrl = ImageUrl,
                 SellerProfileId = sellerProfile.Id,
-                CategoryId = categoryId
+                CategoryId = productCreateDto.categoryId
             };
 
             await _productRepository.CreateAsync(newProduct);
@@ -90,24 +91,38 @@ public class ProductService : IProductService
                 Price = newProduct.Price,
                 SKU = newProduct.SKU,
                 Stock = newProduct.Stock,
+                ImageUrl = newProduct.ImageUrl,
                 CreatedAt = newProduct.CreatedAt,
                 UpdatedAt = newProduct.UpdatedAt
             };
         }
         catch (DbUpdateException ex)
         {
-            _logger.LogError(ex, "A database error occurred while creating the product.");
+            if (ImageUrl != null)
+            {
+                await _fileService.DeleteFileAsync(ImageUrl);
+            }
+
+           _logger.LogError(
+                ex,
+                "Database error while creating product. Inner exception: {Message}",
+                ex.InnerException?.Message
+            );
+
             throw new DatabaseException("Could not save the product to the database.");
         }
     }
 
-    public async Task<bool> UpdateProductAsync(Guid userId, Guid categoryId, Guid productId, ProductUpdateDto productUpdateDto)
+    public async Task<bool> UpdateProductAsync(Guid userId, Guid productId, ProductUpdateDto productUpdateDto)
     {
-        string? ImageUrl = null;
+        string? newImageUrl = null;
 
         await _helper.GetUserOr404(userId);
-
-        await _helper.GetCategoryOr404(categoryId);
+        
+        if (productUpdateDto.categoryId.HasValue)
+        {
+            await _helper.GetCategoryOr404(productUpdateDto.categoryId.Value);
+        }
 
         var sellerProfile = await _profileRepository.GetSellerProfileByUserIdAsync(userId);
 
@@ -125,53 +140,68 @@ public class ProductService : IProductService
             throw new BadRequestException("Product does not belong to seller");
         }
 
-        if (productUpdateDto.Name != null)
-        {
-            product.Name = productUpdateDto.Name;
-        }
-        if (productUpdateDto.Description != null)
-        {
-            product.Description = productUpdateDto.Description;
-        }
-        if (productUpdateDto.Price.HasValue)
-        {
-            product.Price = productUpdateDto.Price.Value;
-        }
-        if (productUpdateDto.SKU != null)
-        {
-            product.SKU = productUpdateDto.SKU;
-        }
-        if (productUpdateDto.Stock.HasValue)
-        {
-            product.Stock = productUpdateDto.Stock.Value;
-        }
+        string? oldImageUrl = product.ImageUrl;
 
-        if (productUpdateDto.Image != null && productUpdateDto.Image.Length > 0 && product.ImageUrl != null)
-        {
-            var isFileDeleted = await _fileService.DeleteFileAsync(product.ImageUrl);
-
-            if (!isFileDeleted)
+        try{
+            if (productUpdateDto.Image != null && productUpdateDto.Image.Length > 0)
             {
-                _logger.LogWarning("File url not found");
-                throw new NotFoundException("File url not found");
+                newImageUrl = await _fileService.UploadFileAsync(productUpdateDto.Image);
+
+                product.ImageUrl = newImageUrl;
             }
 
-            ImageUrl = await _fileService.UploadFileAsync(productUpdateDto.Image);
-        }
+            if (productUpdateDto.Name != null)
+            {
+                product.Name = productUpdateDto.Name;
+            }
+            if (productUpdateDto.Description != null)
+            {
+                product.Description = productUpdateDto.Description;
+            }
+            if (productUpdateDto.Price.HasValue)
+            {
+                product.Price = productUpdateDto.Price.Value;
+            }
+            if (productUpdateDto.SKU != null)
+            {
+                product.SKU = productUpdateDto.SKU;
+            }
+            if (productUpdateDto.Stock.HasValue)
+            {
+                product.Stock = productUpdateDto.Stock.Value;
+            }
+            
+            product.UpdatedAt = DateTime.UtcNow;
 
-        else if (productUpdateDto.Image != null && productUpdateDto.Image.Length > 0 && product.ImageUrl == null)
+            await _productRepository.UpdateAsync(product);
+
+            if (newImageUrl != null && oldImageUrl != null)
+            {
+                await _fileService.DeleteFileAsync(oldImageUrl);
+            }
+
+            _logger.LogInformation("Product successfully updated");
+
+            return true;
+        }
+        catch (DbUpdateException ex)
         {
-            ImageUrl = await _fileService.UploadFileAsync(productUpdateDto.Image);
+            if (newImageUrl != null)
+            {
+                await _fileService.DeleteFileAsync(newImageUrl);
+            }
+
+            _logger.LogError(
+                ex,
+                "Database error while updating product {ProductId}. Inner exception: {Message}",
+                productId,
+                ex.InnerException?.Message
+            );
+
+            throw new DatabaseException(
+                "Could not update the product to the database."
+            );
         }
-        
-        product.ImageUrl = ImageUrl;
-        product.UpdatedAt = DateTime.UtcNow;
-
-        await _productRepository.UpdateAsync(product);
-
-        _logger.LogInformation("Product successfully updated");
-
-        return true;
     }
 
     public async Task<bool> DeleteProductAsync(Guid userId, Guid productId)
@@ -196,13 +226,7 @@ public class ProductService : IProductService
 
         if (product.ImageUrl != null)
         {
-            var isFileDeleted = await _fileService.DeleteFileAsync(product.ImageUrl);
-
-            if (!isFileDeleted)
-            {
-                _logger.LogWarning("File url not found");
-                throw new NotFoundException("File url not found");
-            }
+            await _fileService.DeleteFileAsync(product.ImageUrl);
         }
 
         await _productRepository.DeleteAsync(product);
@@ -228,6 +252,7 @@ public class ProductService : IProductService
             Price = product.Price,
             SKU = product.SKU,
             Stock = product.Stock,
+            ImageUrl = product.ImageUrl,
             CreatedAt = product.CreatedAt,
             UpdatedAt = product.UpdatedAt
         };
@@ -249,8 +274,21 @@ public class ProductService : IProductService
             Price = product.Price,
             SKU = product.SKU,
             Stock = product.Stock,
+            ImageUrl = product.ImageUrl,
             CreatedAt = product.CreatedAt,
             UpdatedAt = product.UpdatedAt
         }).ToList();
+    }
+
+    public async Task<(Stream FileStream, string ContentType)?> GetProductImageAsync(Guid productId)
+    {
+        var product = await _helper.GetProductOr404(productId);
+
+        if (string.IsNullOrWhiteSpace(product.ImageUrl))
+        {
+            return null;
+        }
+
+        return await _fileService.GetFileAsync(product.ImageUrl);
     }
 }
