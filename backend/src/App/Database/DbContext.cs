@@ -98,21 +98,21 @@ public class AppDbContext : DbContext
                 .IsRequired();
 
             // Product -> Seller
-            entity.HasOne(x => x.Seller)
-                .WithMany()
-                .HasForeignKey(x => x.SellerId)
+            entity.HasOne(x => x.SellerProfile)
+                .WithMany(x => x.Products)
+                .HasForeignKey(x => x.SellerProfileId)
                 .OnDelete(DeleteBehavior.Restrict);
 
             // Product -> Category
             entity.HasOne(x => x.Category)
-                .WithMany()
+                .WithMany(x => x.Products)
                 .HasForeignKey(x => x.CategoryId)
                 .OnDelete(DeleteBehavior.Restrict);
 
             entity.HasIndex(x => x.SKU)
                 .IsUnique();
 
-            entity.HasIndex(x => x.SellerId);
+            entity.HasIndex(x => x.SellerProfileId);
             entity.HasIndex(x => x.CategoryId);
         });
 

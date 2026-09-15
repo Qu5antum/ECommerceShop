@@ -95,7 +95,7 @@ builder.Services.AddScoped<Helper>();
 
 var app = builder.Build();
 
-
+app.UseStaticFiles();
 app.UseSwagger();
 app.UseSwaggerUI();
 
