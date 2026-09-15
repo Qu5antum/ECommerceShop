@@ -148,7 +148,14 @@ public class ProductService : IProductService
 
         if (productUpdateDto.Image != null && productUpdateDto.Image.Length > 0 && product.ImageUrl != null)
         {
-            await _fileService.DeleteFileAsync(product.ImageUrl);
+            var isFileDeleted = await _fileService.DeleteFileAsync(product.ImageUrl);
+
+            if (!isFileDeleted)
+            {
+                _logger.LogWarning("File url not found");
+                throw new NotFoundException("File url not found");
+            }
+
             ImageUrl = await _fileService.UploadFileAsync(productUpdateDto.Image);
         }
 
@@ -185,6 +192,17 @@ public class ProductService : IProductService
         {
             _logger.LogWarning("Product does not belong to this seller profile: profile ID: {profileId}, product ID: {productId}", sellerProfile.Id, productId);
             throw new BadRequestException("Product does not belong to seller");
+        }
+
+        if (product.ImageUrl != null)
+        {
+            var isFileDeleted = await _fileService.DeleteFileAsync(product.ImageUrl);
+
+            if (!isFileDeleted)
+            {
+                _logger.LogWarning("File url not found");
+                throw new NotFoundException("File url not found");
+            }
         }
 
         await _productRepository.DeleteAsync(product);
