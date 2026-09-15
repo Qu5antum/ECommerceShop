@@ -21,11 +21,13 @@ public class CategoryService : ICategoryService
 {
     private readonly ICategoryRepsitory _repository;
     private readonly ILogger<CategoryService> _logger;
+    private readonly IHelper _helper;
 
-    public CategoryService(ICategoryRepsitory repsitory, ILogger<CategoryService> logger)
+    public CategoryService(ICategoryRepsitory repsitory, ILogger<CategoryService> logger, IHelper helper)
     {
         _repository = repsitory;
         _logger = logger;
+        _helper = helper;
     }
 
     public async Task<CategoryResponseDto> CreateCategoryAsync(CategoryCreateDto categoryCreateDto)
@@ -92,13 +94,7 @@ public class CategoryService : ICategoryService
 
     public async Task<bool> UpdateCategoryByIdAsync(Guid categoryId, CategoryUpdateDto categoryUpdateDto)
     {
-        var category = await _repository.GetByIdAsync(categoryId);
-
-        if (category == null)
-        {
-            _logger.LogWarning("Category not found by id: {categoryId}", categoryId);
-            throw new NotFoundException("Category not found");
-        }
+        var category = await _helper.GetCategoryOr404(categoryId);
 
         if (categoryUpdateDto.Title != null)
         {
@@ -120,13 +116,7 @@ public class CategoryService : ICategoryService
 
     public async Task<bool> DeleteCategoryByIdAsync(Guid categoryId)
     {
-        var category = await _repository.GetByIdAsync(categoryId);
-
-        if (category == null)
-        {
-            _logger.LogWarning("Category not found by id: {categoryId}", categoryId);
-            throw new NotFoundException("Category not found");
-        }
+        var category = await _helper.GetCategoryOr404(categoryId);
 
         await _repository.DeleteAsync(category);
 
@@ -137,13 +127,7 @@ public class CategoryService : ICategoryService
 
     public async Task<CategoryResponseDto> GetCategoryByIdAsync(Guid categoryId)
     {
-        var category = await _repository.GetByIdAsync(categoryId);
-
-        if (category == null)
-        {
-            _logger.LogWarning("Category not found by this id: {categoryId}", categoryId);
-            throw new NotFoundException("Category not found by id");
-        }
+        var category = await _helper.GetCategoryOr404(categoryId);
 
         return new CategoryResponseDto
         {

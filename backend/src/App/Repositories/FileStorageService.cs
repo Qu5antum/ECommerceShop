@@ -10,7 +10,7 @@ public class FileStorageService : IFileStorageService
 {
     private readonly IWebHostEnvironment _environment;
 
-    private const string ImageFolder = "images";
+    private static readonly string ImageFolder = Path.Combine(AppContext.BaseDirectory, "backend", "images");
 
     private static readonly string[] AllowedExtensions =
     {

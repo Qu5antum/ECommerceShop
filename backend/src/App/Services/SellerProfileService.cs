@@ -21,23 +21,19 @@ public class SellerProfileService : ISellerProfileService
     private readonly ISellerProfileRepository _profileRepository;
     private readonly IUserRepository _userRepository;
     private readonly ILogger<SellerProfileService> _logger;
+    private readonly IHelper _helper;
 
-    public SellerProfileService(ISellerProfileRepository profileRepository, IUserRepository userRepository, ILogger<SellerProfileService> logger)
+    public SellerProfileService(ISellerProfileRepository profileRepository, IUserRepository userRepository, ILogger<SellerProfileService> logger, IHelper helper)
     {
         _profileRepository = profileRepository;
         _userRepository = userRepository;
         _logger = logger;
+        _helper = helper;
     }
 
     public async Task<SellerProfileResponseDto> CreateSellerProfileAsync(Guid currentUserId, SellerProfileCreateDto profileCreateDto)
     {
-        var user = await _userRepository.GetByIdAsync(currentUserId);
-
-        if (user == null)
-        {
-            _logger.LogWarning("User Not Found by id: {userId}", currentUserId);
-            throw new NotFoundException("User not found");
-        }
+        var user = await _helper.GetUserOr404(currentUserId);
 
         var sellerProfileOfUser = await _profileRepository.GetSellerProfileByUserIdAsync(currentUserId);
 
@@ -88,13 +84,7 @@ public class SellerProfileService : ISellerProfileService
 
     public async Task<bool> UpdateSellerProfileAsync(Guid userId, Guid profileId, SellerProfileUpdateDto profileUpdateDto)
     {
-        var user = await _userRepository.GetByIdAsync(userId);
-
-        if (user == null)
-        {
-            _logger.LogWarning("User not found by id: {userId}", userId);
-            throw new NotFoundException("User not found");
-        }
+        await _helper.GetUserOr404(userId);
 
         var sellerProfile = await _profileRepository.GetByIdAsync(profileId);
 
@@ -122,13 +112,7 @@ public class SellerProfileService : ISellerProfileService
 
     public async Task<SellerProfileResponseDto> GetUserSellerProfileAsync(Guid userId)
     {
-        var user = await _userRepository.GetByIdAsync(userId);
-
-        if (user == null)
-        {
-            _logger.LogWarning("User Not Found by id: {userId}", userId);
-            throw new NotFoundException("User not found");
-        }
+        await _helper.GetUserOr404(userId);
         
         var sellerProfile = await _profileRepository.GetSellerProfileByUserIdAsync(userId);
 
