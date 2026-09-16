@@ -17,3 +17,9 @@ public class CartItemResponseDto
     public DateTime CreatedAt { get; set; }
     public DateTime? UpdatedAt { get; set; }
 }
+
+
+public class CartItemUpdateDto
+{
+    public int Quantity { get; set; }
+}

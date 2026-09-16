@@ -35,6 +35,20 @@ public class CartItemController : ControllerBase
     }
 
     [Authorize]
+    [HttpPut("{itemId:guid}")]
+    [ProducesResponseType(200)]
+    [ProducesResponseType(401)]
+    [ProducesResponseType(404)]
+    public async Task<IActionResult> UpdateCartItem(Guid itemId, CartItemUpdateDto itemUpdateDto)
+    {
+        Guid userId = _helper.GetUserId();
+
+        await _itemService.UpdateCartItemAsync(userId, itemId, itemUpdateDto);
+
+        return Ok("Cart item successfully updated");
+    }
+
+    [Authorize]
     [HttpDelete("{itemId:guid}")]
     [ProducesResponseType(200)]
     [ProducesResponseType(401)]
@@ -49,7 +63,7 @@ public class CartItemController : ControllerBase
     }
 
     [Authorize]
-    [HttpGet]
+    [HttpGet("all")]
     [ProducesResponseType(200)]
     [ProducesResponseType(401)]
     [ProducesResponseType(404)]

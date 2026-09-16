@@ -200,9 +200,7 @@ public class ProductService : IProductService
                 ex.InnerException?.Message
             );
 
-            throw new DatabaseException(
-                "Could not update the product to the database."
-            );
+            throw new DatabaseException("Could not update the product to the database.");
         }
     }
 
