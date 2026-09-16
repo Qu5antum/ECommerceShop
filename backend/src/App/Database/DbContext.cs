@@ -160,9 +160,6 @@ public class AppDbContext : DbContext
 
         modelBuilder.Entity<CartItem>(entity =>
         {
-            entity.Property(i => i.Price)
-                  .HasPrecision(18, 2);
-
             entity.HasIndex(i => i.ProductId);
         });
     }

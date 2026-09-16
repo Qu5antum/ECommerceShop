@@ -87,12 +87,15 @@ builder.Services.AddScoped<ISellerProfileService, SellerProfileService>();
 builder.Services.AddScoped<IFileStorageService, FileStorageService>();
 builder.Services.AddScoped<IProductService, ProductService>();
 builder.Services.AddScoped<IHelperService, HelperService>();
+builder.Services.AddScoped<ICartService, CartService>();
 
 // Repositories
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<ICategoryRepsitory, CategoryRepository>();
 builder.Services.AddScoped<ISellerProfileRepository, SellerProfileRepository>();
 builder.Services.AddScoped<IProductRepository, ProductRepository>();
+builder.Services.AddScoped<ICartRepository, CartRepository>();
+builder.Services.AddScoped<ICartItemsRepository, CartItemsRepository>();
 
 builder.Services.AddHttpContextAccessor(); 
 builder.Services.AddScoped<Helper>();
