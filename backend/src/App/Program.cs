@@ -88,6 +88,7 @@ builder.Services.AddScoped<IFileStorageService, FileStorageService>();
 builder.Services.AddScoped<IProductService, ProductService>();
 builder.Services.AddScoped<IHelperService, HelperService>();
 builder.Services.AddScoped<ICartService, CartService>();
+builder.Services.AddScoped<ICartItemService, CartItemService>();
 
 // Repositories
 builder.Services.AddScoped<IUserRepository, UserRepository>();

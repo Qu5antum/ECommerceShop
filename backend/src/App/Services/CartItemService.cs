@@ -2,7 +2,6 @@ using App.DTOs;
 using App.Exceptions;
 using App.Models;
 using App.Repositories;
-using Microsoft.AspNetCore.Http.Features;
 using Microsoft.EntityFrameworkCore;
 
 namespace App.Services;
@@ -13,20 +12,23 @@ public interface ICartItemService
     Task<CartItemResponseDto> CreateCartItemAsync(Guid userId, CartItemCreateDto itemCreateDto);
     Task<bool> DeleteItemFromCartAsync(Guid userId, Guid itemId);
     Task<List<CartItemResponseDto>> GetAllItemsInCartAsync(Guid userId);
+    Task<CartItemResponseDto> GetItemInCartByIdAsync(Guid userId, Guid itemId);
 }
 
-
+// TODO: add update cart item method
 public class CartItemService : ICartItemService
 {
     private readonly ICartItemRepository _itemRepository;
     private readonly ICartRepository _cartRepository;
+    private readonly IProductRepository _productRepository;
     private readonly ILogger<CartItemService> _logger;
     private readonly IHelperService _helper;
 
-    public CartItemService(ICartItemRepository itemRepository, ICartRepository cartRepository, ILogger<CartItemService> logger, IHelperService helper)
+    public CartItemService(ICartItemRepository itemRepository, ICartRepository cartRepository, IProductRepository productRepository, ILogger<CartItemService> logger, IHelperService helper)
     {
         _itemRepository = itemRepository;
         _cartRepository = cartRepository;
+        _productRepository = productRepository;
         _logger = logger;
         _helper = helper;
     }
@@ -35,7 +37,7 @@ public class CartItemService : ICartItemService
     {
         await _helper.GetUserOr404(userId);
 
-        await _helper.GetProductOr404(itemCreateDto.ProductId);
+        var product = await _helper.GetProductOr404(itemCreateDto.ProductId);
 
         var cartId = await _cartRepository.GetCartIdByUserId(userId);
 
@@ -43,6 +45,18 @@ public class CartItemService : ICartItemService
         {
             _logger.LogWarning("Cart not found by this id: {cartId}", cartId);
             throw new NotFoundException("Cart not found");
+        }
+
+        if (itemCreateDto.Quantity <= 0)
+        {
+            _logger.LogWarning("Quantity can't be negative or zero");
+            throw new BadRequestException("Quantity can't be negative or zero");
+        }
+
+        if (product.Stock < itemCreateDto.Quantity)
+        {
+            _logger.LogWarning("Product stock is less than quantity, product ID: {productId}", itemCreateDto.ProductId);
+            throw new BadRequestException("Product stock is less than quantity");
         }
 
         try
@@ -53,6 +67,12 @@ public class CartItemService : ICartItemService
                 ProductId = itemCreateDto.ProductId,
                 Quantity = itemCreateDto.Quantity,
             };
+
+            product.Stock -= itemCreateDto.Quantity;
+
+            await _productRepository.UpdateAsync(product);
+
+            _logger.LogInformation("Product stock updated, product stock: {productId}", itemCreateDto.ProductId);
 
             await _itemRepository.CreateAsync(newItem);
 
@@ -92,6 +112,14 @@ public class CartItemService : ICartItemService
             throw new BadRequestException("Cart item does not belong to user");
         }
 
+        var product = await _helper.GetProductOr404(cartItem.ProductId);
+
+        product.Stock += cartItem.Quantity;
+
+        await _productRepository.UpdateAsync(product);
+
+        _logger.LogInformation("Product stock updated, product stock: {productId}", cartItem.ProductId);
+
         await _itemRepository.DeleteAsync(cartItem);
 
         _logger.LogInformation("Item successfully delete from cart, cart ID: {cartId}, item ID: {itemId}", cartId, itemId);
@@ -119,6 +147,34 @@ public class CartItemService : ICartItemService
             ProductId = item.ProductId,
             Quantity = item.Quantity
         }).ToList();
+    }
+
+    public async Task<CartItemResponseDto> GetItemInCartByIdAsync(Guid userId, Guid itemId)
+    {
+        await _helper.GetUserOr404(userId);
+
+        var cartId = await _cartRepository.GetCartIdByUserId(userId);
+
+        if (cartId == null || cartId == Guid.Empty)
+        {
+            _logger.LogWarning("Cart not found by this id: {cartId}", cartId);
+            throw new NotFoundException("Cart not found");
+        }
+
+        var cartItem = await _helper.GetCartItemOr404(itemId);
+
+        if (cartItem.CartId != cartId)
+        {
+            _logger.LogWarning("Cart item does not belong to user, user ID: {userId}, Cart item ID: {itemId}", userId, itemId);
+            throw new BadRequestException("Cart item does not belong to user");
+        }
+
+        return new CartItemResponseDto
+        {
+            CartId = cartItem.CartId,
+            ProductId = cartItem.ProductId,
+            Quantity = cartItem.Quantity
+        };
     }
 }
 
