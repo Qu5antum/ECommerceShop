@@ -7,7 +7,8 @@ namespace App.Repositories;
 
 public interface ICartRepository : IBaseRepository<Cart>
 {
-    Task<Cart?> GetCartByUserIdAsync(Guid userId);
+    Task<Cart?> GetCartWithItemsByUserIdAsync(Guid userId);
+    Task<Guid?> GetCartIdByUserId(Guid userId);
 }
 
 
@@ -15,10 +16,19 @@ public class CartRepository(AppDbContext context) : BaseRepository<Cart>(context
 {
     private readonly AppDbContext _context = context;
 
-    public async Task<Cart?> GetCartByUserIdAsync(Guid userId)
+    public async Task<Cart?> GetCartWithItemsByUserIdAsync(Guid userId)
     {
         return await _context.Carts
             .Include(c => c.Items)
             .FirstOrDefaultAsync(c => c.UserId == userId);
+    }
+
+    public async Task<Guid?> GetCartIdByUserId(Guid userId)
+    {
+        return await _context.Carts
+            .AsNoTracking()
+            .Where(c => c.UserId == userId)
+            .Select(c => (Guid?)c.Id)
+            .FirstOrDefaultAsync();
     }
 }

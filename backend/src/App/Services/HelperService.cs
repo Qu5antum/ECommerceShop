@@ -11,6 +11,7 @@ public interface IHelperService
     Task<SellerProfile> GetSellerProfileOr404(Guid profileId);
     Task<Category> GetCategoryOr404(Guid categoryId);
     Task<Product> GetProductOr404(Guid productId);
+    Task<CartItem> GetCartItemOr404(Guid itemId);
 }
 public class HelperService : IHelperService
 {
@@ -18,6 +19,7 @@ public class HelperService : IHelperService
     private readonly ICategoryRepsitory _categoryRepository;
     private readonly ISellerProfileRepository _sellerProfileRepository;
     private readonly IProductRepository _productRepository;
+    private readonly ICartItemRepository _itemRepository;
     private readonly ILogger<HelperService> _logger;
 
     public HelperService
@@ -26,6 +28,7 @@ public class HelperService : IHelperService
         ICategoryRepsitory categoryRepsitory,
         ISellerProfileRepository sellerProfileRepository,
         IProductRepository productRepository,
+        ICartItemRepository itemRepository,
         ILogger<HelperService> logger
     )
     {
@@ -33,6 +36,7 @@ public class HelperService : IHelperService
         _categoryRepository = categoryRepsitory;
         _sellerProfileRepository = sellerProfileRepository;
         _productRepository = productRepository;
+        _itemRepository = itemRepository;
         _logger = logger;
     }
 
@@ -86,5 +90,18 @@ public class HelperService : IHelperService
         }
 
         return product;
+    }
+
+    public async Task<CartItem> GetCartItemOr404(Guid itemId)
+    {
+        var cartItem = await _itemRepository.GetByIdAsync(itemId);
+
+        if (cartItem == null)
+        {
+            _logger.LogWarning("Seller profile not found by this id: {itemId}", itemId);
+            throw new NotFoundException("Cart Item not found");
+        }
+
+        return cartItem;
     }
 }

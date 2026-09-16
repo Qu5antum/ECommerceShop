@@ -24,7 +24,7 @@ public class CartService : ICartService
 
      public async Task<CartResponseDto> GetCartAsync(Guid userId)
     {
-        var cart = await _repository.GetCartByUserIdAsync(userId);
+        var cart = await _repository.GetCartWithItemsByUserIdAsync(userId);
 
         if (cart == null)
         {

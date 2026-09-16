@@ -1,6 +1,13 @@
 namespace App.DTOs;
 
 
+public class CartItemCreateDto
+{
+    public Guid ProductId { get; set; }
+    public int Quantity { get; set; }
+}
+
+
 public class CartItemResponseDto
 {
     public Guid CartId { get; set; }
