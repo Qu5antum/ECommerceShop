@@ -15,6 +15,8 @@ public interface IProductService
     Task<ProductResponseDto> GetProductByIdAsync(Guid productId);
     Task<List<ProductResponseDto>> GetProductsAsync();
     Task<(Stream FileStream, string ContentType)?> GetProductImageAsync(Guid productId);
+    Task<List<ProductResponseDto>> GetProductsByCategoryIdAsync(Guid categoryId);
+    Task<List<ProductResponseDto>> SearchProductAsync(string productName);
 }
 
 
@@ -290,5 +292,51 @@ public class ProductService : IProductService
         }
 
         return await _fileService.GetFileAsync(product.ImageUrl);
+    }
+
+    public async Task<List<ProductResponseDto>> GetProductsByCategoryIdAsync(Guid categoryId)
+    {
+        await _helper.GetCategoryOr404(categoryId);
+    
+        var products = await _productRepository.GetProductsByCategoryIdAsync(categoryId);
+
+        _logger.LogInformation("Successfull response of products, categoryID: {categoryId}", categoryId);
+
+        return products.Select(product => new ProductResponseDto
+        {
+            Id = product.Id,
+            SellerProfileId = product.SellerProfileId,
+            CategoryId = product.CategoryId,
+            Name = product.Name,
+            Description = product.Description,
+            Price = product.Price,
+            SKU = product.SKU,
+            Stock = product.Stock,
+            ImageUrl = product.ImageUrl,
+            CreatedAt = product.CreatedAt,
+            UpdatedAt = product.UpdatedAt
+        }).ToList();
+    }
+
+    public async Task<List<ProductResponseDto>> SearchProductAsync(string productName)
+    {
+        var products = await _productRepository.SearchProductByNameAsync(productName);
+
+        _logger.LogInformation("Successfull response of products, product name: {productName}", productName);
+
+        return products.Select(product => new ProductResponseDto
+        {
+            Id = product.Id,
+            SellerProfileId = product.SellerProfileId,
+            CategoryId = product.CategoryId,
+            Name = product.Name,
+            Description = product.Description,
+            Price = product.Price,
+            SKU = product.SKU,
+            Stock = product.Stock,
+            ImageUrl = product.ImageUrl,
+            CreatedAt = product.CreatedAt,
+            UpdatedAt = product.UpdatedAt
+        }).ToList();
     }
 }

@@ -1,15 +1,39 @@
 using App.Database;
 using App.Models;
+using Microsoft.EntityFrameworkCore;
 
 namespace App.Repositories;
 
 
 public interface IProductRepository : IBaseRepository<Product>
 {
+    Task<IEnumerable<Product>> GetProductsByCategoryIdAsync(Guid categoryId);
+    Task<IEnumerable<Product>> SearchProductByNameAsync(string Name);
 }
 
 
 public class ProductRepository(AppDbContext context) : BaseRepository<Product>(context), IProductRepository
 {
     private readonly AppDbContext _context = context;
+
+    public async Task<IEnumerable<Product>> GetProductsByCategoryIdAsync(Guid categoryId)
+    {
+        return await _context.Products
+            .AsNoTracking()
+            .Where(p => p.CategoryId == categoryId)
+            .ToListAsync();
+    }
+
+    public async Task<IEnumerable<Product>> SearchProductByNameAsync(string Name)
+    {
+        if (string.IsNullOrWhiteSpace(Name))
+        {
+            return new List<Product>();
+        }
+        
+        return await _context.Products
+            .AsNoTracking()
+            .Where(p => p.Name.ToLower().Contains(Name.ToLower()))
+            .ToListAsync();
+    }
 }

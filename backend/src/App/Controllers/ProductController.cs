@@ -1,4 +1,5 @@
 using App.DTOs;
+using App.Models;
 using App.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -101,5 +102,29 @@ public class ProductController : ControllerBase
         }
 
         return File(file.Value.FileStream, file.Value.ContentType);
+    }
+
+    [Authorize]
+    [HttpGet("category/{categoryId:guid}")]
+    [ProducesResponseType(200)]
+    [ProducesResponseType(401)]
+    [ProducesResponseType(404)]
+    public async Task<IActionResult> GetProductsByCategoryId(Guid categoryId)
+    {
+        var products = await _service.GetProductsByCategoryIdAsync(categoryId);
+
+        return Ok(products);
+    }
+
+    [Authorize]
+    [HttpGet("search")]
+    [ProducesResponseType(200)]
+    [ProducesResponseType(401)]
+    [ProducesResponseType(404)]
+    public async Task<IActionResult> SearchProduct(string productName)
+    {
+        var products = await _service.SearchProductAsync(productName);
+
+        return Ok(products);
     }
 }
