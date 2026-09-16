@@ -14,6 +14,8 @@ public class AppDbContext : DbContext
     public DbSet<Category> Categories => Set<Category>();
     public DbSet<Product> Products => Set<Product>();
     public DbSet<SellerProfile> SellerProfiles => Set<SellerProfile>();
+    public DbSet<Cart> Carts => Set<Cart>();
+    public DbSet<CartItem> cartItems => Set<CartItem>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -144,6 +146,24 @@ public class AppDbContext : DbContext
 
             entity.HasIndex(x => x.StoreName)
                 .IsUnique();
+        });
+
+        modelBuilder.Entity<Cart>(entity =>
+        {
+            entity.HasIndex(c => c.UserId);
+
+            entity.HasMany(c => c.Items)
+                  .WithOne(i => i.Cart)
+                  .HasForeignKey(i => i.CartId)
+                  .OnDelete(DeleteBehavior.Cascade); 
+        });
+
+        modelBuilder.Entity<CartItem>(entity =>
+        {
+            entity.Property(i => i.Price)
+                  .HasPrecision(18, 2);
+
+            entity.HasIndex(i => i.ProductId);
         });
     }
 }
