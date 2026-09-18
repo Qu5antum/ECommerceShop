@@ -162,5 +162,26 @@ public class AppDbContext : DbContext
         {
             entity.HasIndex(i => i.ProductId);
         });
+
+        modelBuilder.Entity<Order>(entity =>
+        {
+            entity.HasIndex(o => o.userId);
+
+            entity.Property(o => o.TotalAmount)
+                .HasPrecision(18, 2);
+
+            entity.HasMany(o => o.orderItems)
+                .WithOne(i => i.Order)
+                .HasForeignKey(i => i.orderId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<OrderItem>(entity =>
+        {
+            entity.HasIndex(i => i.productId);
+
+            entity.Property(i => i.Price)
+                .HasPrecision(18, 2);
+        });
     }
 }
