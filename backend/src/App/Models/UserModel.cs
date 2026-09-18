@@ -10,8 +10,8 @@ public class User : BaseModel
     public UserRole Roles { get; set; } = UserRole.DefaultUser;
     public bool isActive { get; set; } = true;
     public void AddRole(UserRole role) => Roles |= role;
-    
+
     public void RemoveRole(UserRole role) => Roles &= ~role;
-    
+
     public bool HasRole(UserRole role) => Roles.HasFlag(role);
 }

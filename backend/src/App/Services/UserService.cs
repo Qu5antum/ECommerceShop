@@ -1,5 +1,8 @@
 using App.DTOs;
+using App.Exceptions;
 using App.Repositories;
+using App.Transactions;
+using Microsoft.EntityFrameworkCore;
 
 namespace App.Services;
 
@@ -16,12 +19,14 @@ public class UserService : IUserService
     private readonly IUserRepository _repository;
     private readonly ILogger<UserService> _logger;
     private readonly IHelperService _helper;
+    private readonly IUnitOfWork _unitOfWork;
 
-    public UserService(IUserRepository repository, ILogger<UserService> logger, IHelperService helper)
+    public UserService(IUserRepository repository, ILogger<UserService> logger, IHelperService helper, IUnitOfWork unitOfWork)
     {
         _repository = repository;
         _logger = logger;
         _helper = helper;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<UserProfileResponseDto> GetUserProfile(Guid userId)
@@ -73,12 +78,21 @@ public class UserService : IUserService
             user.Password = BCrypt.Net.BCrypt.HashPassword(userUpdateDto.Password);
         }
 
-        user.UpdatedAt = DateTime.UtcNow;
+        try
+        {
+            user.UpdatedAt = DateTime.UtcNow;
 
-        await _repository.UpdateAsync(user);
+            await _repository.UpdateAsync(user);
 
-        _logger.LogInformation("User successfully updated");
+            _logger.LogInformation("User successfully updated");
 
-        return true;
+            return true;
+        }
+        catch (DbUpdateException ex)
+        {
+            await _unitOfWork.RollbackAsync();
+            _logger.LogError(ex, "A database error occurred while updating the user profile.");
+            throw new DatabaseException("Could not update the user profile to the database.");
+        }
     }
 }

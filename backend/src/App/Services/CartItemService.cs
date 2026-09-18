@@ -2,6 +2,7 @@ using App.DTOs;
 using App.Exceptions;
 using App.Models;
 using App.Repositories;
+using App.Transactions;
 using Microsoft.EntityFrameworkCore;
 
 namespace App.Services;
@@ -23,18 +24,21 @@ public class CartItemService : ICartItemService
     private readonly IProductRepository _productRepository;
     private readonly ILogger<CartItemService> _logger;
     private readonly IHelperService _helper;
+    private readonly IUnitOfWork _unitOfWork;
 
-    public CartItemService(ICartItemRepository itemRepository, ICartRepository cartRepository, IProductRepository productRepository, ILogger<CartItemService> logger, IHelperService helper)
+    public CartItemService(ICartItemRepository itemRepository, ICartRepository cartRepository, IProductRepository productRepository, ILogger<CartItemService> logger, IHelperService helper, IUnitOfWork unitOfWork)
     {
         _itemRepository = itemRepository;
         _cartRepository = cartRepository;
         _productRepository = productRepository;
         _logger = logger;
         _helper = helper;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<CartItemResponseDto> CreateCartItemAsync(Guid userId, CartItemCreateDto itemCreateDto)
     {
+        await _unitOfWork.BeginTransactionAsync();
         await _helper.GetUserOr404(userId);
 
         var product = await _helper.GetProductOr404(itemCreateDto.ProductId);
@@ -98,6 +102,7 @@ public class CartItemService : ICartItemService
         }
         catch (DbUpdateException ex)
         {
+            await _unitOfWork.RollbackAsync();
             _logger.LogError(ex, "A database error occurred while creating the Cart item: {Message}.", ex.InnerException?.Message);
             throw new DatabaseException("Could not save the cart item to the database.");
         }
@@ -105,6 +110,7 @@ public class CartItemService : ICartItemService
 
     public async Task<bool> UpdateCartItemAsync(Guid userId, Guid itemId, CartItemUpdateDto itemUpdateDto)
     {
+        await _unitOfWork.BeginTransactionAsync();
         await _helper.GetUserOr404(userId);
 
         var cartId = await _cartRepository.GetCartIdByUserId(userId);
@@ -116,7 +122,7 @@ public class CartItemService : ICartItemService
         }
 
         var cartItem = await _helper.GetCartItemOr404(itemId);
-        
+
         if (cartItem.CartId != cartId)
         {
             _logger.LogWarning("Cart item does not belong to user, user ID: {userId}, Cart item ID: {itemId}", userId, itemId);
@@ -131,9 +137,10 @@ public class CartItemService : ICartItemService
         {
             _logger.LogWarning("Product stock is less than requested quantity, product ID: {productId}", product.Id);
             throw new BadRequestException("Product stock is less than quantity");
-        } 
+        }
 
-        try{
+        try
+        {
             product.Stock = totalAvaliableStock - itemUpdateDto.Quantity;
 
             await _productRepository.UpdateAsync(product);
@@ -150,6 +157,7 @@ public class CartItemService : ICartItemService
         }
         catch (DbUpdateException ex)
         {
+            await _unitOfWork.RollbackAsync();
             _logger.LogError(
                 ex,
                 "Database error while updating item in cart: cart item ID: {itemId} Inner exception: {Message}",
@@ -174,7 +182,7 @@ public class CartItemService : ICartItemService
         }
 
         var cartItem = await _helper.GetCartItemOr404(itemId);
-        
+
         if (cartItem.CartId != cartId)
         {
             _logger.LogWarning("Cart item does not belong to user, user ID: {userId}, Cart item ID: {itemId}", userId, itemId);

@@ -8,6 +8,7 @@ using System.Security.Claims;
 using System.Text;
 using Microsoft.IdentityModel.Tokens;
 using App.Enum;
+using App.Transactions;
 
 namespace App.Services;
 
@@ -25,16 +26,20 @@ public class AuthService : IAuthService
     private readonly IUserRepository _repository;
     private readonly IConfiguration _configuration;
     private readonly ILogger<AuthService> _logger;
+    private readonly IUnitOfWork _unitOfWork;
 
-    public AuthService(IUserRepository repository, IConfiguration configuration, ILogger<AuthService> logger)
+    public AuthService(IUserRepository repository, IConfiguration configuration, ILogger<AuthService> logger, IUnitOfWork unitOfWork)
     {
         _configuration = configuration;
         _repository = repository;
         _logger = logger;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<bool> RegisterUser(RegisterRequest registerRequest)
     {
+        await _unitOfWork.BeginTransactionAsync();
+
         var userWithEmail = await _repository.GetUserByEmail(registerRequest.Email);
 
         if (userWithEmail is not null)
@@ -75,13 +80,16 @@ public class AuthService : IAuthService
         }
         catch (DbUpdateException ex)
         {
+            await _unitOfWork.RollbackAsync();
             _logger.LogError(ex, "A database error occurred while creating the user.");
             throw new DatabaseException("Could not save the user to the database.");
         }
     }
-    
+
     public async Task<bool> CreateUserAdmin(RegisterRequest registerRequest)
     {
+        await _unitOfWork.BeginTransactionAsync();
+
         var userWithEmail = await _repository.GetUserByEmail(registerRequest.Email);
 
         if (userWithEmail is not null)
@@ -124,6 +132,7 @@ public class AuthService : IAuthService
         }
         catch (DbUpdateException ex)
         {
+            await _unitOfWork.RollbackAsync();
             _logger.LogError(ex, "A database error occurred while creating the user.");
             throw new DatabaseException("Could not save the user to the database.");
         }

@@ -2,6 +2,7 @@ using App.DTOs;
 using App.Exceptions;
 using App.Models;
 using App.Repositories;
+using App.Transactions;
 using Microsoft.EntityFrameworkCore;
 
 namespace App.Services;
@@ -27,6 +28,7 @@ public class ProductService : IProductService
     private readonly IFileStorageService _fileService;
     private readonly ILogger<ProductService> _logger;
     private readonly IHelperService _helper;
+    private readonly IUnitOfWork _unitOfWork;
 
     public ProductService
     (
@@ -34,7 +36,8 @@ public class ProductService : IProductService
         ISellerProfileRepository profileRepository,
         IFileStorageService fileService,
         ILogger<ProductService> logger,
-        IHelperService helper
+        IHelperService helper,
+        IUnitOfWork unitOfWork
     )
     {
         _productRepository = productRepository;
@@ -42,10 +45,13 @@ public class ProductService : IProductService
         _fileService = fileService;
         _logger = logger;
         _helper = helper;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<ProductResponseDto> CreateProductAsync(Guid userId, ProductCreateDto productCreateDto)
     {
+        await _unitOfWork.BeginTransactionAsync();
+
         string? ImageUrl = null;
 
         await _helper.GetUserOr404(userId);
@@ -105,11 +111,13 @@ public class ProductService : IProductService
                 await _fileService.DeleteFileAsync(ImageUrl);
             }
 
-           _logger.LogError(
-                ex,
-                "Database error while creating product. Inner exception: {Message}",
-                ex.InnerException?.Message
-            );
+            await _unitOfWork.RollbackAsync();
+
+            _logger.LogError(
+                 ex,
+                 "Database error while creating product. Inner exception: {Message}",
+                 ex.InnerException?.Message
+             );
 
             throw new DatabaseException("Could not save the product to the database.");
         }
@@ -117,10 +125,12 @@ public class ProductService : IProductService
 
     public async Task<bool> UpdateProductAsync(Guid userId, Guid productId, ProductUpdateDto productUpdateDto)
     {
+        await _unitOfWork.BeginTransactionAsync();
+
         string? newImageUrl = null;
 
         await _helper.GetUserOr404(userId);
-        
+
         if (productUpdateDto.categoryId.HasValue)
         {
             await _helper.GetCategoryOr404(productUpdateDto.categoryId.Value);
@@ -144,7 +154,8 @@ public class ProductService : IProductService
 
         string? oldImageUrl = product.ImageUrl;
 
-        try{
+        try
+        {
             if (productUpdateDto.Image != null && productUpdateDto.Image.Length > 0)
             {
                 newImageUrl = await _fileService.UploadFileAsync(productUpdateDto.Image);
@@ -172,7 +183,7 @@ public class ProductService : IProductService
             {
                 product.Stock = productUpdateDto.Stock.Value;
             }
-            
+
             product.UpdatedAt = DateTime.UtcNow;
 
             await _productRepository.UpdateAsync(product);
@@ -192,6 +203,8 @@ public class ProductService : IProductService
             {
                 await _fileService.DeleteFileAsync(newImageUrl);
             }
+
+            await _unitOfWork.RollbackAsync();
 
             _logger.LogError(
                 ex,
@@ -295,7 +308,7 @@ public class ProductService : IProductService
     public async Task<List<ProductResponseDto>> GetProductsByCategoryIdAsync(Guid categoryId)
     {
         await _helper.GetCategoryOr404(categoryId);
-    
+
         var products = await _productRepository.GetProductsByCategoryIdAsync(categoryId);
 
         _logger.LogInformation("Successfull response of products, categoryID: {categoryId}", categoryId);

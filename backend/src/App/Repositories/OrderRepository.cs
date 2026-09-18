@@ -6,7 +6,7 @@ namespace App.Repositories;
 
 public interface IOrderRepository : IBaseRepository<Order>
 {
-    
+
 }
 
 

@@ -2,6 +2,7 @@ using App.DTOs;
 using App.Exceptions;
 using App.Models;
 using App.Repositories;
+using App.Transactions;
 using Microsoft.EntityFrameworkCore;
 
 namespace App.Services;
@@ -22,16 +23,20 @@ public class CategoryService : ICategoryService
     private readonly ICategoryRepsitory _repository;
     private readonly ILogger<CategoryService> _logger;
     private readonly IHelperService _helper;
+    private readonly IUnitOfWork _unitOfWork;
 
-    public CategoryService(ICategoryRepsitory repsitory, ILogger<CategoryService> logger, IHelperService helper)
+    public CategoryService(ICategoryRepsitory repsitory, ILogger<CategoryService> logger, IHelperService helper, IUnitOfWork unitOfWork)
     {
         _repository = repsitory;
         _logger = logger;
         _helper = helper;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<CategoryResponseDto> CreateCategoryAsync(CategoryCreateDto categoryCreateDto)
     {
+        await _unitOfWork.BeginTransactionAsync();
+
         var categoryWithTitle = await _repository.GetCategoryByTitle(categoryCreateDto.Title);
 
         if (categoryWithTitle != null)
@@ -68,10 +73,11 @@ public class CategoryService : ICategoryService
                 CreatedAt = newCategory.CreatedAt,
                 UpdatedAt = newCategory.UpdatedAt
             };
-        }    
+        }
         catch (DbUpdateException ex)
         {
-            _logger.LogError(ex, "A database error occurred while creating the category.");
+            await _unitOfWork.RollbackAsync();
+            _logger.LogError(ex, "A database error occurred while creating the category: {Message}.", ex.Message);
             throw new DatabaseException("Could not save the category to the database.");
         }
     }
@@ -94,6 +100,8 @@ public class CategoryService : ICategoryService
 
     public async Task<bool> UpdateCategoryByIdAsync(Guid categoryId, CategoryUpdateDto categoryUpdateDto)
     {
+        await _unitOfWork.BeginTransactionAsync();
+
         var category = await _helper.GetCategoryOr404(categoryId);
 
         if (categoryUpdateDto.Title != null)
@@ -105,13 +113,22 @@ public class CategoryService : ICategoryService
             category.Slug = categoryUpdateDto.Slug;
         }
 
-        category.UpdatedAt = DateTime.UtcNow;
+        try
+        {
+            category.UpdatedAt = DateTime.UtcNow;
 
-        await _repository.UpdateAsync(category);
+            await _repository.UpdateAsync(category);
 
-        _logger.LogInformation("Category successfully updated: {categoryId}", categoryId);
+            _logger.LogInformation("Category successfully updated: {categoryId}", categoryId);
 
-        return true;
+            return true;
+        }
+        catch (DbUpdateException ex)
+        {
+            await _unitOfWork.RollbackAsync();
+            _logger.LogError(ex, "A database error occurred while updating the category: {Message}.", ex.Message);
+            throw new DatabaseException("Could not update the category to the database.");
+        }
     }
 
     public async Task<bool> DeleteCategoryByIdAsync(Guid categoryId)

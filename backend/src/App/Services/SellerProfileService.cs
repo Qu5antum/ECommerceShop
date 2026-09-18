@@ -3,6 +3,7 @@ using App.Enum;
 using App.Exceptions;
 using App.Models;
 using App.Repositories;
+using App.Transactions;
 using Microsoft.EntityFrameworkCore;
 
 namespace App.Services;
@@ -19,20 +20,22 @@ public interface ISellerProfileService
 public class SellerProfileService : ISellerProfileService
 {
     private readonly ISellerProfileRepository _profileRepository;
-    private readonly IUserRepository _userRepository;
     private readonly ILogger<SellerProfileService> _logger;
     private readonly IHelperService _helper;
+    private readonly IUnitOfWork _unitOfWork;
 
-    public SellerProfileService(ISellerProfileRepository profileRepository, IUserRepository userRepository, ILogger<SellerProfileService> logger, IHelperService helper)
+    public SellerProfileService(ISellerProfileRepository profileRepository, ILogger<SellerProfileService> logger, IHelperService helper, IUnitOfWork unitOfWork)
     {
         _profileRepository = profileRepository;
-        _userRepository = userRepository;
         _logger = logger;
         _helper = helper;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<SellerProfileResponseDto> CreateSellerProfileAsync(Guid currentUserId, SellerProfileCreateDto profileCreateDto)
     {
+        await _unitOfWork.BeginTransactionAsync();
+
         var user = await _helper.GetUserOr404(currentUserId);
 
         var sellerProfileOfUser = await _profileRepository.GetSellerProfileByUserIdAsync(currentUserId);
@@ -77,6 +80,7 @@ public class SellerProfileService : ISellerProfileService
         }
         catch (DbUpdateException ex)
         {
+            await _unitOfWork.RollbackAsync();
             _logger.LogError(ex, "A database error occurred while creating the seller profile.");
             throw new DatabaseException("Could not save the seller profile to the database.");
         }
@@ -84,6 +88,7 @@ public class SellerProfileService : ISellerProfileService
 
     public async Task<bool> UpdateSellerProfileAsync(Guid userId, Guid profileId, SellerProfileUpdateDto profileUpdateDto)
     {
+        await _unitOfWork.BeginTransactionAsync();
         await _helper.GetUserOr404(userId);
 
         var sellerProfile = await _profileRepository.GetByIdAsync(profileId);
@@ -102,12 +107,20 @@ public class SellerProfileService : ISellerProfileService
         {
             sellerProfile.Description = profileUpdateDto.Description;
         }
+        try
+        {
+            sellerProfile.UpdatedAt = DateTime.UtcNow;
 
-        sellerProfile.UpdatedAt = DateTime.UtcNow;
+            await _profileRepository.UpdateAsync(sellerProfile);
 
-        await _profileRepository.UpdateAsync(sellerProfile);
-
-        return true;
+            return true;
+        }
+        catch (DbUpdateException ex)
+        {
+            await _unitOfWork.RollbackAsync();
+            _logger.LogError(ex, "A database error occurred while updating the seller profile.");
+            throw new DatabaseException("Could not update the seller profile to the database.");
+        }
     }
 
     public async Task<SellerProfileResponseDto> GetUserSellerProfileAsync(Guid userId)

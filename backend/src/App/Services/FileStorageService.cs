@@ -108,7 +108,7 @@ public class FileStorageService : IFileStorageService
 
         var relativePath = fileUrl.TrimStart('/');
 
-        var physicalPath = Path.Combine( _environment.WebRootPath, relativePath);
+        var physicalPath = Path.Combine(_environment.WebRootPath, relativePath);
 
         if (!File.Exists(physicalPath))
         {

@@ -30,7 +30,7 @@ public class ProductRepository(AppDbContext context) : BaseRepository<Product>(c
         {
             return new List<Product>();
         }
-        
+
         return await _context.Products
             .AsNoTracking()
             .Where(p => p.Name.ToLower().Contains(Name.ToLower()))
