@@ -9,6 +9,7 @@ public interface IProductRepository : IBaseRepository<Product>
 {
     Task<IEnumerable<Product>> GetProductsByCategoryIdAsync(Guid categoryId);
     Task<IEnumerable<Product>> SearchProductByNameAsync(string Name);
+    Task<List<Product>> GetProductsByMultipleIds(List<Guid> productIds);
 }
 
 
@@ -34,6 +35,13 @@ public class ProductRepository(AppDbContext context) : BaseRepository<Product>(c
         return await _context.Products
             .AsNoTracking()
             .Where(p => p.Name.ToLower().Contains(Name.ToLower()))
+            .ToListAsync();
+    }
+
+    public async Task<List<Product>> GetProductsByMultipleIds(List<Guid> productIds)
+    {
+        return await _context.Products
+            .Where(p => productIds.Contains(p.Id))
             .ToListAsync();
     }
 }

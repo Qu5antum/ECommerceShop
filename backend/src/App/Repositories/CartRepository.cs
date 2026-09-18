@@ -9,6 +9,7 @@ public interface ICartRepository : IBaseRepository<Cart>
 {
     Task<Cart?> GetCartWithItemsByUserIdAsync(Guid userId);
     Task<Guid?> GetCartIdByUserId(Guid userId);
+    Task ClearCartAsync(Guid cartId);
 }
 
 
@@ -30,5 +31,17 @@ public class CartRepository(AppDbContext context) : BaseRepository<Cart>(context
             .Where(c => c.UserId == userId)
             .Select(c => (Guid?)c.Id)
             .FirstOrDefaultAsync();
+    }
+
+    public async Task ClearCartAsync(Guid cartId)
+    {
+        var cartItems = await _context.cartItems
+            .Where(ci => ci.CartId == cartId)
+            .ToListAsync();
+
+        if (cartItems.Any())
+        {
+            _context.cartItems.RemoveRange(cartItems);
+        }
     }
 }

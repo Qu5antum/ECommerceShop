@@ -21,16 +21,14 @@ public class CartItemService : ICartItemService
 {
     private readonly ICartItemRepository _itemRepository;
     private readonly ICartRepository _cartRepository;
-    private readonly IProductRepository _productRepository;
     private readonly ILogger<CartItemService> _logger;
     private readonly IHelperService _helper;
     private readonly IUnitOfWork _unitOfWork;
 
-    public CartItemService(ICartItemRepository itemRepository, ICartRepository cartRepository, IProductRepository productRepository, ILogger<CartItemService> logger, IHelperService helper, IUnitOfWork unitOfWork)
+    public CartItemService(ICartItemRepository itemRepository, ICartRepository cartRepository, ILogger<CartItemService> logger, IHelperService helper, IUnitOfWork unitOfWork)
     {
         _itemRepository = itemRepository;
         _cartRepository = cartRepository;
-        _productRepository = productRepository;
         _logger = logger;
         _helper = helper;
         _unitOfWork = unitOfWork;
@@ -59,18 +57,6 @@ public class CartItemService : ICartItemService
             throw new BadRequestException("Product already exists in cart");
         }
 
-        if (itemCreateDto.Quantity <= 0)
-        {
-            _logger.LogWarning("Quantity can't be negative or zero");
-            throw new BadRequestException("Quantity can't be negative or zero");
-        }
-
-        if (product.Stock < itemCreateDto.Quantity)
-        {
-            _logger.LogWarning("Product stock is less than quantity, product ID: {productId}", itemCreateDto.ProductId);
-            throw new BadRequestException("Product stock is less than quantity");
-        }
-
         try
         {
             var newItem = new CartItem
@@ -80,13 +66,8 @@ public class CartItemService : ICartItemService
                 Quantity = itemCreateDto.Quantity,
             };
 
-            product.Stock -= itemCreateDto.Quantity;
-
-            await _productRepository.UpdateAsync(product);
-
-            _logger.LogInformation("Product stock updated, product stock: {productId}", itemCreateDto.ProductId);
-
             await _itemRepository.CreateAsync(newItem);
+            await _unitOfWork.CommitAsync();
 
             _logger.LogInformation("Cart item successfully created, cartID: {cartId}", cartId);
 
@@ -129,27 +110,12 @@ public class CartItemService : ICartItemService
             throw new BadRequestException("Cart item does not belong to user");
         }
 
-        var product = await _helper.GetProductOr404(cartItem.ProductId);
-
-        int totalAvaliableStock = product.Stock + cartItem.Quantity;
-
-        if (totalAvaliableStock < itemUpdateDto.Quantity)
-        {
-            _logger.LogWarning("Product stock is less than requested quantity, product ID: {productId}", product.Id);
-            throw new BadRequestException("Product stock is less than quantity");
-        }
-
         try
         {
-            product.Stock = totalAvaliableStock - itemUpdateDto.Quantity;
-
-            await _productRepository.UpdateAsync(product);
-
-            _logger.LogInformation("Product stock is updated");
-
             cartItem.Quantity = itemUpdateDto.Quantity;
 
             await _itemRepository.UpdateAsync(cartItem);
+            await _unitOfWork.CommitAsync();
 
             _logger.LogInformation("Cart item successfully updated");
 
@@ -171,6 +137,7 @@ public class CartItemService : ICartItemService
 
     public async Task<bool> DeleteItemFromCartAsync(Guid userId, Guid itemId)
     {
+        await _unitOfWork.BeginTransactionAsync();
         await _helper.GetUserOr404(userId);
 
         var cartId = await _cartRepository.GetCartIdByUserId(userId);
@@ -189,15 +156,8 @@ public class CartItemService : ICartItemService
             throw new BadRequestException("Cart item does not belong to user");
         }
 
-        var product = await _helper.GetProductOr404(cartItem.ProductId);
-
-        product.Stock += cartItem.Quantity;
-
-        await _productRepository.UpdateAsync(product);
-
-        _logger.LogInformation("Product stock updated, product stock: {productId}", cartItem.ProductId);
-
         await _itemRepository.DeleteAsync(cartItem);
+        await _unitOfWork.CommitAsync();
 
         _logger.LogInformation("Item successfully delete from cart, cart ID: {cartId}, item ID: {itemId}", cartId, itemId);
 

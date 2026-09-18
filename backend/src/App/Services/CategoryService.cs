@@ -62,6 +62,7 @@ public class CategoryService : ICategoryService
             };
 
             await _repository.CreateAsync(newCategory);
+            await _unitOfWork.CommitAsync();
 
             _logger.LogInformation("Category successfully created");
 
@@ -118,6 +119,7 @@ public class CategoryService : ICategoryService
             category.UpdatedAt = DateTime.UtcNow;
 
             await _repository.UpdateAsync(category);
+            await _unitOfWork.CommitAsync();
 
             _logger.LogInformation("Category successfully updated: {categoryId}", categoryId);
 
@@ -133,9 +135,12 @@ public class CategoryService : ICategoryService
 
     public async Task<bool> DeleteCategoryByIdAsync(Guid categoryId)
     {
+        await _unitOfWork.BeginTransactionAsync();
+        
         var category = await _helper.GetCategoryOr404(categoryId);
 
         await _repository.DeleteAsync(category);
+        await _unitOfWork.CommitAsync();
 
         _logger.LogInformation("Category successfully updated: {categoryId}", categoryId);
 

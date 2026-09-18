@@ -67,6 +67,7 @@ public class SellerProfileService : ISellerProfileService
             user.AddRole(UserRole.Seller);
 
             await _profileRepository.CreateAsync(newSellerProfile);
+            await _unitOfWork.CommitAsync();
 
             _logger.LogInformation("Seller Prorile created successfully: {profileId}", newSellerProfile.Id);
 
@@ -112,6 +113,7 @@ public class SellerProfileService : ISellerProfileService
             sellerProfile.UpdatedAt = DateTime.UtcNow;
 
             await _profileRepository.UpdateAsync(sellerProfile);
+            await _unitOfWork.CommitAsync();
 
             return true;
         }
