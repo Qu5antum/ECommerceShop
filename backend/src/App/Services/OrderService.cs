@@ -246,7 +246,7 @@ public class OrderService : IOrderService
             throw new BadRequestException("Order does not belong to user");
         }
 
-        if (order.status < OrderStatus.Paid)
+        if (order.status > OrderStatus.Paid)
         {
             _logger.LogWarning("Cannot cancel order before Paid stage, order ID: {orderId}, status: {status}", orderId, order.status);
             throw new BadRequestException("Orders cannot be cancelled before the Paid stage.");
@@ -257,9 +257,10 @@ public class OrderService : IOrderService
             foreach (var item in order.orderItems)
             {
                 var product = await _helper.GetProductOr404(item.productId);
-                
+
                 product.Stock += item.Quantity;
 
+                await _orderItemRepository.DeleteAsync(item);
             }
 
             order.status = OrderStatus.Cancelled;

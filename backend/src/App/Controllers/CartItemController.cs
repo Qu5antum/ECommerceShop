@@ -63,7 +63,7 @@ public class CartItemController : ControllerBase
     }
 
     [Authorize]
-    [HttpGet("all")]
+    [HttpGet("CartItems")]
     [ProducesResponseType(200)]
     [ProducesResponseType(401)]
     [ProducesResponseType(404)]

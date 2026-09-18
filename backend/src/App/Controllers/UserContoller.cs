@@ -18,7 +18,7 @@ public class UserContoller : ControllerBase{
     }
     
     [Authorize(Roles = "Admin")]
-    [HttpGet("users/all")]
+    [HttpGet("Users")]
     [ProducesResponseType(200)]
     [ProducesResponseType(401)]
     public async Task<IActionResult> GetAllUsersNotAdmin()

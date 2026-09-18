@@ -247,13 +247,22 @@ public class ProductService : IProductService
             await _fileService.DeleteFileAsync(product.ImageUrl);
         }
 
-        await _productRepository.DeleteAsync(product);
-        await _unitOfWork.SaveChangesAsync();
-        await _unitOfWork.CommitAsync();
+        try
+        {
+            await _productRepository.DeleteAsync(product);
+            await _unitOfWork.SaveChangesAsync();
+            await _unitOfWork.CommitAsync();
 
-        _logger.LogInformation("Product successfully deleted");
+            _logger.LogInformation("Product successfully deleted");
 
-        return true;
+            return true;
+        }
+        catch (DbUpdateException ex)
+        {
+            await _unitOfWork.RollbackAsync();
+            _logger.LogError(ex, "Database error while deleting product: {Message}", ex.Message);
+            throw new DatabaseException("Database error while deleting product");
+        }
     }
 
     public async Task<ProductResponseDto> GetProductByIdAsync(Guid productId)

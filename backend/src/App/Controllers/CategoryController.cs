@@ -55,7 +55,7 @@ public class CategoryContoller : ControllerBase
     }
     
     [Authorize]
-    [HttpGet("categories")]
+    [HttpGet("Categories")]
     [ProducesResponseType(200)]
     [ProducesResponseType(401)]
     [ProducesResponseType(404)]

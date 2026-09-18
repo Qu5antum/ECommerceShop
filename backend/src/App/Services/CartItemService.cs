@@ -1,3 +1,4 @@
+using System.Data.Common;
 using App.DTOs;
 using App.Exceptions;
 using App.Models;
@@ -158,14 +159,24 @@ public class CartItemService : ICartItemService
             _logger.LogWarning("Cart item does not belong to user, user ID: {userId}, Cart item ID: {itemId}", userId, itemId);
             throw new BadRequestException("Cart item does not belong to user");
         }
+        try
+        {
+            await _itemRepository.DeleteAsync(cartItem);
+            await _unitOfWork.SaveChangesAsync();
+            await _unitOfWork.CommitAsync();
 
-        await _itemRepository.DeleteAsync(cartItem);
-        await _unitOfWork.SaveChangesAsync();
-        await _unitOfWork.CommitAsync();
+            _logger.LogInformation("Item successfully delete from cart, cart ID: {cartId}, item ID: {itemId}", cartId, itemId);
 
-        _logger.LogInformation("Item successfully delete from cart, cart ID: {cartId}, item ID: {itemId}", cartId, itemId);
+            return true;
+        }
+        catch (DbUpdateException ex)
+        {
+            await _unitOfWork.RollbackAsync();
+            _logger.LogError(ex, "Database error while deleting item from cart: {Message}", ex.Message);
+            throw new DatabaseException("Database error while deleting item from cart");
+        }
 
-        return true;
+        
     }
 
     public async Task<List<CartItemResponseDto>> GetAllItemsInCartAsync(Guid userId)

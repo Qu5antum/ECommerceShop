@@ -76,7 +76,7 @@ public class ProductController : ControllerBase
     }
 
     [Authorize]
-    [HttpGet("all")]
+    [HttpGet("Products")]
     [ProducesResponseType(200)]
     [ProducesResponseType(401)]
     [ProducesResponseType(404)]
@@ -88,7 +88,7 @@ public class ProductController : ControllerBase
     }
     
     [Authorize]
-    [HttpGet("{productId:guid}/image")]
+    [HttpGet("{ProductId:guid}/image")]
     [ProducesResponseType(200)]
     [ProducesResponseType(401)]
     [ProducesResponseType(404)]
@@ -105,7 +105,7 @@ public class ProductController : ControllerBase
     }
 
     [Authorize]
-    [HttpGet("category/{categoryId:guid}")]
+    [HttpGet("Category/{categoryId:guid}")]
     [ProducesResponseType(200)]
     [ProducesResponseType(401)]
     [ProducesResponseType(404)]
@@ -117,7 +117,7 @@ public class ProductController : ControllerBase
     }
 
     [Authorize]
-    [HttpGet("search")]
+    [HttpGet("Search")]
     [ProducesResponseType(200)]
     [ProducesResponseType(401)]
     [ProducesResponseType(404)]

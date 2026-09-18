@@ -141,13 +141,23 @@ public class CategoryService : ICategoryService
         
         var category = await _helper.GetCategoryOr404(categoryId);
 
-        await _repository.DeleteAsync(category);
-        await _unitOfWork.SaveChangesAsync();
-        await _unitOfWork.CommitAsync();
+        try
+        {
+            await _repository.DeleteAsync(category);
+            await _unitOfWork.SaveChangesAsync();
+            await _unitOfWork.CommitAsync();
 
-        _logger.LogInformation("Category successfully updated: {categoryId}", categoryId);
+            _logger.LogInformation("Category successfully updated: {categoryId}", categoryId);
 
-        return true;
+            return true;
+        }
+        catch (DbUpdateException ex)
+        {
+            await _unitOfWork.RollbackAsync();
+            _logger.LogError(ex, "Database error while deleting category: {Message}", ex.Message);
+            throw new DatabaseException("Database error while deleting category");
+        }
+        
     }
 
     public async Task<CategoryResponseDto> GetCategoryByIdAsync(Guid categoryId)

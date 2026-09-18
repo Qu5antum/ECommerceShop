@@ -16,7 +16,7 @@ public class AuthController : ControllerBase
         _authService = authService;
     }
 
-    [HttpPost("register")]
+    [HttpPost("Register")]
     [ProducesResponseType(200)]
     [ProducesResponseType(404)]
     [ProducesResponseType(400)]
@@ -30,7 +30,7 @@ public class AuthController : ControllerBase
         });
     }
 
-    [HttpPost("adminRegister")]
+    [HttpPost("AdminRegister")]
     [ProducesResponseType(200)]
     [ProducesResponseType(404)]
     [ProducesResponseType(400)]
@@ -44,7 +44,7 @@ public class AuthController : ControllerBase
         });
     }
 
-    [HttpPost("login")]
+    [HttpPost("Login")]
     [ProducesResponseType(200)]
     [ProducesResponseType(404)]
     [ProducesResponseType(400)]
