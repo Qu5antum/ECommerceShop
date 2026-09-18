@@ -86,6 +86,7 @@ public class ProductService : IProductService
             };
 
             await _productRepository.CreateAsync(newProduct);
+            await _unitOfWork.SaveChangesAsync();
             await _unitOfWork.CommitAsync();
 
             _logger.LogInformation("Product successfully create: {productId}", newProduct.Id);
@@ -188,6 +189,7 @@ public class ProductService : IProductService
             product.UpdatedAt = DateTime.UtcNow;
 
             await _productRepository.UpdateAsync(product);
+            await _unitOfWork.SaveChangesAsync();
             await _unitOfWork.CommitAsync();
 
             if (newImageUrl != null && oldImageUrl != null)
@@ -246,6 +248,7 @@ public class ProductService : IProductService
         }
 
         await _productRepository.DeleteAsync(product);
+        await _unitOfWork.SaveChangesAsync();
         await _unitOfWork.CommitAsync();
 
         _logger.LogInformation("Product successfully deleted");

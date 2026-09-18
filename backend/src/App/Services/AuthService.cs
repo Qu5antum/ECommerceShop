@@ -75,6 +75,7 @@ public class AuthService : IAuthService
             );
 
             await _repository.CreateAsync(newUser);
+            await _unitOfWork.SaveChangesAsync();
             await _unitOfWork.CommitAsync();
 
             return true;
@@ -128,6 +129,7 @@ public class AuthService : IAuthService
             );
 
             await _repository.CreateAsync(newUser);
+            await _unitOfWork.SaveChangesAsync();
             await _unitOfWork.CommitAsync();
 
             return true;

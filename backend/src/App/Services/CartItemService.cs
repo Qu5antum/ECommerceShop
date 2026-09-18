@@ -67,6 +67,7 @@ public class CartItemService : ICartItemService
             };
 
             await _itemRepository.CreateAsync(newItem);
+            await _unitOfWork.SaveChangesAsync();
             await _unitOfWork.CommitAsync();
 
             _logger.LogInformation("Cart item successfully created, cartID: {cartId}", cartId);
@@ -113,8 +114,10 @@ public class CartItemService : ICartItemService
         try
         {
             cartItem.Quantity = itemUpdateDto.Quantity;
+            cartItem.UpdatedAt = DateTime.UtcNow;
 
             await _itemRepository.UpdateAsync(cartItem);
+            await _unitOfWork.SaveChangesAsync();
             await _unitOfWork.CommitAsync();
 
             _logger.LogInformation("Cart item successfully updated");
@@ -157,6 +160,7 @@ public class CartItemService : ICartItemService
         }
 
         await _itemRepository.DeleteAsync(cartItem);
+        await _unitOfWork.SaveChangesAsync();
         await _unitOfWork.CommitAsync();
 
         _logger.LogInformation("Item successfully delete from cart, cart ID: {cartId}, item ID: {itemId}", cartId, itemId);

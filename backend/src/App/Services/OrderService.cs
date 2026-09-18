@@ -12,6 +12,9 @@ namespace App.Services;
 public interface IOrderService
 {
     Task<OrderReponseDto> CreateOrderAsync(Guid userId);
+    Task<List<OrderReponseDto>> GetOrdersByUserIdAsync(Guid userId);
+    Task<OrderReponseDto> GetOrderByUserIdAsync(Guid userId, Guid orderId);
+    Task<bool> CancelOrderAsync(Guid userId, Guid orderId);
 }
 
 
@@ -125,7 +128,7 @@ public class OrderService : IOrderService
             }
 
             await _cartRepository.ClearCartAsync(cartWithItems.Id);
-            
+            await _unitOfWork.SaveChangesAsync();
             await _unitOfWork.CommitAsync();
 
             return new OrderReponseDto
@@ -152,6 +155,128 @@ public class OrderService : IOrderService
             await _unitOfWork.RollbackAsync();
             _logger.LogError(ex, "A database error occurred while creating the order: {Message}.", ex.Message);
             throw new DatabaseException("Could not create the order to the database.");
+        }
+    }
+
+    public async Task<List<OrderReponseDto>> GetOrdersByUserIdAsync(Guid userId)
+    {
+        await _helper.GetUserOr404(userId);
+
+        var orders = await _orderRepository.GetOrdersByUserIdAsync(userId);
+
+        _logger.LogInformation("Successfull response of orders: {userId}", userId);
+
+        return orders.Select(order => new OrderReponseDto 
+        {
+            Id = order.Id,
+            userId = order.userId,
+            TotalAmount = order.TotalAmount,
+            status = order.status,
+            CreatedAt = order.CreatedAt,
+            UpdatedAt = order.UpdatedAt,
+            orderItems = order.orderItems.Select(item => new OrderItemResponseDto
+            {
+                Id = item.Id,              
+                orderId = item.orderId,    
+                productId = item.productId, 
+                ProductName = item.ProductName,
+                Price = item.Price,       
+                Quantity = item.Quantity   
+            }).ToList()
+        }).ToList();
+    }
+
+    public async Task<OrderReponseDto> GetOrderByUserIdAsync(Guid userId, Guid orderId)
+    {
+        await _helper.GetUserOr404(userId);
+
+        var order = await _orderRepository.GetOrderWithItemsById(orderId);
+
+        if (order == null)
+        {
+            _logger.LogWarning("Order not found: {orderId}", orderId);
+            throw new NotFoundException("Order not found");
+        }
+
+        if (order.userId != userId)
+        {
+            _logger.LogWarning("Order does not belong to user, order ID: {orderId}, user ID: {userId}", orderId, userId);
+            throw new BadRequestException("Order does not belong to user");
+        }
+
+        _logger.LogInformation("Successfully retrieved order: {orderId}", orderId);
+
+        return new OrderReponseDto
+        {
+            Id = order.Id,
+            userId = order.userId,
+            TotalAmount = order.TotalAmount,
+            status = order.status,
+            CreatedAt = order.CreatedAt,
+            UpdatedAt = order.UpdatedAt,
+            orderItems = order.orderItems.Select(item => new OrderItemResponseDto
+            {
+                Id = item.Id,
+                orderId = item.orderId,
+                productId = item.productId,
+                ProductName = item.ProductName,
+                Price = item.Price,
+                Quantity = item.Quantity
+            }).ToList()
+        };
+    }
+
+    public async Task<bool> CancelOrderAsync(Guid userId, Guid orderId)
+    {
+        await _unitOfWork.BeginTransactionAsync();
+
+        await _helper.GetUserOr404(userId);
+        
+        var order = await _orderRepository.GetOrderWithItemsById(orderId);
+
+        if (order == null)
+        {
+            _logger.LogWarning("Order not found by this id: {orderId}", orderId);
+            throw new NotFoundException("Order not found");
+        }
+
+        if (order.userId != userId)
+        {
+            _logger.LogWarning("Order does not belong to user, user ID: {userId}, order ID: {orderId}", userId, orderId);
+            throw new BadRequestException("Order does not belong to user");
+        }
+
+        if (order.status < OrderStatus.Paid)
+        {
+            _logger.LogWarning("Cannot cancel order before Paid stage, order ID: {orderId}, status: {status}", orderId, order.status);
+            throw new BadRequestException("Orders cannot be cancelled before the Paid stage.");
+        }
+
+        try
+        {
+            foreach (var item in order.orderItems)
+            {
+                var product = await _helper.GetProductOr404(item.productId);
+                
+                product.Stock += item.Quantity;
+
+            }
+
+            order.status = OrderStatus.Cancelled;
+            order.UpdatedAt = DateTime.UtcNow;
+
+            await _unitOfWork.SaveChangesAsync();
+            await _unitOfWork.CommitAsync();
+
+            _logger.LogWarning("Order was cancelled, user ID: {userId}, order ID: {orderId}", userId, orderId);
+
+            return true;
+        }
+        catch (DbUpdateException ex)
+        {
+            await _unitOfWork.RollbackAsync();
+            _logger.LogError(ex, "A database error occurred while cancelling the order: {Message}.", ex.Message);
+            throw new DatabaseException("Could not cancel the order to the database.");
         }
     }
 }

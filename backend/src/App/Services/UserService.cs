@@ -83,6 +83,7 @@ public class UserService : IUserService
             user.UpdatedAt = DateTime.UtcNow;
 
             await _repository.UpdateAsync(user);
+            await _unitOfWork.SaveChangesAsync();
             await _unitOfWork.CommitAsync();
 
             _logger.LogInformation("User successfully updated");
