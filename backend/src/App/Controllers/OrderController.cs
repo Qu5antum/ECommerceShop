@@ -77,7 +77,7 @@ public class OrderController : ControllerBase
     }
 
     [Authorize(Roles = "Seller")]
-    [HttpDelete("Admin/Orders")]
+    [HttpGet("Admin/Orders")]
     [ProducesResponseType(200)]
     [ProducesResponseType(401)]
     [ProducesResponseType(404)]
