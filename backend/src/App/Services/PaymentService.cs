@@ -13,6 +13,7 @@ public interface IPaymentService
 {
     Task<PaymentResponseDto> CreatePaymentAsync(Guid userId, Guid orderId);
     Task<PaymentResponseDto> GetPaymentAsync(Guid userId, Guid orderId, Guid paymentId);
+    Task<bool> ProcessWebhookAsync(PaymentWebhookDto webhookDto);
 }
 
 
@@ -115,5 +116,58 @@ public class PaymentService : IPaymentService
             CreatedAt = payment.CreatedAt,
             UpdatedAt = payment.UpdatedAt
         };
+    }
+
+    public async Task<bool> ProcessWebhookAsync(PaymentWebhookDto webhookDto)
+    {
+        await _unitOfWork.BeginTransactionAsync();
+
+        var payment = await _paymentRepository.GetPaymentWithProviderId(webhookDto.ProviderPaymentId);
+
+        if (payment == null)
+        {
+            _logger.LogWarning("Payment not found for provider payment ID: {providerId}", webhookDto.ProviderPaymentId);
+            throw new NotFoundException("Payment not found");
+        }
+
+        if (payment.Status == PaymentStatus.Succeeded)
+        {
+            _logger.LogInformation("Payment already marked as Succeeded. Provider ID: {providerId}", webhookDto.ProviderPaymentId);
+            return true; 
+        }
+
+        var order = await _helper.GetOrderOr404(payment.OrderId);
+
+        try
+        {
+            payment.Status = webhookDto.Status;
+            payment.UpdatedAt = DateTime.UtcNow;
+
+            if (webhookDto.Status == PaymentStatus.Succeeded)
+            {
+                order.status = OrderStatus.Paid;
+                order.UpdatedAt = DateTime.UtcNow;
+                
+                _logger.LogInformation("Order status updated to Paid via webhook. Order ID: {orderId}", order.Id);
+            }
+            else if (webhookDto.Status == PaymentStatus.Failed)
+            {
+                order.status = OrderStatus.Pending; 
+                order.UpdatedAt = DateTime.UtcNow;
+                
+                _logger.LogWarning("Payment failed via webhook for order ID: {orderId}", order.Id);
+            }
+
+            await _unitOfWork.SaveChangesAsync();
+            await _unitOfWork.CommitAsync();
+
+            return true;
+        }
+        catch (DbUpdateException ex)
+        {
+            await _unitOfWork.RollbackAsync();
+            _logger.LogError(ex, "A database error occurred while processing webhook: {Message}.", ex.Message);
+            throw new DatabaseException("Could not process payment webhook in the database.");
+        }
     }
 }

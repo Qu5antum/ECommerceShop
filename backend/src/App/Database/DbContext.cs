@@ -18,6 +18,7 @@ public class AppDbContext : DbContext
     public DbSet<CartItem> cartItems => Set<CartItem>();
     public DbSet<Order> Orders => Set<Order>();
     public DbSet<OrderItem> OrderItems => Set<OrderItem>();
+    public DbSet<Payment> Payments => Set<Payment>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -183,6 +184,14 @@ public class AppDbContext : DbContext
             entity.HasIndex(i => i.productId);
 
             entity.Property(i => i.Price)
+                .HasPrecision(18, 2);
+        });
+
+        modelBuilder.Entity<Payment>(entity =>
+        {
+            entity.HasIndex(p => p.OrderId);
+
+            entity.Property(p => p.Amount)
                 .HasPrecision(18, 2);
         });
     }

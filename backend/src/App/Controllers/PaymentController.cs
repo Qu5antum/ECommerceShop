@@ -1,3 +1,4 @@
+using App.DTOs;
 using App.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -44,5 +45,17 @@ public class PaymentController : ControllerBase
         var payment = await _service.GetPaymentAsync(userId, orderId, paymentId);
 
         return Ok(payment);
+    }
+
+    [HttpPost("webhook")]
+    [ProducesResponseType(200)]
+    [ProducesResponseType(401)]
+    [ProducesResponseType(404)]
+    public async Task<IActionResult> Webhook([FromBody] PaymentWebhookDto webhookDto)
+    {
+        
+        await _service.ProcessWebhookAsync(webhookDto);
+        
+        return Ok(new { message = "Webhook processed successfully" });
     }
 }
