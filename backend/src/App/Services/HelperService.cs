@@ -12,6 +12,7 @@ public interface IHelperService
     Task<Category> GetCategoryOr404(Guid categoryId);
     Task<Product> GetProductOr404(Guid productId);
     Task<CartItem> GetCartItemOr404(Guid itemId);
+    Task<Order> GetOrderOr404(Guid orderId);
 }
 public class HelperService : IHelperService
 {
@@ -20,6 +21,7 @@ public class HelperService : IHelperService
     private readonly ISellerProfileRepository _sellerProfileRepository;
     private readonly IProductRepository _productRepository;
     private readonly ICartItemRepository _itemRepository;
+    private readonly IOrderRepository _orderRepository;
     private readonly ILogger<HelperService> _logger;
 
     public HelperService
@@ -29,6 +31,7 @@ public class HelperService : IHelperService
         ISellerProfileRepository sellerProfileRepository,
         IProductRepository productRepository,
         ICartItemRepository itemRepository,
+        IOrderRepository orderRepository,
         ILogger<HelperService> logger
     )
     {
@@ -37,6 +40,7 @@ public class HelperService : IHelperService
         _sellerProfileRepository = sellerProfileRepository;
         _productRepository = productRepository;
         _itemRepository = itemRepository;
+        _orderRepository = orderRepository;
         _logger = logger;
     }
 
@@ -103,5 +107,18 @@ public class HelperService : IHelperService
         }
 
         return cartItem;
+    }
+
+    public async Task<Order> GetOrderOr404(Guid orderId)
+    {
+        var order = await _orderRepository.GetByIdAsync(orderId);
+
+        if (order == null)
+        {
+            _logger.LogWarning("Order not found by this id: {orderId}", orderId);
+            throw new NotFoundException("Order not found");
+        }
+
+        return order;
     }
 }

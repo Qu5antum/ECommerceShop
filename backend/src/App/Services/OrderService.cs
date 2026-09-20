@@ -15,6 +15,8 @@ public interface IOrderService
     Task<List<OrderReponseDto>> GetOrdersByUserIdAsync(Guid userId);
     Task<OrderReponseDto> GetOrderByUserIdAsync(Guid userId, Guid orderId);
     Task<bool> CancelOrderAsync(Guid userId, Guid orderId);
+    Task<List<SellerOrderItemResponseDto>> GetOrdersOfSellerAsync(Guid userId);
+    Task<bool> UpdateOrderStatusAsync(Guid orderId, UpdateOrderStatusDto orderStatusDto);
 }
 
 
@@ -24,16 +26,28 @@ public class OrderService : IOrderService
     private readonly IOrderItemRepository _orderItemRepository;
     private readonly ICartRepository _cartRepository;
     private readonly IProductRepository _productRepository;
+    private readonly ISellerProfileRepository _sellerRepository;
     private readonly ILogger<OrderService> _logger;
     private readonly IHelperService _helper;
     private readonly IUnitOfWork _unitOfWork;
 
-    public OrderService(IOrderRepository orderRepository, IOrderItemRepository orderItemRepository, ICartRepository cartRepository, IProductRepository productRepository, ILogger<OrderService> logger, IHelperService helper, IUnitOfWork unitOfWork)
+    public OrderService
+    (
+        IOrderRepository orderRepository, 
+        IOrderItemRepository orderItemRepository, 
+        ICartRepository cartRepository, 
+        IProductRepository productRepository, 
+        ISellerProfileRepository sellerRepository,
+        ILogger<OrderService> logger, 
+        IHelperService helper, 
+        IUnitOfWork unitOfWork
+    )
     {
         _orderRepository = orderRepository;
         _orderItemRepository = orderItemRepository;
         _cartRepository = cartRepository;
         _productRepository = productRepository;
+        _sellerRepository = sellerRepository;
         _logger = logger;
         _helper = helper;
         _unitOfWork = unitOfWork;
@@ -259,8 +273,6 @@ public class OrderService : IOrderService
                 var product = await _helper.GetProductOr404(item.productId);
 
                 product.Stock += item.Quantity;
-
-                await _orderItemRepository.DeleteAsync(item);
             }
 
             order.status = OrderStatus.Cancelled;
@@ -278,6 +290,102 @@ public class OrderService : IOrderService
             await _unitOfWork.RollbackAsync();
             _logger.LogError(ex, "A database error occurred while cancelling the order: {Message}.", ex.Message);
             throw new DatabaseException("Could not cancel the order to the database.");
+        }
+    }
+
+    public async Task<List<SellerOrderItemResponseDto>> GetOrdersOfSellerAsync(Guid userId)
+    {
+        var seller = await _sellerRepository.GetSellerProfileByUserIdAsync(userId);
+
+        if (seller == null)
+        {
+            _logger.LogWarning("Seller not found by user ID: {userId}", userId);
+            throw new NotFoundException("Seller not found by user");
+        }
+
+        var orderItems = await _orderItemRepository.GetOrderItemsBySellerIdAsync(seller.Id);
+
+        _logger.LogInformation("Successfully retrieved orders for seller: {sellerProfileId}", seller.Id);
+
+        return orderItems.Select(item => new SellerOrderItemResponseDto
+        {
+            OrderId = item.orderId,
+            OrderStatus = item.Order.status,
+            CreatedAt = item.Order.CreatedAt,
+            ProductId = item.productId,
+            ProductName = item.ProductName,
+            Price = item.Price,
+            Quantity = item.Quantity
+        }).ToList();
+    }
+
+    public async Task<bool> UpdateOrderStatusAsync(Guid orderId, UpdateOrderStatusDto orderStatusDto)
+    {
+        await _unitOfWork.BeginTransactionAsync();
+
+        var order = await _orderRepository.GetOrderWithItemsById(orderId);
+        
+        if (order == null)
+        {
+            _logger.LogWarning("Order not found by this id: {orderId}", orderId);
+            throw new NotFoundException("Order not found");
+        }
+
+        if (order.status == OrderStatus.Cancelled || order.status == OrderStatus.Delivered)
+        {
+            _logger.LogWarning("Cannot change status of an order that is already {status}, order ID: {orderId}", order.status, orderId);
+            throw new BadRequestException($"Cannot change status of a {order.status} order.");
+        }
+
+        if (orderStatusDto.Status == OrderStatus.Cancelled && (order.status == OrderStatus.Shipped || order.status == OrderStatus.Delivered))
+        {
+            _logger.LogWarning("Cannot cancel order from status: {status}, order ID: {orderId}", order.status, orderId);
+            throw new BadRequestException("Cannot cancel an order that has already been shipped or delivered.");
+        }
+
+        if (orderStatusDto.Status != OrderStatus.Cancelled && order.status > orderStatusDto.Status)
+        {
+            _logger.LogWarning("Order status backward transition not available, order ID: {orderId}", orderId);
+            throw new BadRequestException("Order status transition is not available");
+        }
+
+        try
+        {
+            if (orderStatusDto.Status == OrderStatus.Cancelled)
+            {
+                foreach (var item in order.orderItems)
+                {
+                    var product = await _helper.GetProductOr404(item.productId);
+
+                    product.Stock += item.Quantity;
+                }
+
+                order.status = orderStatusDto.Status;
+                order.UpdatedAt = DateTime.UtcNow;
+
+                await _unitOfWork.SaveChangesAsync();
+                await _unitOfWork.CommitAsync();
+
+                _logger.LogWarning("Order was cancelled by Moderator order ID: {orderId}", orderId);
+
+                return true;
+            }
+
+            order.status = orderStatusDto.Status;
+            order.UpdatedAt = DateTime.UtcNow;
+
+            await _unitOfWork.SaveChangesAsync();
+            await _unitOfWork.CommitAsync();
+
+            _logger.LogWarning("Order status updated successfully: {orderId}", orderId);
+
+            return true;
+        }
+        catch (DbUpdateException ex)
+        {
+            await _unitOfWork.RollbackAsync();
+            _logger.LogError(ex, "A database error occurred while updating status of order: {Message}.", ex.Message);
+            throw new DatabaseException("Could not update status of order in the database.");
         }
     }
 }

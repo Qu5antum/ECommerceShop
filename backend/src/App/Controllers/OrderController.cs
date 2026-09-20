@@ -1,4 +1,5 @@
 using App.Services;
+using App.DTOs;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -73,5 +74,33 @@ public class OrderController : ControllerBase
         await _service.CancelOrderAsync(userId, orderId);
 
         return Ok("Order cancelled successfully");
+    }
+
+    [Authorize(Roles = "Seller")]
+    [HttpDelete("Admin/Orders")]
+    [ProducesResponseType(200)]
+    [ProducesResponseType(401)]
+    [ProducesResponseType(404)]
+    [ProducesResponseType(400)]
+    public async Task<IActionResult> GetOrdersOfSeller()
+    {
+        Guid userId = _helper.GetUserId();
+
+        var orders = await _service.GetOrdersOfSellerAsync(userId);
+
+        return Ok(orders);
+    }
+
+    [Authorize(Roles = "Moderator, Admin, Manager")]
+    [HttpPut("{orderId:guid}/Status")]
+    [ProducesResponseType(200)]
+    [ProducesResponseType(401)]
+    [ProducesResponseType(404)]
+    [ProducesResponseType(400)]
+    public async Task<IActionResult> UpdateStatusOfOrder(Guid orderId, UpdateOrderStatusDto orderStatusDto)
+    {
+        await _service.UpdateOrderStatusAsync(orderId, orderStatusDto);
+
+        return Ok("Order status successfully updated");
     }
 }
