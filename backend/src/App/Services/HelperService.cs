@@ -13,6 +13,7 @@ public interface IHelperService
     Task<Product> GetProductOr404(Guid productId);
     Task<CartItem> GetCartItemOr404(Guid itemId);
     Task<Order> GetOrderOr404(Guid orderId);
+    Task<Payment> GetPaymentOr404(Guid paymentId);
 }
 public class HelperService : IHelperService
 {
@@ -22,6 +23,7 @@ public class HelperService : IHelperService
     private readonly IProductRepository _productRepository;
     private readonly ICartItemRepository _itemRepository;
     private readonly IOrderRepository _orderRepository;
+    private readonly IPaymentRepository _paymentRepository;
     private readonly ILogger<HelperService> _logger;
 
     public HelperService
@@ -32,6 +34,7 @@ public class HelperService : IHelperService
         IProductRepository productRepository,
         ICartItemRepository itemRepository,
         IOrderRepository orderRepository,
+        IPaymentRepository paymentRepository,
         ILogger<HelperService> logger
     )
     {
@@ -41,6 +44,7 @@ public class HelperService : IHelperService
         _productRepository = productRepository;
         _itemRepository = itemRepository;
         _orderRepository = orderRepository;
+        _paymentRepository = paymentRepository;
         _logger = logger;
     }
 
@@ -120,5 +124,18 @@ public class HelperService : IHelperService
         }
 
         return order;
+    }
+
+    public async Task<Payment> GetPaymentOr404(Guid paymentId)
+    {
+        var payment = await _paymentRepository.GetByIdAsync(paymentId);
+
+        if (payment == null)
+        {
+            _logger.LogWarning("Payment not found by this id: {paymentId}", paymentId);
+            throw new NotFoundException("Payment not found");
+        }
+
+        return payment;
     }
 }
