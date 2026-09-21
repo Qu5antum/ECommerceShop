@@ -34,7 +34,7 @@ public class PaymentController : ControllerBase
     }
 
     [Authorize]
-    [HttpPost("{paymentId:guid}/Order/{orderId:guid}")]
+    [HttpGet("{paymentId:guid}/Order/{orderId:guid}")]
     [ProducesResponseType(200)]
     [ProducesResponseType(401)]
     [ProducesResponseType(404)]
@@ -47,7 +47,7 @@ public class PaymentController : ControllerBase
         return Ok(payment);
     }
 
-    [HttpPost("webhook")]
+    [HttpPut("webhook")]
     [ProducesResponseType(200)]
     [ProducesResponseType(401)]
     [ProducesResponseType(404)]

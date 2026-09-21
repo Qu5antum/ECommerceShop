@@ -45,6 +45,12 @@ public class PaymentService : IPaymentService
             throw new BadRequestException("Order does not belong to user");
         }
 
+        if (order.status == OrderStatus.Cancelled)
+        {
+            _logger.LogWarning("Bad request, order cancelled, can't pay order: {orderId}", orderId);
+            throw new BadRequestException("Can't pay for order, order cancelled");
+        }
+
         if (order.status == OrderStatus.Paid)
         {
             _logger.LogWarning("Bad request, Order already in paid status: {orderId}", orderId);

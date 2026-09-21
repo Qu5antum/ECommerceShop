@@ -19,6 +19,7 @@ public class AppDbContext : DbContext
     public DbSet<Order> Orders => Set<Order>();
     public DbSet<OrderItem> OrderItems => Set<OrderItem>();
     public DbSet<Payment> Payments => Set<Payment>();
+    public DbSet<Review> Reviews => Set<Review>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -193,6 +194,16 @@ public class AppDbContext : DbContext
 
             entity.Property(p => p.Amount)
                 .HasPrecision(18, 2);
+        });
+
+        modelBuilder.Entity<Review>(entity =>
+        {
+            entity.Property(r => r.Comment)
+                .HasMaxLength(500)       
+                .IsRequired(); 
+                
+            entity.ToTable(t => t.HasCheckConstraint("CK_Review_Rating_Range", "[Rating] >= 1 AND [Rating] <= 5"));
+            entity.HasIndex(r => new { r.UserId, r.ProductId }).IsUnique();
         });
     }
 }
