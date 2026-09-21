@@ -14,6 +14,7 @@ public interface IHelperService
     Task<CartItem> GetCartItemOr404(Guid itemId);
     Task<Order> GetOrderOr404(Guid orderId);
     Task<Payment> GetPaymentOr404(Guid paymentId);
+    Task<Review> GetReviewOr404(Guid reviewId);
 }
 public class HelperService : IHelperService
 {
@@ -24,6 +25,7 @@ public class HelperService : IHelperService
     private readonly ICartItemRepository _itemRepository;
     private readonly IOrderRepository _orderRepository;
     private readonly IPaymentRepository _paymentRepository;
+    private readonly IReviewRepository _reviewRepository;
     private readonly ILogger<HelperService> _logger;
 
     public HelperService
@@ -35,6 +37,7 @@ public class HelperService : IHelperService
         ICartItemRepository itemRepository,
         IOrderRepository orderRepository,
         IPaymentRepository paymentRepository,
+        IReviewRepository reviewRepository,
         ILogger<HelperService> logger
     )
     {
@@ -45,6 +48,7 @@ public class HelperService : IHelperService
         _itemRepository = itemRepository;
         _orderRepository = orderRepository;
         _paymentRepository = paymentRepository;
+        _reviewRepository = reviewRepository;
         _logger = logger;
     }
 
@@ -137,5 +141,18 @@ public class HelperService : IHelperService
         }
 
         return payment;
+    }
+
+    public async Task<Review> GetReviewOr404(Guid reviewId)
+    {
+        var review = await _reviewRepository.GetByIdAsync(reviewId);
+
+        if (review == null)
+        {
+            _logger.LogWarning("Review not found by this id: {reviewId}", reviewId);
+            throw new NotFoundException("Review not found");
+        }
+
+        return review;
     }
 }

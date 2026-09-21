@@ -201,8 +201,8 @@ public class AppDbContext : DbContext
             entity.Property(r => r.Comment)
                 .HasMaxLength(500)       
                 .IsRequired(); 
-                
-            entity.ToTable(t => t.HasCheckConstraint("CK_Review_Rating_Range", "[Rating] >= 1 AND [Rating] <= 5"));
+
+            entity.ToTable(t => t.HasCheckConstraint("CK_Review_Rating_Range", "\"Rating\" >= 1 AND \"Rating\" <= 5"));
             entity.HasIndex(r => new { r.UserId, r.ProductId }).IsUnique();
         });
     }
