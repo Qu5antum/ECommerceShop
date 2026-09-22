@@ -20,13 +20,15 @@ public interface IPaymentService
 public class PaymentService : IPaymentService
 {
     private readonly IPaymentRepository _paymentRepository;
+    private readonly INotificationRepository _notificationRepository;
     private readonly IHelperService _helper;
     private readonly ILogger<PaymentService> _logger;
     private readonly IUnitOfWork _unitOfWork;
 
-    public PaymentService(IPaymentRepository paymentRepository, IHelperService helper, ILogger<PaymentService> logger, IUnitOfWork unitOfWork)
+    public PaymentService(IPaymentRepository paymentRepository, INotificationRepository notificationRepository, IHelperService helper, ILogger<PaymentService> logger, IUnitOfWork unitOfWork)
     {
         _paymentRepository = paymentRepository;
+        _notificationRepository = notificationRepository;
         _helper = helper;
         _logger = logger;
         _unitOfWork = unitOfWork;
@@ -149,12 +151,20 @@ public class PaymentService : IPaymentService
             payment.Status = webhookDto.Status;
             payment.UpdatedAt = DateTime.UtcNow;
 
+            string notificationTitle = string.Empty;
+            string notificationMessage = string.Empty;
+            NotificationType notificationType = NotificationType.General;
+
             if (webhookDto.Status == PaymentStatus.Succeeded)
             {
                 order.status = OrderStatus.Paid;
                 order.UpdatedAt = DateTime.UtcNow;
-                
+
                 _logger.LogInformation("Order status updated to Paid via webhook. Order ID: {orderId}", order.Id);
+
+                notificationTitle = "Payment successful";
+                notificationMessage = $"Your payment of {payment.Amount} for order #{order.Id} was successful.";
+                notificationType = NotificationType.PaymentSuccess;
             }
             else if (webhookDto.Status == PaymentStatus.Failed)
             {
@@ -162,8 +172,22 @@ public class PaymentService : IPaymentService
                 order.UpdatedAt = DateTime.UtcNow;
                 
                 _logger.LogWarning("Payment failed via webhook for order ID: {orderId}", order.Id);
+
+                notificationTitle = "Payment failed";
+                notificationMessage = $"Payment for order #{order.Id} has failed. Please try again.";
+                notificationType = NotificationType.PaymentFailed;
             }
 
+            var notification = new Notification
+            {
+                UserId = order.userId, 
+                Title = notificationTitle,
+                Message = notificationMessage,
+                Type = notificationType,
+                IsRead = false
+            };
+            
+            await _notificationRepository.CreateAsync(notification);
             await _unitOfWork.SaveChangesAsync();
             await _unitOfWork.CommitAsync();
 

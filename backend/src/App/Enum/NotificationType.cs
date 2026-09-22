@@ -3,8 +3,10 @@ namespace App.Enum;
 
 public enum NotificationType
 {
+    General = 0,
     PaymentSuccess = 1,
-    OrderShipped = 2,
-    OrderDelivered = 3,
-    OrderCancelled = 4
+    PaymentFailed = 2,
+    OrderShipped = 3,
+    OrderDelivered = 4,
+    OrderCancelled = 5
 }

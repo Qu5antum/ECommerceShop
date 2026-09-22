@@ -351,6 +351,10 @@ public class OrderService : IOrderService
 
         try
         {
+            string notificationTitle = string.Empty;
+            string notificationMessage = string.Empty;
+            NotificationType notificationType = NotificationType.General;
+
             if (orderStatusDto.Status == OrderStatus.Cancelled)
             {
                 foreach (var item in order.orderItems)
@@ -363,6 +367,10 @@ public class OrderService : IOrderService
                 order.status = orderStatusDto.Status;
                 order.UpdatedAt = DateTime.UtcNow;
 
+                notificationTitle = "Order cancelled";
+                notificationMessage = $"You're order cancelled order ID: {orderId}";
+                notificationType = NotificationType.OrderCancelled;
+
                 await _unitOfWork.SaveChangesAsync();
                 await _unitOfWork.CommitAsync();
 
@@ -370,6 +378,29 @@ public class OrderService : IOrderService
 
                 return true;
             }
+
+            else if (orderStatusDto.Status == OrderStatus.Shipped)
+            {
+                notificationTitle = "Order shiped";
+                notificationMessage = $"You're order shiped order ID: {orderId}";
+                notificationType = NotificationType.OrderShipped;
+            }
+
+            else if (orderStatusDto.Status == OrderStatus.Delivered)
+            {
+                notificationTitle = "Order delivered";
+                notificationMessage = $"You're order delivered order ID: {orderId}";
+                notificationType = NotificationType.OrderShipped;
+            }
+
+            var newNotification = new Notification
+            {
+                UserId = order.userId, 
+                Title = notificationTitle,
+                Message = notificationMessage,
+                Type = notificationType,
+                IsRead = false
+            };
 
             order.status = orderStatusDto.Status;
             order.UpdatedAt = DateTime.UtcNow;
