@@ -7,7 +7,8 @@ namespace App.Services;
 
 public interface INotificationService
 {
-    
+    Task<List<NotificationResponseDto>> GetNotificationsAsync(Guid userId, int? take = null, bool? isRead = null);
+    Task<int> GetCountOfUnreadNotificationsAsync(Guid userId);
 }
 
 
@@ -26,11 +27,18 @@ public class NotificationService : INotificationService
         _unitOfWork = unitOfWork;
     }
 
-    public async Task<List<NotificationResponseDto>> GetNotificationsAsync(Guid userId)
+    public async Task<List<NotificationResponseDto>> GetNotificationsAsync(Guid userId, int? take = null, bool? isRead = null)
     {
+        await _unitOfWork.BeginTransactionAsync();
         await _helper.GetUserOr404(userId);
 
-        var notifications = await _notificationRepository.GetNotificationsAsync(userId);
+        var notifications = await _notificationRepository.GetNotificationsAsync(userId, take, isRead);
+
+        if (isRead == false)
+        {
+            await _notificationRepository.MarkAllAsReadAsync(userId);
+            await _unitOfWork.SaveChangesAsync();
+        }
 
         _logger.LogInformation("Succesfull response of notifications of user: {userId}", userId);
 
@@ -41,8 +49,20 @@ public class NotificationService : INotificationService
             Title = notification.Title,
             Message = notification.Message,
             Type = notification.Type,
+            IsRead = notification.IsRead,
             CreatedAt = notification.CreatedAt,
             UpdatedAt = notification.UpdatedAt
         }).ToList();
+    }
+
+    public async Task<int> GetCountOfUnreadNotificationsAsync(Guid userId)
+    {
+        await _helper.GetUserOr404(userId);
+
+        int notificationsCount = await _notificationRepository.GetCountOfUnReadNotifications(userId);
+
+        _logger.LogInformation("Successfull response of notifications count: {userId}", userId);
+
+        return notificationsCount;
     }
 }

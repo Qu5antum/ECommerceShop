@@ -18,9 +18,13 @@ services:
       Jwt__Issuer: "EcommerceApi"
       Jwt__Audience: "EcommerceClient"
 
+    working_dir: /app/src/App
+
     volumes:
+      - ./backend:/app
+      - /app/src/App/bin
+      - /app/src/App/obj
       - ./backend/src/App/wwwroot/images:/app/src/App/wwwroot/images
-      - working_dir: /app
 
   shop.database:
     image: postgres:18
