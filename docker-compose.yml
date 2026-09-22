@@ -20,6 +20,7 @@ services:
 
     volumes:
       - ./backend/src/App/wwwroot/images:/app/src/App/wwwroot/images
+      - working_dir: /app
 
   shop.database:
     image: postgres:18

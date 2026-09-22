@@ -18,7 +18,7 @@ public class CartItemRepository(AppDbContext context) : BaseRepository<CartItem>
 
     public async Task<IEnumerable<CartItem>> GetAllItemsInCartAsyncByCartId(Guid cartId)
     {
-        return await _context.cartItems
+        return await _context.CartItems
             .AsNoTracking()
             .Where(i => i.CartId == cartId)
             .ToListAsync();
@@ -26,7 +26,7 @@ public class CartItemRepository(AppDbContext context) : BaseRepository<CartItem>
 
     public async Task<bool> GetCartItemByProductId(Guid productId)
     {
-        return await _context.cartItems
+        return await _context.CartItems
             .AsNoTracking()
             .AnyAsync(i => i.ProductId == productId);
     }

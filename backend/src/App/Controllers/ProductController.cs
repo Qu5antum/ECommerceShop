@@ -119,10 +119,31 @@ public class ProductController : ControllerBase
     [HttpGet("Search")]
     [ProducesResponseType(200)]
     [ProducesResponseType(401)]
-    [ProducesResponseType(404)]
     public async Task<IActionResult> SearchProduct(string productName)
     {
         var products = await _service.SearchProductAsync(productName);
+
+        return Ok(products);
+    }
+
+    [Authorize]
+    [HttpGet("Search/Min")]
+    [ProducesResponseType(200)]
+    [ProducesResponseType(401)]
+    public async Task<IActionResult> SearchProductAsc(string productName)
+    {
+        var products = await _service.SearchProductByPriceAsc(productName);
+
+        return Ok(products);
+    }
+
+    [Authorize]
+    [HttpGet("Search/Max")]
+    [ProducesResponseType(200)]
+    [ProducesResponseType(401)]
+    public async Task<IActionResult> SearchProductDesc(string productName)
+    {
+        var products = await _service.SearchProductByPriceDesc(productName);
 
         return Ok(products);
     }

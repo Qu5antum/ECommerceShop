@@ -15,11 +15,12 @@ public class AppDbContext : DbContext
     public DbSet<Product> Products => Set<Product>();
     public DbSet<SellerProfile> SellerProfiles => Set<SellerProfile>();
     public DbSet<Cart> Carts => Set<Cart>();
-    public DbSet<CartItem> cartItems => Set<CartItem>();
+    public DbSet<CartItem> CartItems => Set<CartItem>();
     public DbSet<Order> Orders => Set<Order>();
     public DbSet<OrderItem> OrderItems => Set<OrderItem>();
     public DbSet<Payment> Payments => Set<Payment>();
     public DbSet<Review> Reviews => Set<Review>();
+    public DbSet<Notification> Notifications => Set<Notification>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -204,6 +205,11 @@ public class AppDbContext : DbContext
 
             entity.ToTable(t => t.HasCheckConstraint("CK_Review_Rating_Range", "\"Rating\" >= 1 AND \"Rating\" <= 5"));
             entity.HasIndex(r => new { r.UserId, r.ProductId }).IsUnique();
+        });
+
+        modelBuilder.Entity<Notification>(entity =>
+        {
+            entity.HasIndex(n => new { n.UserId, n.IsRead });
         });
     }
 }

@@ -35,13 +35,13 @@ public class CartRepository(AppDbContext context) : BaseRepository<Cart>(context
 
     public async Task ClearCartAsync(Guid cartId)
     {
-        var cartItems = await _context.cartItems
+        var cartItems = await _context.CartItems
             .Where(ci => ci.CartId == cartId)
             .ToListAsync();
 
         if (cartItems.Any())
         {
-            _context.cartItems.RemoveRange(cartItems);
+            _context.CartItems.RemoveRange(cartItems);
         }
     }
 }

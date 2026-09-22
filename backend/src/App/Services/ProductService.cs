@@ -18,6 +18,8 @@ public interface IProductService
     Task<(Stream FileStream, string ContentType)?> GetProductImageAsync(Guid productId);
     Task<List<ProductResponseDto>> GetProductsByCategoryIdAsync(Guid categoryId);
     Task<List<ProductResponseDto>> SearchProductAsync(string productName);
+    Task<List<ProductResponseDto>> SearchProductByPriceDesc(string productName);
+    Task<List<ProductResponseDto>> SearchProductByPriceAsc(string productName);
 }
 
 
@@ -348,6 +350,50 @@ public class ProductService : IProductService
     public async Task<List<ProductResponseDto>> SearchProductAsync(string productName)
     {
         var products = await _productRepository.SearchProductByNameAsync(productName);
+
+        _logger.LogInformation("Successfull response of products, product name: {productName}", productName);
+
+        return products.Select(product => new ProductResponseDto
+        {
+            Id = product.Id,
+            SellerProfileId = product.SellerProfileId,
+            CategoryId = product.CategoryId,
+            Name = product.Name,
+            Description = product.Description,
+            Price = product.Price,
+            SKU = product.SKU,
+            Stock = product.Stock,
+            ImageUrl = product.ImageUrl,
+            CreatedAt = product.CreatedAt,
+            UpdatedAt = product.UpdatedAt
+        }).ToList();
+    }
+
+    public async Task<List<ProductResponseDto>> SearchProductByPriceDesc(string productName)
+    {
+        var products = await _productRepository.SearchProductByPriceDesc(productName);
+
+        _logger.LogInformation("Successfull response of products, product name: {productName}", productName);
+
+        return products.Select(product => new ProductResponseDto
+        {
+            Id = product.Id,
+            SellerProfileId = product.SellerProfileId,
+            CategoryId = product.CategoryId,
+            Name = product.Name,
+            Description = product.Description,
+            Price = product.Price,
+            SKU = product.SKU,
+            Stock = product.Stock,
+            ImageUrl = product.ImageUrl,
+            CreatedAt = product.CreatedAt,
+            UpdatedAt = product.UpdatedAt
+        }).ToList();
+    }
+
+    public async Task<List<ProductResponseDto>> SearchProductByPriceAsc(string productName)
+    {
+        var products = await _productRepository.SearchProductByPriceAsc(productName);
 
         _logger.LogInformation("Successfull response of products, product name: {productName}", productName);
 
