@@ -76,6 +76,13 @@ builder.Services.AddAuthentication(options =>
     };
 });
 
+// Redis configuration
+builder.Services.AddStackExchangeRedisCache(option =>
+{
+    option.Configuration = builder.Configuration.GetConnectionString("Redis");
+    option.InstanceName = "Shop_";
+});
+
 builder.Services.AddAuthorization();
 
 builder.Services.AddControllers();
