@@ -22,7 +22,7 @@ public class CartService : ICartService
         _logger = logger;
     }
 
-     public async Task<CartResponseDto> GetCartAsync(Guid userId)
+    public async Task<CartResponseDto> GetCartAsync(Guid userId)
     {
         var cart = await _repository.GetCartWithItemsByUserIdAsync(userId);
 

@@ -5,6 +5,7 @@ using App.Repositories;
 using App.Transactions;
 using App.Enum;
 using Microsoft.EntityFrameworkCore;
+using App.Services.Caching;
 
 namespace App.Services;
 
@@ -30,6 +31,22 @@ public class OrderService : IOrderService
     private readonly ILogger<OrderService> _logger;
     private readonly IHelperService _helper;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly IRedisCacheService _cache;
+
+    private static string GetOrdersCacheKeyByUser(Guid userId)
+    {
+        return $"orders:{userId}";
+    }
+
+    private static string GetOrderCacheKeyByOrderIdAndUser(Guid userId, Guid orderId)
+    {
+        return $"order:{userId}:{orderId}";
+    }
+
+    private static string GetOrdersCacheKeyOfSeller(Guid userId)
+    {
+        return $"orderSeller:{userId}";
+    }
 
     public OrderService
     (
@@ -40,7 +57,8 @@ public class OrderService : IOrderService
         ISellerProfileRepository sellerRepository,
         ILogger<OrderService> logger, 
         IHelperService helper, 
-        IUnitOfWork unitOfWork
+        IUnitOfWork unitOfWork,
+        IRedisCacheService cache
     )
     {
         _orderRepository = orderRepository;
@@ -51,6 +69,7 @@ public class OrderService : IOrderService
         _logger = logger;
         _helper = helper;
         _unitOfWork = unitOfWork;
+        _cache = cache;
     }
 
     public async Task<OrderReponseDto> CreateOrderAsync(Guid userId)
@@ -145,6 +164,12 @@ public class OrderService : IOrderService
             await _unitOfWork.SaveChangesAsync();
             await _unitOfWork.CommitAsync();
 
+            _logger.LogInformation("Product successfully created, order ID: {orderId}, user ID: {userId}", newOrder.Id, userId);
+
+            await _cache.RemoveDataAsync(GetOrdersCacheKeyByUser(userId));
+
+            _logger.LogInformation("Products deleted from redis cache: {userId}", userId);
+
             return new OrderReponseDto
             {
                 Id = newOrder.Id,
@@ -176,11 +201,19 @@ public class OrderService : IOrderService
     {
         await _helper.GetUserOr404(userId);
 
+        var cacheKey = GetOrdersCacheKeyByUser(userId);
+
+        var cachedOrder = await _cache.GetDataAsync<List<OrderReponseDto>>(cacheKey);
+
+        if (cachedOrder is not null)
+        {
+            _logger.LogInformation("Order retrieved from redis cache");
+            return cachedOrder;
+        } 
+
         var orders = await _orderRepository.GetOrdersByUserIdAsync(userId);
 
-        _logger.LogInformation("Successfull response of orders: {userId}", userId);
-
-        return orders.Select(order => new OrderReponseDto 
+        var result =  orders.Select(order => new OrderReponseDto 
         {
             Id = order.Id,
             userId = order.userId,
@@ -198,11 +231,31 @@ public class OrderService : IOrderService
                 Quantity = item.Quantity   
             }).ToList()
         }).ToList();
+
+        await _cache.SetDataAsync(
+            cacheKey,
+            result,
+            TimeSpan.FromMinutes(5)
+        );
+
+        _logger.LogInformation("Successfull response of orders: {userId}", userId);
+        
+        return result;
     }
 
     public async Task<OrderReponseDto> GetOrderByUserIdAsync(Guid userId, Guid orderId)
     {
         await _helper.GetUserOr404(userId);
+
+        var cacheKey = GetOrderCacheKeyByOrderIdAndUser(userId, orderId);
+
+        var cachedOrder = await _cache.GetDataAsync<OrderReponseDto>(cacheKey);
+
+        if(cachedOrder is not null)
+        {
+            _logger.LogInformation("Order retrieved from redis cache, order ID: {orderId}, user ID: {userId}", orderId, userId);
+            return cachedOrder;
+        }
 
         var order = await _orderRepository.GetOrderWithItemsById(orderId);
 
@@ -218,9 +271,7 @@ public class OrderService : IOrderService
             throw new BadRequestException("Order does not belong to user");
         }
 
-        _logger.LogInformation("Successfully retrieved order: {orderId}", orderId);
-
-        return new OrderReponseDto
+        var result = new OrderReponseDto
         {
             Id = order.Id,
             userId = order.userId,
@@ -238,6 +289,16 @@ public class OrderService : IOrderService
                 Quantity = item.Quantity
             }).ToList()
         };
+
+        await _cache.SetDataAsync(
+            cacheKey,
+            result,
+            TimeSpan.FromMinutes(5)
+        );
+
+        _logger.LogInformation("Successfully retrieved order: {orderId}", orderId);
+        
+        return result;
     }
 
     public async Task<bool> CancelOrderAsync(Guid userId, Guid orderId)
@@ -283,6 +344,10 @@ public class OrderService : IOrderService
 
             _logger.LogWarning("Order was cancelled, user ID: {userId}, order ID: {orderId}", userId, orderId);
 
+            await _cache.RemoveDataAsync(GetOrdersCacheKeyByUser(userId));
+
+            _logger.LogInformation("Order deleted from redis cache: {userId}", userId);
+
             return true;
         }
         catch (DbUpdateException ex)
@@ -303,11 +368,19 @@ public class OrderService : IOrderService
             throw new NotFoundException("Seller not found by user");
         }
 
+        var cacheKey = GetOrdersCacheKeyOfSeller(userId);
+
+        var cachedOrders = await _cache.GetDataAsync<List<SellerOrderItemResponseDto>>(cacheKey);
+
+        if (cachedOrders is not null)
+        {
+            _logger.LogInformation("Orders retrieved from redis cache: {userId}", userId);
+            return cachedOrders;
+        }
+
         var orderItems = await _orderItemRepository.GetOrderItemsBySellerIdAsync(seller.Id);
 
-        _logger.LogInformation("Successfully retrieved orders for seller: {sellerProfileId}", seller.Id);
-
-        return orderItems.Select(item => new SellerOrderItemResponseDto
+        var result = orderItems.Select(item => new SellerOrderItemResponseDto
         {
             OrderId = item.orderId,
             OrderStatus = item.Order.status,
@@ -317,6 +390,16 @@ public class OrderService : IOrderService
             Price = item.Price,
             Quantity = item.Quantity
         }).ToList();
+
+        await _cache.SetDataAsync(
+            cacheKey,
+            result,
+            TimeSpan.FromMinutes(5)
+        );
+
+        _logger.LogInformation("Successfully retrieved orders for seller: {sellerProfileId}", seller.Id);
+
+        return result;
     }
 
     public async Task<bool> UpdateOrderStatusAsync(Guid orderId, UpdateOrderStatusDto orderStatusDto)

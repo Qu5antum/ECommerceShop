@@ -2,6 +2,7 @@ using App.DTOs;
 using App.Exceptions;
 using App.Models;
 using App.Repositories;
+using App.Services.Caching;
 using App.Transactions;
 using Microsoft.EntityFrameworkCore;
 
@@ -23,13 +24,20 @@ public class ReviewService : IReviewService
     private readonly ILogger<ReviewService> _logger;
     private readonly IHelperService _helper;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly IRedisCacheService _cache;
 
-    public ReviewService(IReviewRepository reviewRepository, ILogger<ReviewService> logger, IHelperService helper, IUnitOfWork unitOfWork)
+    private static string GetReviewsCacheKey(Guid productId)
+    {
+        return $"review:{productId}";
+    }
+
+    public ReviewService(IReviewRepository reviewRepository, ILogger<ReviewService> logger, IHelperService helper, IUnitOfWork unitOfWork, IRedisCacheService cache)
     {
         _reviewRepository = reviewRepository;
         _logger = logger;
         _helper = helper;
         _unitOfWork = unitOfWork;
+        _cache = cache;
     }
 
     public async Task<ReviewResponseDto> CreateReviewAsync(Guid userId, Guid productId, CreateReviewDto createReviewDto)
@@ -67,6 +75,10 @@ public class ReviewService : IReviewService
             await _unitOfWork.CommitAsync();
 
             _logger.LogInformation("Review successfully created: {reviewId}", newReview.Id);
+
+            await _cache.RemoveDataAsync(GetReviewsCacheKey(productId));
+
+            _logger.LogInformation("Reviews deleted from redis cache");
 
             return new ReviewResponseDto
             {
@@ -168,11 +180,19 @@ public class ReviewService : IReviewService
     {
         await _helper.GetProductOr404(productId);
 
+        var cacheKey = GetReviewsCacheKey(productId);
+
+        var cachedReviews = await _cache.GetDataAsync<List<ReviewResponseDto>>(cacheKey);
+
+        if (cachedReviews is not null)
+        {
+            _logger.LogInformation("Review retrieved from redis cache");
+            return cachedReviews;
+        }
+
         var reviews = await _reviewRepository.GetReviewsByProductId(productId);
 
-        _logger.LogInformation("Successfull response of reviews by product: {productId}", productId);
-
-        return reviews.Select(review => new ReviewResponseDto
+        var result = reviews.Select(review => new ReviewResponseDto
         {
             Id = review.Id,
             UserId = review.UserId,
@@ -182,5 +202,15 @@ public class ReviewService : IReviewService
             CreatedAt = review.CreatedAt,
             UpdatedAt = review.UpdatedAt
         }).ToList();
+
+        await _cache.SetDataAsync(
+            cacheKey,
+            result,
+            TimeSpan.FromMinutes(5)
+        );
+
+        _logger.LogInformation("Successfull response of reviews by product: {productId}", productId);
+        
+        return result;
     }
 }

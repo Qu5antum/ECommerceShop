@@ -46,11 +46,18 @@ services:
     image: redis:7.4-alpine
     container_name: redis-cache
     restart: always
+
+    environment:
+      ConnectionStrings__Redis: "redis:6379,password=StrongSecurePassword123"
+
     ports:
       - "6379:6379"
+
     volumes:
       - redis_data:/data
+
     command: redis-server --appendonly yes --requirepass StrongSecurePassword123
+
     healthcheck:
       test: ["CMD", "redis-cli", "-a", "StrongSecurePassword123", "ping"]
       interval: 10s

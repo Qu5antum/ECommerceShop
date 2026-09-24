@@ -3,6 +3,7 @@ using App.Enum;
 using App.Exceptions;
 using App.Models;
 using App.Repositories;
+using App.Services.Caching;
 using App.Transactions;
 using Microsoft.EntityFrameworkCore;
 
@@ -24,14 +25,28 @@ public class PaymentService : IPaymentService
     private readonly IHelperService _helper;
     private readonly ILogger<PaymentService> _logger;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly IRedisCacheService _cache;
 
-    public PaymentService(IPaymentRepository paymentRepository, INotificationRepository notificationRepository, IHelperService helper, ILogger<PaymentService> logger, IUnitOfWork unitOfWork)
+    private static string GetPaymentCacheKey(Guid paymentId)
+    {
+        return $"payment:{paymentId}";
+    }
+
+    public PaymentService(
+        IPaymentRepository paymentRepository, 
+        INotificationRepository notificationRepository, 
+        IHelperService helper, 
+        ILogger<PaymentService> logger, 
+        IUnitOfWork unitOfWork,
+        IRedisCacheService cache
+    )
     {
         _paymentRepository = paymentRepository;
         _notificationRepository = notificationRepository;
         _helper = helper;
         _logger = logger;
         _unitOfWork = unitOfWork;
+        _cache = cache;
     }
 
     public async Task<PaymentResponseDto> CreatePaymentAsync(Guid userId, Guid orderId)
@@ -98,6 +113,16 @@ public class PaymentService : IPaymentService
     {
         await _helper.GetUserOr404(userId);
 
+        var cacheyKey = GetPaymentCacheKey(paymentId);
+
+        var cachedPayment = await _cache.GetDataAsync<PaymentResponseDto>(cacheyKey);
+
+        if (cachedPayment is not null)
+        {
+            _logger.LogInformation("Payment retrieved from redis cache, user ID: {userId}, payment ID: {paymentId}", userId, paymentId);
+            return cachedPayment;
+        }
+
         var order = await _helper.GetOrderOr404(orderId);
 
         if (order.userId != userId)
@@ -114,7 +139,7 @@ public class PaymentService : IPaymentService
             throw new BadRequestException("Payment does not belong to order");
         }
         
-        return new PaymentResponseDto
+        var result = new PaymentResponseDto
         {
             Id = payment.Id,
             OrderId = payment.OrderId,
@@ -124,6 +149,16 @@ public class PaymentService : IPaymentService
             CreatedAt = payment.CreatedAt,
             UpdatedAt = payment.UpdatedAt
         };
+
+        await _cache.SetDataAsync(
+            cacheyKey,
+            result,
+            TimeSpan.FromMinutes(5)
+        );
+
+        _logger.LogInformation("Successfull response of payment of user: {userId}", userId);
+
+        return result;
     }
 
     public async Task<bool> ProcessWebhookAsync(PaymentWebhookDto webhookDto)
@@ -190,6 +225,12 @@ public class PaymentService : IPaymentService
             await _notificationRepository.CreateAsync(notification);
             await _unitOfWork.SaveChangesAsync();
             await _unitOfWork.CommitAsync();
+
+            _logger.LogInformation("Payment status updated: {paymentId}", payment.Id);
+
+            await _cache.RemoveDataAsync(GetPaymentCacheKey(payment.Id));
+
+            _logger.LogInformation("Payment deleted from redis cache: {paymentId}", payment.Id);
 
             return true;
         }

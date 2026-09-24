@@ -2,6 +2,7 @@ using App.DTOs;
 using App.Exceptions;
 using App.Models;
 using App.Repositories;
+using App.Services.Caching;
 using App.Transactions;
 using Microsoft.EntityFrameworkCore;
 
@@ -31,6 +32,22 @@ public class ProductService : IProductService
     private readonly ILogger<ProductService> _logger;
     private readonly IHelperService _helper;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly IRedisCacheService _cache;
+
+    private static string GetProductsCacheKey()
+    {
+        return $"products:all";
+    }
+
+    private static string GetProductCacheKeyById(Guid productId)
+    {
+        return $"products:{productId}";
+    }
+
+    private static string GetProductsCacheKeyByCategoryId(Guid categoryId)
+    {
+        return $"products:{categoryId}";
+    }
 
     public ProductService
     (
@@ -39,7 +56,8 @@ public class ProductService : IProductService
         IFileStorageService fileService,
         ILogger<ProductService> logger,
         IHelperService helper,
-        IUnitOfWork unitOfWork
+        IUnitOfWork unitOfWork,
+        IRedisCacheService cache
     )
     {
         _productRepository = productRepository;
@@ -48,6 +66,7 @@ public class ProductService : IProductService
         _logger = logger;
         _helper = helper;
         _unitOfWork = unitOfWork;
+        _cache = cache;
     }
 
     public async Task<ProductResponseDto> CreateProductAsync(Guid userId, ProductCreateDto productCreateDto)
@@ -92,6 +111,10 @@ public class ProductService : IProductService
             await _unitOfWork.CommitAsync();
 
             _logger.LogInformation("Product successfully create: {productId}", newProduct.Id);
+
+            await _cache.RemoveDataAsync(GetProductsCacheKey());
+
+            _logger.LogInformation("Products deleted from redis cache");
 
             return new ProductResponseDto
             {
@@ -201,6 +224,11 @@ public class ProductService : IProductService
 
             _logger.LogInformation("Product successfully updated");
 
+            await _cache.RemoveDataAsync(GetProductsCacheKey());
+            await _cache.RemoveDataAsync(GetProductCacheKeyById(productId));
+
+            _logger.LogInformation("Products deleted from redis cache");
+
             return true;
         }
         catch (DbUpdateException ex)
@@ -257,6 +285,11 @@ public class ProductService : IProductService
 
             _logger.LogInformation("Product successfully deleted");
 
+            await _cache.RemoveDataAsync(GetProductsCacheKey());
+            await _cache.RemoveDataAsync(GetProductCacheKeyById(productId));
+
+            _logger.LogInformation("Products deleted from redis cache");
+
             return true;
         }
         catch (DbUpdateException ex)
@@ -271,9 +304,17 @@ public class ProductService : IProductService
     {
         var product = await _helper.GetProductOr404(productId);
 
-        _logger.LogInformation("Product successfull response");
+        var cacheKey = GetProductCacheKeyById(productId);
 
-        return new ProductResponseDto
+        var cachedProduct = await _cache.GetDataAsync<ProductResponseDto>(cacheKey);
+
+        if (cachedProduct is not null)
+        {
+            _logger.LogInformation("Product retrieved from redis cache: {productId}", productId);
+            return cachedProduct;
+        }
+
+        var result = new ProductResponseDto
         {
             Id = product.Id,
             SellerProfileId = product.SellerProfileId,
@@ -287,15 +328,33 @@ public class ProductService : IProductService
             CreatedAt = product.CreatedAt,
             UpdatedAt = product.UpdatedAt
         };
+
+        await _cache.SetDataAsync(
+            cacheKey,
+            result,
+            TimeSpan.FromMinutes(5)
+        );
+
+        _logger.LogInformation("Product successfull response: {productId}", productId);
+
+        return result;
     }
 
     public async Task<List<ProductResponseDto>> GetProductsAsync()
     {
+        var cacheKey = GetProductsCacheKey();
+
+        var cacheProducts = await _cache.GetDataAsync<List<ProductResponseDto>>(cacheKey);
+
+        if (cacheProducts is not null)
+        {
+            _logger.LogInformation("Products retrieved from redis cache");
+            return cacheProducts;
+        }
+
         var products = await _productRepository.GetAllAsync();
 
-        _logger.LogInformation("Products successfull response");
-
-        return products.Select(product => new ProductResponseDto
+        var result = products.Select(product => new ProductResponseDto
         {
             Id = product.Id,
             SellerProfileId = product.SellerProfileId,
@@ -309,6 +368,16 @@ public class ProductService : IProductService
             CreatedAt = product.CreatedAt,
             UpdatedAt = product.UpdatedAt
         }).ToList();
+
+        await _cache.SetDataAsync(
+            cacheKey,
+            result,
+            TimeSpan.FromMinutes(5)
+        );
+
+        _logger.LogInformation("Products successfull response");
+
+        return result;
     }
 
     public async Task<(Stream FileStream, string ContentType)?> GetProductImageAsync(Guid productId)
@@ -327,11 +396,19 @@ public class ProductService : IProductService
     {
         await _helper.GetCategoryOr404(categoryId);
 
+        var cacheKey = GetProductsCacheKeyByCategoryId(categoryId);
+
+        var cachedProducts = await _cache.GetDataAsync<List<ProductResponseDto>>(cacheKey);
+
+        if (cachedProducts is not null)
+        {
+            _logger.LogInformation("Products retrieved from redis cache: {categoryId}", categoryId);
+            return cachedProducts;
+        }
+
         var products = await _productRepository.GetProductsByCategoryIdAsync(categoryId);
 
-        _logger.LogInformation("Successfull response of products, categoryID: {categoryId}", categoryId);
-
-        return products.Select(product => new ProductResponseDto
+        var result = products.Select(product => new ProductResponseDto
         {
             Id = product.Id,
             SellerProfileId = product.SellerProfileId,
@@ -345,6 +422,16 @@ public class ProductService : IProductService
             CreatedAt = product.CreatedAt,
             UpdatedAt = product.UpdatedAt
         }).ToList();
+
+        await _cache.SetDataAsync(
+            cacheKey,
+            result,
+            TimeSpan.FromMinutes(5)
+        );
+
+        _logger.LogInformation("Successfull response of products, categoryID: {categoryId}", categoryId);
+
+        return result;
     }
 
     public async Task<List<ProductResponseDto>> SearchProductAsync(string productName)

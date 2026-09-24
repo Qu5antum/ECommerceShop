@@ -1,8 +1,8 @@
-using System.Data.Common;
 using App.DTOs;
 using App.Exceptions;
 using App.Models;
 using App.Repositories;
+using App.Services.Caching;
 using App.Transactions;
 using Microsoft.EntityFrameworkCore;
 
@@ -25,13 +25,31 @@ public class CartItemService : ICartItemService
     private readonly ILogger<CartItemService> _logger;
     private readonly IHelperService _helper;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly IRedisCacheService _cache;
 
-    public CartItemService(ICartItemRepository itemRepository, ICartRepository cartRepository, ILogger<CartItemService> logger, IHelperService helper, IUnitOfWork unitOfWork)
+    private static string GetCartItemsCacheKeyByUser(Guid userId)
+    {
+        return $"cartItems:{userId}";
+    }
+
+    private static string GetCartItemCacheKey(Guid itemId)
+    {
+        return $"cartItem:{itemId}";
+    }
+
+    public CartItemService(
+        ICartItemRepository itemRepository, 
+        ICartRepository cartRepository, 
+        ILogger<CartItemService> logger, 
+        IHelperService helper, 
+        IRedisCacheService cache,
+        IUnitOfWork unitOfWork)
     {
         _itemRepository = itemRepository;
         _cartRepository = cartRepository;
         _logger = logger;
         _helper = helper;
+        _cache = cache;
         _unitOfWork = unitOfWork;
     }
 
@@ -72,6 +90,10 @@ public class CartItemService : ICartItemService
             await _unitOfWork.CommitAsync();
 
             _logger.LogInformation("Cart item successfully created, cartID: {cartId}", cartId);
+
+            await _cache.RemoveDataAsync(GetCartItemsCacheKeyByUser(userId));
+
+            _logger.LogInformation("Cart items deleted from redis cache: {userId}", userId);
 
             return new CartItemResponseDto
             {
@@ -123,6 +145,11 @@ public class CartItemService : ICartItemService
 
             _logger.LogInformation("Cart item successfully updated");
 
+            await _cache.RemoveDataAsync(GetCartItemsCacheKeyByUser(userId)); 
+            await _cache.RemoveDataAsync(GetCartItemCacheKey(itemId));
+
+            _logger.LogInformation("Cart items deleted from redis cache: {userId}", userId);
+
             return true;
         }
         catch (DbUpdateException ex)
@@ -167,6 +194,11 @@ public class CartItemService : ICartItemService
 
             _logger.LogInformation("Item successfully delete from cart, cart ID: {cartId}, item ID: {itemId}", cartId, itemId);
 
+            await _cache.RemoveDataAsync(GetCartItemsCacheKeyByUser(userId));
+            await _cache.RemoveDataAsync(GetCartItemCacheKey(itemId));
+
+            _logger.LogInformation("Cart items deleted from redis cache: {userId}", userId);
+
             return true;
         }
         catch (DbUpdateException ex)
@@ -175,12 +207,20 @@ public class CartItemService : ICartItemService
             _logger.LogError(ex, "Database error while deleting item from cart: {Message}", ex.Message);
             throw new DatabaseException("Database error while deleting item from cart");
         }
-
-        
     }
 
     public async Task<List<CartItemResponseDto>> GetAllItemsInCartAsync(Guid userId)
     {
+        var cacheKey = GetCartItemsCacheKeyByUser(userId);
+
+        var cachedItems = await _cache.GetDataAsync<List<CartItemResponseDto>>(cacheKey);
+
+        if (cachedItems is not null)
+        {
+            _logger.LogInformation("Cart items retrieved from redis cache");
+            return cachedItems;
+        }
+
         await _helper.GetUserOr404(userId);
 
         var cartId = await _cartRepository.GetCartIdByUserId(userId);
@@ -193,7 +233,7 @@ public class CartItemService : ICartItemService
 
         var cartItems = await _itemRepository.GetAllItemsInCartAsyncByCartId(cartId.Value);
 
-        return cartItems.Select(item => new CartItemResponseDto
+        var result = cartItems.Select(item => new CartItemResponseDto
         {
             Id = item.Id,
             CartId = item.CartId,
@@ -202,10 +242,30 @@ public class CartItemService : ICartItemService
             CreatedAt = item.CreatedAt,
             UpdatedAt = item.UpdatedAt
         }).ToList();
+
+        await _cache.SetDataAsync(
+            cacheKey,
+            result,
+            TimeSpan.FromMinutes(5)
+        );
+
+        _logger.LogInformation("Cart items successfull response: user ID: {UserId}", userId);
+
+        return result;
     }
 
     public async Task<CartItemResponseDto> GetItemInCartByIdAsync(Guid userId, Guid itemId)
     {
+        var cacheKey = GetCartItemCacheKey(itemId);
+
+        var cachedCartItem = await _cache.GetDataAsync<CartItemResponseDto>(cacheKey);
+
+        if (cachedCartItem is not null)
+        {
+            _logger.LogInformation("Cart item retrieved from redis cache");
+            return cachedCartItem;
+        }
+
         await _helper.GetUserOr404(userId);
 
         var cartId = await _cartRepository.GetCartIdByUserId(userId);
@@ -224,7 +284,7 @@ public class CartItemService : ICartItemService
             throw new BadRequestException("Cart item does not belong to user");
         }
 
-        return new CartItemResponseDto
+        var result = new CartItemResponseDto
         {
             Id = cartItem.Id,
             CartId = cartItem.CartId,
@@ -233,6 +293,14 @@ public class CartItemService : ICartItemService
             CreatedAt = cartItem.CreatedAt,
             UpdatedAt = cartItem.UpdatedAt
         };
+
+        await _cache.SetDataAsync(
+            cacheKey,
+            result,
+            TimeSpan.FromMinutes(5)
+        );
+
+        return result;
     }
 }
 

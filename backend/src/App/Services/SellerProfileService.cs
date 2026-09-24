@@ -3,6 +3,7 @@ using App.Enum;
 using App.Exceptions;
 using App.Models;
 using App.Repositories;
+using App.Services.Caching;
 using App.Transactions;
 using Microsoft.EntityFrameworkCore;
 
@@ -23,13 +24,20 @@ public class SellerProfileService : ISellerProfileService
     private readonly ILogger<SellerProfileService> _logger;
     private readonly IHelperService _helper;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly IRedisCacheService _cache;
 
-    public SellerProfileService(ISellerProfileRepository profileRepository, ILogger<SellerProfileService> logger, IHelperService helper, IUnitOfWork unitOfWork)
+    private static string GetSellerProfileCacheKey(Guid userId)
+    {
+        return $"seller:{userId}";
+    }
+
+    public SellerProfileService(ISellerProfileRepository profileRepository, ILogger<SellerProfileService> logger, IHelperService helper, IUnitOfWork unitOfWork, IRedisCacheService cache)
     {
         _profileRepository = profileRepository;
         _logger = logger;
         _helper = helper;
         _unitOfWork = unitOfWork;
+        _cache = cache;
     }
 
     public async Task<SellerProfileResponseDto> CreateSellerProfileAsync(Guid currentUserId, SellerProfileCreateDto profileCreateDto)
@@ -117,6 +125,12 @@ public class SellerProfileService : ISellerProfileService
             await _unitOfWork.SaveChangesAsync();
             await _unitOfWork.CommitAsync();
 
+            _logger.LogInformation("Seller profile successfully updated: {userId}", userId);
+
+            await _cache.RemoveDataAsync(GetSellerProfileCacheKey(userId));
+
+            _logger.LogInformation("Seller profile deleted from redis cache: {userId}", userId);
+            
             return true;
         }
         catch (DbUpdateException ex)
@@ -130,6 +144,16 @@ public class SellerProfileService : ISellerProfileService
     public async Task<SellerProfileResponseDto> GetUserSellerProfileAsync(Guid userId)
     {
         await _helper.GetUserOr404(userId);
+
+        var cacheKey = GetSellerProfileCacheKey(userId);
+
+        var cachedSellerProfile = await _cache.GetDataAsync<SellerProfileResponseDto>(cacheKey);
+
+        if (cachedSellerProfile is not null)
+        {
+            _logger.LogInformation("Seller profile retrieved from redis cache");
+            return cachedSellerProfile;
+        }
         
         var sellerProfile = await _profileRepository.GetSellerProfileByUserIdAsync(userId);
 
@@ -139,7 +163,7 @@ public class SellerProfileService : ISellerProfileService
             throw new NotFoundException("User don't have seller profile");
         }
 
-        return new SellerProfileResponseDto
+        var result = new SellerProfileResponseDto
         {
             Id = sellerProfile.Id,
             userId = sellerProfile.userId,
@@ -149,5 +173,15 @@ public class SellerProfileService : ISellerProfileService
             CreatedAt = sellerProfile.CreatedAt,
             UpdatedAt = sellerProfile.UpdatedAt
         };
+
+        await _cache.SetDataAsync(
+            cacheKey,
+            result,
+            TimeSpan.FromMinutes(5)
+        );
+
+        _logger.LogInformation("Successfull response of seller profile: {userId}", userId);
+
+        return result;
     }
 }

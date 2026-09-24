@@ -2,6 +2,7 @@ using App.DTOs;
 using App.Exceptions;
 using App.Models;
 using App.Repositories;
+using App.Services.Caching;
 using App.Transactions;
 using Microsoft.EntityFrameworkCore;
 
@@ -24,13 +25,20 @@ public class CategoryService : ICategoryService
     private readonly ILogger<CategoryService> _logger;
     private readonly IHelperService _helper;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly IRedisCacheService _cache;
 
-    public CategoryService(ICategoryRepsitory repsitory, ILogger<CategoryService> logger, IHelperService helper, IUnitOfWork unitOfWork)
+    private static string GetCategoryCacheKey(Guid categoryId)
+    {
+        return $"category:{categoryId}";
+    }
+
+    public CategoryService(ICategoryRepsitory repsitory, ILogger<CategoryService> logger, IHelperService helper, IUnitOfWork unitOfWork, IRedisCacheService cache)
     {
         _repository = repsitory;
         _logger = logger;
         _helper = helper;
         _unitOfWork = unitOfWork;
+        _cache = cache;
     }
 
     public async Task<CategoryResponseDto> CreateCategoryAsync(CategoryCreateDto categoryCreateDto)
@@ -64,8 +72,12 @@ public class CategoryService : ICategoryService
             await _repository.CreateAsync(newCategory);
             await _unitOfWork.SaveChangesAsync();
             await _unitOfWork.CommitAsync();
-
+            
             _logger.LogInformation("Category successfully created");
+
+            await _cache.RemoveDataAsync("categories:all");
+
+            _logger.LogInformation("Categories deleted from redis cache");
 
             return new CategoryResponseDto
             {
@@ -86,11 +98,20 @@ public class CategoryService : ICategoryService
 
     public async Task<List<CategoryResponseDto>> GetAllCategoriesAsync()
     {
+        var cacheKey = $"categories:all";
+
+        var cachedCategories = await _cache.GetDataAsync<List<CategoryResponseDto>>(cacheKey);
+
+        if (cachedCategories is not null)
+        {
+            _logger.LogInformation("Categories retrieved from redis cache");
+
+            return cachedCategories;
+        }
+
         var categories = await _repository.GetAllAsync();
 
-        _logger.LogInformation("Successfull response of categories");
-
-        return categories.Select(category => new CategoryResponseDto
+        var result = categories.Select(category => new CategoryResponseDto
         {
             Id = category.Id,
             Title = category.Title,
@@ -98,6 +119,16 @@ public class CategoryService : ICategoryService
             CreatedAt = category.CreatedAt,
             UpdatedAt = category.UpdatedAt
         }).ToList();
+
+        await _cache.SetDataAsync(
+            cacheKey,
+            result,
+            TimeSpan.FromMinutes(5)
+        );
+
+        _logger.LogInformation("Successfull response of categories");
+
+        return result;
     }
 
     public async Task<bool> UpdateCategoryByIdAsync(Guid categoryId, CategoryUpdateDto categoryUpdateDto)
@@ -125,6 +156,11 @@ public class CategoryService : ICategoryService
 
             _logger.LogInformation("Category successfully updated: {categoryId}", categoryId);
 
+            await _cache.RemoveDataAsync("categories:all");
+            await _cache.RemoveDataAsync(GetCategoryCacheKey(categoryId));
+
+            _logger.LogInformation("Categories deleted from redis cache");
+
             return true;
         }
         catch (DbUpdateException ex)
@@ -149,6 +185,11 @@ public class CategoryService : ICategoryService
 
             _logger.LogInformation("Category successfully updated: {categoryId}", categoryId);
 
+            await _cache.RemoveDataAsync("categories:all");
+            await _cache.RemoveDataAsync(GetCategoryCacheKey(categoryId));
+
+            _logger.LogInformation("Categories deleted from redis cache");
+
             return true;
         }
         catch (DbUpdateException ex)
@@ -162,9 +203,19 @@ public class CategoryService : ICategoryService
 
     public async Task<CategoryResponseDto> GetCategoryByIdAsync(Guid categoryId)
     {
+        var cacheKey = GetCategoryCacheKey(categoryId);
+
+        var cachedCategory = await _cache.GetDataAsync<CategoryResponseDto>(cacheKey);
+
+        if (cachedCategory is not null)
+        {
+            _logger.LogInformation("Category retrieved from redis cache");
+            return cachedCategory;
+        }
+
         var category = await _helper.GetCategoryOr404(categoryId);
 
-        return new CategoryResponseDto
+        var result = new CategoryResponseDto
         {
             Id = category.Id,
             Title = category.Title,
@@ -172,5 +223,15 @@ public class CategoryService : ICategoryService
             CreatedAt = category.CreatedAt,
             UpdatedAt = category.UpdatedAt
         };
+
+        await _cache.SetDataAsync(
+            cacheKey,
+            result,
+            TimeSpan.FromMinutes(5)
+        );
+
+        _logger.LogInformation("Successfull response of category: {categoryId}", categoryId);
+
+        return result;
     }
 }
