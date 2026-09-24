@@ -9,11 +9,11 @@ namespace App.Controllers;
 [Authorize]
 [ApiController]
 [Route("api/[controller]")]
-public class CategoryContoller : ControllerBase
+public class CategoryController : ControllerBase
 {
     private readonly ICategoryService _service;
 
-    public CategoryContoller(ICategoryService service)
+    public CategoryController(ICategoryService service)
     {
         _service = service;
     }
