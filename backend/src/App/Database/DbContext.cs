@@ -137,9 +137,6 @@ public class AppDbContext : DbContext
             entity.Property(x => x.Description)
                 .HasMaxLength(2000);
 
-            entity.Property(x => x.IsApproved)
-                .IsRequired();
-
             // SellerProfile -> User
             entity.HasOne(x => x.User)
                 .WithOne()

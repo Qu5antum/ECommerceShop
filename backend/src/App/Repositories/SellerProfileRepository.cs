@@ -1,4 +1,5 @@
 using App.Database;
+using App.Enum;
 using App.Models;
 using Microsoft.EntityFrameworkCore;
 
@@ -9,6 +10,7 @@ public interface ISellerProfileRepository : IBaseRepository<SellerProfile>
 {
     Task<SellerProfile?> GetSellerProfileByUserIdAsync(Guid userId);
     Task<bool> IsStoreNameTakenAsync(string storeName);
+    Task<List<SellerProfile>> GetSellersByStatusAsync(SellerStatus status);
 }
 
 
@@ -27,5 +29,13 @@ public class SellerProfileRepository(AppDbContext context) : BaseRepository<Sell
     {
         return await _context.SellerProfiles
             .AnyAsync(s => s.StoreName == storeName);
+    }
+
+    public async Task<List<SellerProfile>> GetSellersByStatusAsync(SellerStatus status)
+    {
+        return await _context.SellerProfiles
+            .AsNoTracking()
+            .Where(s => s.Status == status)
+            .ToListAsync();
     }
 }

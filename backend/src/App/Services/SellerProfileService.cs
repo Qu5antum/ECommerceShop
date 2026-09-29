@@ -15,6 +15,8 @@ public interface ISellerProfileService
     Task<SellerProfileResponseDto> CreateSellerProfileAsync(Guid currentUserId, SellerProfileCreateDto profileCreateDto);
     Task<SellerProfileResponseDto> GetUserSellerProfileAsync(Guid userId);
     Task<bool> UpdateSellerProfileAsync(Guid userId, Guid profileId, SellerProfileUpdateDto profileUpdateDto);
+    Task<List<SellerProfileResponseDto>> GetSellersAsync(SellerStatus status);
+    Task<bool> UpdateStatusOfSellerProfile(Guid userId, Guid sellerId, SellerStatus status);
 }
 
 
@@ -29,6 +31,11 @@ public class SellerProfileService : ISellerProfileService
     private static string GetSellerProfileCacheKey(Guid userId)
     {
         return $"seller:{userId}";
+    }
+
+    private static string GetSellerProfileWithStatusCacheyKey(SellerStatus status)
+    {
+        return $"seller:status:{status}";
     }
 
     public SellerProfileService(ISellerProfileRepository profileRepository, ILogger<SellerProfileService> logger, IHelperService helper, IUnitOfWork unitOfWork, IRedisCacheService cache)
@@ -69,7 +76,6 @@ public class SellerProfileService : ISellerProfileService
                 userId = user.Id,
                 StoreName = profileCreateDto.StoreName,
                 Description = profileCreateDto.Description,
-                IsApproved = false
             };
 
             user.AddRole(UserRole.Seller);
@@ -80,12 +86,18 @@ public class SellerProfileService : ISellerProfileService
 
             _logger.LogInformation("Seller Prorile created successfully: {profileId}", newSellerProfile.Id);
 
+            await _cache.RemoveDataAsync(GetSellerProfileWithStatusCacheyKey(SellerStatus.Approved));
+            await _cache.RemoveDataAsync(GetSellerProfileWithStatusCacheyKey(SellerStatus.Pending));
+            await _cache.RemoveDataAsync(GetSellerProfileWithStatusCacheyKey(SellerStatus.Rejected));
+            await _cache.RemoveDataAsync(GetSellerProfileWithStatusCacheyKey(SellerStatus.Suspended));
+
+            _logger.LogInformation("Profile sellers with status delete from redis cache");
+
             return new SellerProfileResponseDto
             {
                 userId = newSellerProfile.Id,
                 StoreName = newSellerProfile.StoreName,
                 Description = newSellerProfile.Description,
-                IsApproved = newSellerProfile.IsApproved
             };
         }
         catch (DbUpdateException ex)
@@ -128,7 +140,12 @@ public class SellerProfileService : ISellerProfileService
             _logger.LogInformation("Seller profile successfully updated: {userId}", userId);
 
             await _cache.RemoveDataAsync(GetSellerProfileCacheKey(userId));
+            await _cache.RemoveDataAsync(GetSellerProfileWithStatusCacheyKey(SellerStatus.Approved));
+            await _cache.RemoveDataAsync(GetSellerProfileWithStatusCacheyKey(SellerStatus.Pending));
+            await _cache.RemoveDataAsync(GetSellerProfileWithStatusCacheyKey(SellerStatus.Rejected));
+            await _cache.RemoveDataAsync(GetSellerProfileWithStatusCacheyKey(SellerStatus.Suspended));
 
+            _logger.LogInformation("Profile sellers with status delete from redis cache");
             _logger.LogInformation("Seller profile deleted from redis cache: {userId}", userId);
             
             return true;
@@ -169,7 +186,7 @@ public class SellerProfileService : ISellerProfileService
             userId = sellerProfile.userId,
             StoreName = sellerProfile.StoreName,
             Description = sellerProfile.Description,
-            IsApproved = sellerProfile.IsApproved,
+            Status = sellerProfile.Status,
             CreatedAt = sellerProfile.CreatedAt,
             UpdatedAt = sellerProfile.UpdatedAt
         };
@@ -183,5 +200,86 @@ public class SellerProfileService : ISellerProfileService
         _logger.LogInformation("Successfull response of seller profile: {userId}", userId);
 
         return result;
+    }
+
+    public async Task<List<SellerProfileResponseDto>> GetSellersAsync(SellerStatus status)
+    {
+        var cacheyKey = GetSellerProfileWithStatusCacheyKey(status);
+
+        var cachedSellers = await _cache.GetDataAsync<List<SellerProfileResponseDto>>(cacheyKey);
+
+        if (cachedSellers is not null)
+        {
+            _logger.LogInformation("Seller profile retrieved from redis cache");
+            return cachedSellers;
+        }
+
+        var sellers = await _profileRepository.GetSellersByStatusAsync(status);
+
+        var result = sellers.Select(seller => new SellerProfileResponseDto
+        {
+            Id = seller.Id,
+            userId = seller.userId,
+            StoreName = seller.StoreName,
+            Description = seller.Description,
+            Status = seller.Status,
+            CreatedAt = seller.CreatedAt,
+            UpdatedAt = seller.UpdatedAt
+        }).ToList();
+
+        await _cache.SetDataAsync(
+            cacheyKey,
+            result,
+            TimeSpan.FromMinutes(5)
+        );
+
+        _logger.LogInformation("Successfull response for sellers by status: {status}", status);
+
+        return result;
+    }
+
+    public async Task<bool> UpdateStatusOfSellerProfile(Guid userId, Guid sellerId, SellerStatus status)
+    {
+        await _helper.GetUserOr404(userId);
+        await _unitOfWork.BeginTransactionAsync();
+
+        var seller = await _helper.GetSellerProfileOr404(sellerId);
+
+        if (seller.userId == userId)
+        {
+            _logger.LogWarning("User cannot set a status for themselves, User ID: {userId}, Seller ID: {sellerId}", userId, sellerId);
+            throw new BadRequestException("User cannot set a status for themselves");
+        }
+
+        if (seller.Status == status)
+        {
+            _logger.LogWarning("This status has already been set: {sellerId}", sellerId);
+            throw new BadRequestException("This status has already been set");
+        }
+
+        try
+        {
+            seller.Status = status;
+            await _profileRepository.UpdateAsync(seller);
+            await _unitOfWork.SaveChangesAsync();
+            await _unitOfWork.CommitAsync();
+
+            _logger.LogInformation("Status of seller successfully updated: {sellerId}", sellerId);
+
+            await _cache.RemoveDataAsync(GetSellerProfileWithStatusCacheyKey(SellerStatus.Approved));
+            await _cache.RemoveDataAsync(GetSellerProfileWithStatusCacheyKey(SellerStatus.Pending));
+            await _cache.RemoveDataAsync(GetSellerProfileWithStatusCacheyKey(SellerStatus.Rejected));
+            await _cache.RemoveDataAsync(GetSellerProfileWithStatusCacheyKey(SellerStatus.Suspended));
+
+            _logger.LogInformation("Profile sellers with status delete from redis cache");
+
+            return true;
+        }
+        catch (DbUpdateException ex)
+        {
+            await _unitOfWork.RollbackAsync();
+            _logger.LogError(ex, "A database error occurred while updating the seller profile.");
+            throw new DatabaseException("Could not update the seller profile to the database.");
+        }
     }
 }

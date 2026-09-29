@@ -1,4 +1,5 @@
 using App.DTOs;
+using App.Enum;
 using App.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -65,5 +66,31 @@ public class SellerProfileController : ControllerBase
         var sellerProfile = await _service.GetUserSellerProfileAsync(userId);
 
         return Ok(sellerProfile);
+    }
+
+    [Authorize(Roles = "Admin, Moderator")]
+    [HttpGet("Status")]
+    [ProducesResponseType(200)]
+    [ProducesResponseType(400)]
+    [ProducesResponseType(401)]
+    public async Task<IActionResult> GetSellers(SellerStatus status)
+    {
+        var sellers = await _service.GetSellersAsync(status);
+
+        return Ok(sellers);
+    }
+
+    [Authorize(Roles = "Admin, Moderator")]
+    [HttpPut("{sellerId:guid}/Status")]
+    [ProducesResponseType(200)]
+    [ProducesResponseType(400)]
+    [ProducesResponseType(401)]
+    public async Task<IActionResult> UpdateStatusOfSellerProfile(Guid sellerId, SellerStatus status)
+    {
+        Guid userId = _helper.GetUserId();
+
+        await _service.UpdateStatusOfSellerProfile(userId, sellerId, status);
+
+        return Ok("Status of seller profile successfully updated");
     }
 }

@@ -1,3 +1,5 @@
+using App.Enum;
+
 namespace App.Models;
 
 
@@ -8,6 +10,6 @@ public class SellerProfile : BaseModel
 
     public string StoreName { get; set; } = string.Empty;
     public string? Description { get; set; }
-    public bool IsApproved { get; set; } = false;
+    public SellerStatus Status { get; set; } = SellerStatus.Pending;
     public ICollection<Product> Products { get; set; } = new List<Product>();
 }
