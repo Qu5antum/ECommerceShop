@@ -157,7 +157,7 @@ public class SellerProfileService : ISellerProfileService
             throw new DatabaseException("Could not update the seller profile to the database.");
         }
     }
-
+    
     public async Task<SellerProfileResponseDto> GetUserSellerProfileAsync(Guid userId)
     {
         await _helper.GetUserOr404(userId);
@@ -237,7 +237,8 @@ public class SellerProfileService : ISellerProfileService
 
         return result;
     }
-
+    
+    // TODO: Add notification sender for user 
     public async Task<bool> UpdateStatusOfSellerProfile(Guid userId, Guid sellerId, SellerStatus status)
     {
         await _helper.GetUserOr404(userId);

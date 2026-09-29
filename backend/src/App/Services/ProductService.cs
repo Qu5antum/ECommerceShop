@@ -21,6 +21,8 @@ public interface IProductService
     Task<List<ProductResponseDto>> SearchProductAsync(string productName);
     Task<List<ProductResponseDto>> SearchProductByPriceDesc(string productName);
     Task<List<ProductResponseDto>> SearchProductByPriceAsc(string productName);
+    Task<bool> DeleteProductByIdAdminAsync(Guid productId);
+    Task<List<ProductResponseDto>> GetProductThatOutOfStockAsync();
 }
 
 
@@ -47,6 +49,11 @@ public class ProductService : IProductService
     private static string GetProductsCacheKeyByCategoryId(Guid categoryId)
     {
         return $"products:{categoryId}";
+    }
+
+    private static string GetProductsOutOfStockCacheyKey()
+    {
+        return $"products:outOfStock";
     }
 
     public ProductService
@@ -113,6 +120,7 @@ public class ProductService : IProductService
             _logger.LogInformation("Product successfully create: {productId}", newProduct.Id);
 
             await _cache.RemoveDataAsync(GetProductsCacheKey());
+            await _cache.RemoveDataAsync(GetProductsOutOfStockCacheyKey());
 
             _logger.LogInformation("Products deleted from redis cache");
 
@@ -226,6 +234,7 @@ public class ProductService : IProductService
 
             await _cache.RemoveDataAsync(GetProductsCacheKey());
             await _cache.RemoveDataAsync(GetProductCacheKeyById(productId));
+            await _cache.RemoveDataAsync(GetProductsOutOfStockCacheyKey());
 
             _logger.LogInformation("Products deleted from redis cache");
 
@@ -287,6 +296,7 @@ public class ProductService : IProductService
 
             await _cache.RemoveDataAsync(GetProductsCacheKey());
             await _cache.RemoveDataAsync(GetProductCacheKeyById(productId));
+            await _cache.RemoveDataAsync(GetProductsOutOfStockCacheyKey());
 
             _logger.LogInformation("Products deleted from redis cache");
 
@@ -498,5 +508,72 @@ public class ProductService : IProductService
             CreatedAt = product.CreatedAt,
             UpdatedAt = product.UpdatedAt
         }).ToList();
+    }
+
+    public async Task<bool> DeleteProductByIdAdminAsync(Guid productId)
+    {
+        await _unitOfWork.BeginTransactionAsync();
+        var product = await _helper.GetProductOr404(productId);
+
+        try
+        {
+            await _productRepository.DeleteAsync(product);
+            await _unitOfWork.SaveChangesAsync();
+            await _unitOfWork.CommitAsync();
+
+            _logger.LogInformation("Product successfully deleted: {productId}", productId);
+
+            await _cache.RemoveDataAsync(GetProductsCacheKey());
+            await _cache.RemoveDataAsync(GetProductCacheKeyById(productId));
+            await _cache.RemoveDataAsync(GetProductsOutOfStockCacheyKey());
+
+            _logger.LogInformation("Products deleted from redis cache");
+
+            return true;
+        }
+        catch (DbUpdateException ex)
+        {
+            await _unitOfWork.RollbackAsync();
+            _logger.LogError(ex, "Database error while deleting product: {Message}", ex.Message);
+            throw new DatabaseException("Database error while deleting product");
+        }
+    }
+
+    public async Task<List<ProductResponseDto>> GetProductThatOutOfStockAsync()
+    {
+        var cacheKey = GetProductsOutOfStockCacheyKey();
+
+        var cachedProducts = await _cache.GetDataAsync<List<ProductResponseDto>>(cacheKey);
+
+        if (cachedProducts is not null)
+        {
+            _logger.LogInformation("Out of stock products retrieved from redis cache");
+            return cachedProducts;
+        }
+        
+        var products = await _productRepository.GetProductsOutOfStockAsync();
+        
+        var result = products.Select(product => new ProductResponseDto
+        {
+            Id = product.Id,
+            SellerProfileId = product.SellerProfileId,
+            CategoryId = product.CategoryId,
+            Name = product.Name,
+            Description = product.Description,
+            Price = product.Price,
+            SKU = product.SKU,
+            Stock = product.Stock,
+            ImageUrl = product.ImageUrl,
+            CreatedAt = product.CreatedAt,
+            UpdatedAt = product.UpdatedAt
+        }).ToList();
+
+        await _cache.SetDataAsync(
+            cacheKey,
+            result,
+            TimeSpan.FromMinutes(5)
+        );
+        
+        return result;
     }
 }

@@ -12,6 +12,7 @@ public interface IProductRepository : IBaseRepository<Product>
     Task<List<Product>> GetProductsByMultipleIds(List<Guid> productIds);
     Task<List<Product>> SearchProductByPriceDesc(string ProductName);
     Task<List<Product>> SearchProductByPriceAsc(string ProductName);
+    Task<List<Product>> GetProductsOutOfStockAsync();
 }
 
 
@@ -62,6 +63,14 @@ public class ProductRepository(AppDbContext context) : BaseRepository<Product>(c
             .AsNoTracking()
             .Where(p => p.Name.ToLower().Contains(ProductName.ToLower()))
             .OrderBy(p => p.Price)
+            .ToListAsync();
+    }
+
+    public async Task<List<Product>> GetProductsOutOfStockAsync()
+    {
+        return await _context.Products
+            .AsNoTracking()
+            .Where(p => p.Stock == 0)
             .ToListAsync();
     }
 }

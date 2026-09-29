@@ -147,4 +147,26 @@ public class ProductController : ControllerBase
 
         return Ok(products);
     }
+
+    [Authorize(Roles = "Admin, Moderator")]
+    [HttpDelete("Admin/{productId:guid}")]
+    [ProducesResponseType(200)]
+    [ProducesResponseType(401)]
+    public async Task<IActionResult> DeleteProductAdmin(Guid productId)
+    {
+        await _service.DeleteProductByIdAdminAsync(productId);
+
+        return Ok("Product successfully deleted");
+    }
+
+    [Authorize(Roles = "Admin, Moderator")]
+    [HttpGet("Admin")]
+    [ProducesResponseType(200)]
+    [ProducesResponseType(401)]
+    public async Task<IActionResult> GetProductsOutOfStock()
+    {
+        var products = await _service.GetProductThatOutOfStockAsync();
+
+        return Ok(products);
+    }
 }
