@@ -4,7 +4,7 @@ using App.Enum;
 namespace App.DTOs;
 
 
-public class OrderReponseDto
+public class OrderResponseDto
 {
     public Guid Id { get; set; }
     public Guid userId { get; set; }

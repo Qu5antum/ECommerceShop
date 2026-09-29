@@ -509,7 +509,8 @@ public class ProductService : IProductService
             UpdatedAt = product.UpdatedAt
         }).ToList();
     }
-
+    
+    // TODO: Add notification for seller after deleting product
     public async Task<bool> DeleteProductByIdAdminAsync(Guid productId)
     {
         await _unitOfWork.BeginTransactionAsync();

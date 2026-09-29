@@ -1,4 +1,5 @@
 using App.Database;
+using App.Enum;
 using App.Models;
 using Microsoft.EntityFrameworkCore;
 
@@ -9,6 +10,7 @@ public interface IOrderRepository : IBaseRepository<Order>
 {
     Task<IEnumerable<Order>> GetOrdersByUserIdAsync(Guid userId);
     Task<Order?> GetOrderWithItemsById(Guid orderId);
+    Task<List<Order>> GetOrdersWithStatus(OrderStatus? status = null);
 }
 
 
@@ -29,5 +31,20 @@ public class OrderRepository(AppDbContext context) : BaseRepository<Order>(conte
         return await _context.Orders
             .Include(o => o.orderItems)
             .FirstOrDefaultAsync(o => o.Id == orderId);
+    }
+
+    public async Task<List<Order>> GetOrdersWithStatus(OrderStatus? status = null)
+    {
+        var query = _context.Orders
+            .AsNoTracking();
+        
+        if (status.HasValue)
+        {
+            query = query.Where(p => p.status == status.Value);
+        }
+
+        var result = await query.ToListAsync();
+
+        return result;
     }
 }

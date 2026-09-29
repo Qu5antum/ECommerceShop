@@ -2,6 +2,7 @@ using App.Services;
 using App.DTOs;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using App.Enum;
 
 namespace App.Controllers;
 
@@ -39,7 +40,7 @@ public class OrderController : ControllerBase
     [ProducesResponseType(401)]
     [ProducesResponseType(404)]
     [ProducesResponseType(400)]
-    public async Task<IActionResult> GetOrders()
+    public async Task<IActionResult> GetOrdersOfUser()
     {
         Guid userId = _helper.GetUserId();
 
@@ -53,7 +54,7 @@ public class OrderController : ControllerBase
     [ProducesResponseType(401)]
     [ProducesResponseType(404)]
     [ProducesResponseType(400)]
-    public async Task<IActionResult> GetOrder(Guid orderId)
+    public async Task<IActionResult> GetOrderOfUser(Guid orderId)
     {
         Guid userId = _helper.GetUserId();
 
@@ -102,5 +103,27 @@ public class OrderController : ControllerBase
         await _service.UpdateOrderStatusAsync(orderId, orderStatusDto);
 
         return Ok("Order status successfully updated");
+    }
+
+    [Authorize(Roles = "Moderator, Admin, Manager")]
+    [HttpGet("Orders/Admin")]
+    [ProducesResponseType(200)]
+    [ProducesResponseType(401)]
+    public async Task<IActionResult> GetOrders(OrderStatus? status)
+    {
+        var orders = await _service.GetOrdersForAdminAsync(status);
+
+        return Ok(orders);
+    }
+
+    [Authorize(Roles = "Moderator, Admin, Manager")]
+    [HttpGet("{orderId:guid}/Admin")]
+    [ProducesResponseType(200)]
+    [ProducesResponseType(401)]
+    public async Task<IActionResult> GetOrder(Guid orderId)
+    {
+        var order = await _service.GetOrderAdminAsync(orderId);
+
+        return Ok(order);
     }
 }
