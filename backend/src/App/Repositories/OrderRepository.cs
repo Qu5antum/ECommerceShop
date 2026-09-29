@@ -11,6 +11,7 @@ public interface IOrderRepository : IBaseRepository<Order>
     Task<IEnumerable<Order>> GetOrdersByUserIdAsync(Guid userId);
     Task<Order?> GetOrderWithItemsById(Guid orderId);
     Task<List<Order>> GetOrdersWithStatus(OrderStatus? status = null);
+    Task<List<Order>> GetOrderWithDate(DateTime fromDate, DateTime toDate);
 }
 
 
@@ -46,5 +47,15 @@ public class OrderRepository(AppDbContext context) : BaseRepository<Order>(conte
         var result = await query.ToListAsync();
 
         return result;
+    }
+
+    public async Task<List<Order>> GetOrderWithDate(DateTime fromDate, DateTime toDate)
+    {
+        var endOfDay = toDate.Date.AddDays(1).AddTicks(-1);
+
+        return await _context.Orders
+            .AsNoTracking()
+            .Where(o => o.CreatedAt >= fromDate && o.CreatedAt <= endOfDay)
+            .ToListAsync();
     }
 }

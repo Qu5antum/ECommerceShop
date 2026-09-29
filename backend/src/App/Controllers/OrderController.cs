@@ -126,4 +126,26 @@ public class OrderController : ControllerBase
 
         return Ok(order);
     }
+
+    [Authorize(Roles = "Moderator, Admin, Manager")]
+    [HttpGet("User/{userId:guid}/Admin")]
+    [ProducesResponseType(200)]
+    [ProducesResponseType(401)]
+    public async Task<IActionResult> GetOrdersByUserId(Guid userId)
+    {
+        var orders = await _service.GetOrdersByUserIdAsync(userId);
+
+        return Ok(orders);
+    }
+
+    [Authorize(Roles = "Moderator, Admin, Manager")]
+    [HttpGet("Admin/Date")]
+    [ProducesResponseType(200)]
+    [ProducesResponseType(401)]
+    public async Task<IActionResult> GetOrdersFromDateToDate(DateTime fromDate, DateTime toDate)
+    {
+        var products = await _service.GetOrdersFromDateToDateAsync(fromDate, toDate);
+
+        return Ok(products);
+    }
 }
