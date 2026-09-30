@@ -1,4 +1,5 @@
 using App.DTOs;
+using App.Enum;
 using App.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -46,8 +47,9 @@ public class PaymentController : ControllerBase
 
         return Ok(payment);
     }
-
-    [HttpPut("webhook")]
+    
+    [Authorize(Roles = "Admin, Moderator, Manager")]
+    [HttpPut("Admin/Webhook")]
     [ProducesResponseType(200)]
     [ProducesResponseType(401)]
     [ProducesResponseType(404)]
@@ -57,5 +59,39 @@ public class PaymentController : ControllerBase
         await _service.ProcessWebhookAsync(webhookDto);
         
         return Ok(new { message = "Webhook processed successfully" });
+    }
+
+    [Authorize(Roles = "Admin, Moderator, Manager")]
+    [HttpGet("Payments")]
+    [ProducesResponseType(200)]
+    [ProducesResponseType(401)]
+    public async Task<IActionResult> GetPaymentsAdmin(PaymentStatus? status)
+    {
+        var payments = await _service.GetPaymentsAdminAsync(status);
+
+        return Ok(payments);
+    }
+
+    [Authorize(Roles = "Admin, Moderator, Manager")]
+    [HttpGet("{paymentId:guid}")]
+    [ProducesResponseType(200)]
+    [ProducesResponseType(404)]
+    [ProducesResponseType(401)]
+    public async Task<IActionResult> GetPaymentAdmin(Guid paymentId)
+    {
+        var payment = await _service.GetPaymentAdminAsync(paymentId);
+
+        return Ok(payment);
+    }
+
+    [Authorize(Roles = "Admin, Moderator, Manager")]
+    [HttpGet("Payments/Statistics")]
+    [ProducesResponseType(200)]
+    [ProducesResponseType(401)]
+    public async Task<IActionResult> GetPaymentsStatistics()
+    {
+        var statistics = await _service.GetPaymentsStatisticAsync();
+
+        return Ok(statistics);
     }
 }

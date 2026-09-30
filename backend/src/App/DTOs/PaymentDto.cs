@@ -13,3 +13,14 @@ public class PaymentResponseDto
     public DateTime CreatedAt { get; set; }
     public DateTime? UpdatedAt { get; set; }
 }
+
+
+public class PaymentStatisticsDto
+{
+    public int Total { get; set; }
+    public int Successfull { get; set; }
+    public int Failed { get; set; }
+    public int Pending { get; set; }
+    public int Refunded { get; set; }
+    public decimal Revenue { get; set; }
+}

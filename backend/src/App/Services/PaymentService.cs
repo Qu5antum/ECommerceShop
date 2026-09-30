@@ -15,6 +15,9 @@ public interface IPaymentService
     Task<PaymentResponseDto> CreatePaymentAsync(Guid userId, Guid orderId);
     Task<PaymentResponseDto> GetPaymentAsync(Guid userId, Guid orderId, Guid paymentId);
     Task<bool> ProcessWebhookAsync(PaymentWebhookDto webhookDto);
+    Task<List<PaymentResponseDto>> GetPaymentsAdminAsync(PaymentStatus? status = null);
+    Task<PaymentResponseDto> GetPaymentAdminAsync(Guid paymentId);
+    Task<PaymentStatisticsDto> GetPaymentsStatisticAsync();
 }
 
 
@@ -30,6 +33,16 @@ public class PaymentService : IPaymentService
     private static string GetPaymentCacheKey(Guid paymentId)
     {
         return $"payment:{paymentId}";
+    }
+
+    private static string GetPaymentsCacheKey()
+    {
+        return $"payments:all";
+    }
+
+    private static string GetPaymentsWithStatusCacheKey(PaymentStatus status)
+    {
+        return $"payments:{status}";
     }
 
     public PaymentService(
@@ -90,6 +103,17 @@ public class PaymentService : IPaymentService
             await _unitOfWork.SaveChangesAsync();
             await _unitOfWork.CommitAsync();
 
+            
+            await _cache.RemoveDataAsync(GetPaymentsCacheKey());
+            await _cache.RemoveDataAsync(GetPaymentsWithStatusCacheKey(PaymentStatus.Succeeded));
+            await _cache.RemoveDataAsync(GetPaymentsWithStatusCacheKey(PaymentStatus.Pending));
+            await _cache.RemoveDataAsync(GetPaymentsWithStatusCacheKey(PaymentStatus.Failed));
+            await _cache.RemoveDataAsync(GetPaymentsWithStatusCacheKey(PaymentStatus.Refunded));
+
+            _logger.LogInformation("Payments deleted from redis cache");
+
+            _logger.LogInformation("Successfull response of payment, user ID: {userId}, order ID: {orderId}", userId, orderId);
+
             return new PaymentResponseDto
             {
                 Id = newPayment.Id,
@@ -115,14 +139,6 @@ public class PaymentService : IPaymentService
 
         var cacheyKey = GetPaymentCacheKey(paymentId);
 
-        var cachedPayment = await _cache.GetDataAsync<PaymentResponseDto>(cacheyKey);
-
-        if (cachedPayment is not null)
-        {
-            _logger.LogInformation("Payment retrieved from redis cache, user ID: {userId}, payment ID: {paymentId}", userId, paymentId);
-            return cachedPayment;
-        }
-
         var order = await _helper.GetOrderOr404(orderId);
 
         if (order.userId != userId)
@@ -137,6 +153,14 @@ public class PaymentService : IPaymentService
         {
             _logger.LogWarning("Payment does not belong to order, payment ID: {paymentId}, order ID: {orderId}", paymentId, orderId);
             throw new BadRequestException("Payment does not belong to order");
+        }
+
+        var cachedPayment = await _cache.GetDataAsync<PaymentResponseDto>(cacheyKey);
+
+        if (cachedPayment is not null)
+        {
+            _logger.LogInformation("Payment retrieved from redis cache, user ID: {userId}, payment ID: {paymentId}", userId, paymentId);
+            return cachedPayment;
         }
         
         var result = new PaymentResponseDto
@@ -240,5 +264,82 @@ public class PaymentService : IPaymentService
             _logger.LogError(ex, "A database error occurred while processing webhook: {Message}.", ex.Message);
             throw new DatabaseException("Could not process payment webhook in the database.");
         }
+    }
+
+    public async Task<List<PaymentResponseDto>> GetPaymentsAdminAsync(PaymentStatus? status = null)
+    {
+        var cacheKey = status.HasValue
+            ? GetPaymentsWithStatusCacheKey(status.Value)
+            : GetPaymentsCacheKey();
+
+        var cachedPayments = await _cache.GetDataAsync<List<PaymentResponseDto>>(cacheKey);
+
+        if (cachedPayments is not null)
+        {
+            _logger.LogInformation("Payments retrieved from redis cache");
+            return cachedPayments;
+        }
+
+        var products = await _paymentRepository.GetPaymetsByStatusAsync(status);
+        
+        var result = products.Select(payment => new PaymentResponseDto
+        {
+            Id = payment.Id,
+            OrderId = payment.OrderId,
+            Amount = payment.Amount,
+            Status = payment.Status,
+            ProviderPaymentId = payment.ProviderPaymentId,
+            CreatedAt = payment.CreatedAt,
+            UpdatedAt = payment.UpdatedAt
+        }).ToList();
+
+        await _cache.SetDataAsync(
+            cacheKey,
+            result,
+            TimeSpan.FromMinutes(5)
+        );
+
+        return result;
+    }
+
+    public async Task<PaymentResponseDto> GetPaymentAdminAsync(Guid paymentId)
+    {
+        var payment = await _helper.GetPaymentOr404(paymentId);
+
+        var cacheKey = GetPaymentCacheKey(paymentId);
+
+        var cachedPayment = await _cache.GetDataAsync<PaymentResponseDto>(cacheKey);
+
+        if (cachedPayment is not null)
+        {
+            _logger.LogInformation("Payment retrieved from redis cache: {paymentId}", paymentId);
+            return cachedPayment;
+        }
+
+        var result = new PaymentResponseDto
+        {
+            Id = payment.Id,
+            OrderId = payment.OrderId,
+            Amount = payment.Amount,
+            Status = payment.Status,
+            ProviderPaymentId = payment.ProviderPaymentId,
+            CreatedAt = payment.CreatedAt,
+            UpdatedAt = payment.UpdatedAt
+        };
+        
+        await _cache.SetDataAsync(
+            cacheKey,
+            result,
+            TimeSpan.FromMinutes(5)
+        );
+
+        return result;
+    }
+
+    public async Task<PaymentStatisticsDto> GetPaymentsStatisticAsync()
+    {
+        var stats = await _paymentRepository.GetPaymentsStatisticsAsync();
+
+        return stats;
     }
 }
