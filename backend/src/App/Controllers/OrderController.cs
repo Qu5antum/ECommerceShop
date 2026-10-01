@@ -22,10 +22,6 @@ public class OrderController : ControllerBase
     }
 
     [HttpPost]
-    [ProducesResponseType(200)]
-    [ProducesResponseType(401)]
-    [ProducesResponseType(404)]
-    [ProducesResponseType(400)]
     public async Task<IActionResult> CreateOrder()
     {
         Guid userId = _helper.GetUserId();
@@ -36,10 +32,6 @@ public class OrderController : ControllerBase
     }
 
     [HttpGet("Orders")]
-    [ProducesResponseType(200)]
-    [ProducesResponseType(401)]
-    [ProducesResponseType(404)]
-    [ProducesResponseType(400)]
     public async Task<IActionResult> GetOrdersOfUser()
     {
         Guid userId = _helper.GetUserId();
@@ -50,10 +42,6 @@ public class OrderController : ControllerBase
     }
 
     [HttpGet("{orderId:guid}")]
-    [ProducesResponseType(200)]
-    [ProducesResponseType(401)]
-    [ProducesResponseType(404)]
-    [ProducesResponseType(400)]
     public async Task<IActionResult> GetOrderOfUser(Guid orderId)
     {
         Guid userId = _helper.GetUserId();
@@ -64,10 +52,6 @@ public class OrderController : ControllerBase
     }
 
     [HttpDelete("{orderId:guid}/Cancel")]
-    [ProducesResponseType(200)]
-    [ProducesResponseType(401)]
-    [ProducesResponseType(404)]
-    [ProducesResponseType(400)]
     public async Task<IActionResult> CancelOrder(Guid orderId)
     {
         Guid userId = _helper.GetUserId();
@@ -79,10 +63,6 @@ public class OrderController : ControllerBase
 
     [Authorize(Roles = "Seller")]
     [HttpGet("Admin/Orders")]
-    [ProducesResponseType(200)]
-    [ProducesResponseType(401)]
-    [ProducesResponseType(404)]
-    [ProducesResponseType(400)]
     public async Task<IActionResult> GetOrdersOfSeller()
     {
         Guid userId = _helper.GetUserId();
@@ -94,10 +74,6 @@ public class OrderController : ControllerBase
 
     [Authorize(Roles = "Moderator, Admin, Manager")]
     [HttpPut("{orderId:guid}/Status")]
-    [ProducesResponseType(200)]
-    [ProducesResponseType(401)]
-    [ProducesResponseType(404)]
-    [ProducesResponseType(400)]
     public async Task<IActionResult> UpdateStatusOfOrder(Guid orderId, UpdateOrderStatusDto orderStatusDto)
     {
         await _service.UpdateOrderStatusAsync(orderId, orderStatusDto);
@@ -107,8 +83,6 @@ public class OrderController : ControllerBase
 
     [Authorize(Roles = "Moderator, Admin, Manager")]
     [HttpGet("Orders/Admin")]
-    [ProducesResponseType(200)]
-    [ProducesResponseType(401)]
     public async Task<IActionResult> GetOrders(OrderStatus? status)
     {
         var orders = await _service.GetOrdersForAdminAsync(status);
@@ -118,8 +92,6 @@ public class OrderController : ControllerBase
 
     [Authorize(Roles = "Moderator, Admin, Manager")]
     [HttpGet("{orderId:guid}/Admin")]
-    [ProducesResponseType(200)]
-    [ProducesResponseType(401)]
     public async Task<IActionResult> GetOrder(Guid orderId)
     {
         var order = await _service.GetOrderAdminAsync(orderId);
@@ -129,8 +101,6 @@ public class OrderController : ControllerBase
 
     [Authorize(Roles = "Moderator, Admin, Manager")]
     [HttpGet("User/{userId:guid}/Admin")]
-    [ProducesResponseType(200)]
-    [ProducesResponseType(401)]
     public async Task<IActionResult> GetOrdersByUserId(Guid userId)
     {
         var orders = await _service.GetOrdersByUserIdAsync(userId);
@@ -140,8 +110,6 @@ public class OrderController : ControllerBase
 
     [Authorize(Roles = "Moderator, Admin, Manager")]
     [HttpGet("Admin/Date")]
-    [ProducesResponseType(200)]
-    [ProducesResponseType(401)]
     public async Task<IActionResult> GetOrdersFromDateToDate(DateTime fromDate, DateTime toDate)
     {
         var products = await _service.GetOrdersFromDateToDateAsync(fromDate, toDate);

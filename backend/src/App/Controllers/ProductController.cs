@@ -22,9 +22,6 @@ public class ProductController : ControllerBase
 
     [Authorize(Roles = "Seller")]
     [HttpPost]
-    [ProducesResponseType(200)]
-    [ProducesResponseType(401)]
-    [ProducesResponseType(404)]
     public async Task<IActionResult> CreateProduct(ProductCreateDto productCreateDto)
     {
         Guid userId = _helper.GetUserId();
@@ -36,9 +33,6 @@ public class ProductController : ControllerBase
 
     [Authorize(Roles = "Seller")]
     [HttpPut("{productId:guid}")]
-    [ProducesResponseType(200)]
-    [ProducesResponseType(401)]
-    [ProducesResponseType(404)]
     public async Task<IActionResult> UpdateProduct(Guid productId, ProductUpdateDto productUpdateDto)
     {
         Guid userId = _helper.GetUserId();
@@ -50,9 +44,6 @@ public class ProductController : ControllerBase
 
     [Authorize(Roles = "Seller")]
     [HttpDelete("{productId:guid}")]
-    [ProducesResponseType(200)]
-    [ProducesResponseType(401)]
-    [ProducesResponseType(404)]
     public async Task<IActionResult> DeleteProduct(Guid productId)
     {
         Guid userId = _helper.GetUserId();
@@ -64,9 +55,6 @@ public class ProductController : ControllerBase
 
     [Authorize]
     [HttpGet("{productId:guid}")]
-    [ProducesResponseType(200)]
-    [ProducesResponseType(401)]
-    [ProducesResponseType(404)]
     public async Task<IActionResult> GetProductById(Guid productId)
     {
         var product = await _service.GetProductByIdAsync(productId);
@@ -76,9 +64,6 @@ public class ProductController : ControllerBase
 
     [Authorize]
     [HttpGet("Products")]
-    [ProducesResponseType(200)]
-    [ProducesResponseType(401)]
-    [ProducesResponseType(404)]
     public async Task<IActionResult> GetProducts()
     {
         var products = await _service.GetProductsAsync();
@@ -88,9 +73,6 @@ public class ProductController : ControllerBase
     
     [Authorize]
     [HttpGet("{ProductId:guid}/image")]
-    [ProducesResponseType(200)]
-    [ProducesResponseType(401)]
-    [ProducesResponseType(404)]
     public async Task<IActionResult> GetProductImage(Guid productId)
     {
         var file = await _service.GetProductImageAsync(productId);
@@ -105,9 +87,6 @@ public class ProductController : ControllerBase
 
     [Authorize]
     [HttpGet("Category/{categoryId:guid}")]
-    [ProducesResponseType(200)]
-    [ProducesResponseType(401)]
-    [ProducesResponseType(404)]
     public async Task<IActionResult> GetProductsByCategoryId(Guid categoryId)
     {
         var products = await _service.GetProductsByCategoryIdAsync(categoryId);
@@ -117,8 +96,6 @@ public class ProductController : ControllerBase
 
     [Authorize]
     [HttpGet("Search")]
-    [ProducesResponseType(200)]
-    [ProducesResponseType(401)]
     public async Task<IActionResult> SearchProduct(string productName)
     {
         var products = await _service.SearchProductAsync(productName);
@@ -128,8 +105,6 @@ public class ProductController : ControllerBase
 
     [Authorize]
     [HttpGet("Search/Min")]
-    [ProducesResponseType(200)]
-    [ProducesResponseType(401)]
     public async Task<IActionResult> SearchProductAsc(string productName)
     {
         var products = await _service.SearchProductByPriceAsc(productName);
@@ -139,8 +114,6 @@ public class ProductController : ControllerBase
 
     [Authorize]
     [HttpGet("Search/Max")]
-    [ProducesResponseType(200)]
-    [ProducesResponseType(401)]
     public async Task<IActionResult> SearchProductDesc(string productName)
     {
         var products = await _service.SearchProductByPriceDesc(productName);
@@ -150,8 +123,6 @@ public class ProductController : ControllerBase
 
     [Authorize(Roles = "Admin, Moderator")]
     [HttpDelete("Admin/{productId:guid}")]
-    [ProducesResponseType(200)]
-    [ProducesResponseType(401)]
     public async Task<IActionResult> DeleteProductAdmin(Guid productId)
     {
         await _service.DeleteProductByIdAdminAsync(productId);
@@ -161,8 +132,6 @@ public class ProductController : ControllerBase
 
     [Authorize(Roles = "Admin, Moderator")]
     [HttpGet("Admin")]
-    [ProducesResponseType(200)]
-    [ProducesResponseType(401)]
     public async Task<IActionResult> GetProductsOutOfStock()
     {
         var products = await _service.GetProductThatOutOfStockAsync();

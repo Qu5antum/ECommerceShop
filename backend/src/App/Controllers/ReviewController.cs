@@ -21,10 +21,6 @@ public class ReviewController : ControllerBase
     }
 
     [HttpPost("{productId:guid}")]
-    [ProducesResponseType(200)]
-    [ProducesResponseType(401)]
-    [ProducesResponseType(404)]
-    [ProducesResponseType(400)]
     public async Task<IActionResult> CreateReview(Guid productId, CreateReviewDto createReviewDto)
     {
         Guid userId = _helper.GetUserId();
@@ -35,10 +31,6 @@ public class ReviewController : ControllerBase
     }
 
     [HttpPut("{reviewId:guid}")]
-    [ProducesResponseType(200)]
-    [ProducesResponseType(401)]
-    [ProducesResponseType(404)]
-    [ProducesResponseType(400)]
     public async Task<IActionResult> UpdateReview(Guid reviewId, UpdateReviewDto updateReviewDto)
     {
         Guid userId = _helper.GetUserId();
@@ -49,10 +41,6 @@ public class ReviewController : ControllerBase
     }
 
     [HttpDelete("{reviewId:guid}")]
-    [ProducesResponseType(200)]
-    [ProducesResponseType(401)]
-    [ProducesResponseType(404)]
-    [ProducesResponseType(400)]
     public async Task<IActionResult> DeleteReview(Guid reviewId)
     {
         Guid userId = _helper.GetUserId();
@@ -63,14 +51,37 @@ public class ReviewController : ControllerBase
     }
 
     [HttpGet("{productId:guid}")]
-    [ProducesResponseType(200)]
-    [ProducesResponseType(401)]
-    [ProducesResponseType(404)]
-    [ProducesResponseType(400)]
     public async Task<IActionResult> GetReviewsByProduct(Guid productId)
     {
         var reviews = await _service.GetReviewsByProductId(productId);
 
         return Ok(reviews);
+    }
+
+    [Authorize(Roles = "Admin, Moderator, Manager")]
+    [HttpGet("Admin/Reviews")]
+    public async Task<IActionResult> GetReviewsAdmin()
+    {
+        var reviews = await _service.GetAllReviewsAdminAsync();
+
+        return Ok(reviews);
+    }
+
+    [Authorize(Roles = "Admin, Moderator, Manager")]
+    [HttpGet("{reviewId:guid}/Admin")]
+    public async Task<IActionResult> GetReviewById(Guid reviewId)
+    {
+        var review = await _service.GetReviewByIdAdminAsync(reviewId);
+
+        return Ok(review);
+    }
+
+    [Authorize(Roles = "Admin, Moderator, Manager")]
+    [HttpDelete("{reviewId:guid}/Admin")]
+    public async Task<IActionResult> DeleteReviewById(Guid reviewId)
+    {
+        await _service.DeleteReviewAdminAsync(reviewId);
+
+        return Ok("Review successfully deleted");
     }
 }

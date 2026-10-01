@@ -22,9 +22,6 @@ public class CartItemController : ControllerBase
 
     [Authorize]
     [HttpPost]
-    [ProducesResponseType(200)]
-    [ProducesResponseType(401)]
-    [ProducesResponseType(404)]
     public async Task<IActionResult> CreateCartItem(CartItemCreateDto itemCreateDto)
     {
         Guid userId = _helper.GetUserId();
@@ -36,9 +33,6 @@ public class CartItemController : ControllerBase
 
     [Authorize]
     [HttpPut("{itemId:guid}")]
-    [ProducesResponseType(200)]
-    [ProducesResponseType(401)]
-    [ProducesResponseType(404)]
     public async Task<IActionResult> UpdateCartItem(Guid itemId, CartItemUpdateDto itemUpdateDto)
     {
         Guid userId = _helper.GetUserId();
@@ -50,9 +44,6 @@ public class CartItemController : ControllerBase
 
     [Authorize]
     [HttpDelete("{itemId:guid}")]
-    [ProducesResponseType(200)]
-    [ProducesResponseType(401)]
-    [ProducesResponseType(404)]
     public async Task<IActionResult> DeleteCartItem(Guid itemId)
     {
         Guid userId = _helper.GetUserId();
@@ -64,9 +55,6 @@ public class CartItemController : ControllerBase
 
     [Authorize]
     [HttpGet("CartItems")]
-    [ProducesResponseType(200)]
-    [ProducesResponseType(401)]
-    [ProducesResponseType(404)]
     public async Task<IActionResult> GetAllItemsFromCart()
     {
         Guid userId = _helper.GetUserId();
@@ -78,9 +66,6 @@ public class CartItemController : ControllerBase
 
     [Authorize]
     [HttpGet("{itemId:guid}")]
-    [ProducesResponseType(200)]
-    [ProducesResponseType(401)]
-    [ProducesResponseType(404)]
     public async Task<IActionResult> GetItemInCartById(Guid itemId)
     {
         Guid userId = _helper.GetUserId();

@@ -21,9 +21,6 @@ public class CartController : ControllerBase
 
     [Authorize]
     [HttpGet]
-    [ProducesResponseType(200)]
-    [ProducesResponseType(401)]
-    [ProducesResponseType(404)]
     public async Task<IActionResult> GetCart()
     {
         Guid userId = _helper.GetUserId();

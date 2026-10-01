@@ -15,6 +15,9 @@ public interface IReviewService
     Task<bool> UpdateReviewAsync(Guid userId, Guid reviewId, UpdateReviewDto updateReviewDto);
     Task<bool> DeleteReviewAsync(Guid userId, Guid reviewId);
     Task<List<ReviewResponseDto>> GetReviewsByProductId(Guid productId);
+    Task<bool> DeleteReviewAdminAsync(Guid reviewId);
+    Task<List<ReviewResponseDto>> GetAllReviewsAdminAsync();
+    Task<ReviewResponseDto> GetReviewByIdAdminAsync(Guid reviewId);
 }
 
 
@@ -29,6 +32,16 @@ public class ReviewService : IReviewService
     private static string GetReviewsCacheKey(Guid productId)
     {
         return $"review:{productId}";
+    }
+
+    private static string GetReviewsCacheKey()
+    {
+        return $"review:all";
+    }
+
+    private static string GetReviewCacheKey(Guid reviewId)
+    {
+        return $"review:{reviewId}";
     }
 
     public ReviewService(IReviewRepository reviewRepository, ILogger<ReviewService> logger, IHelperService helper, IUnitOfWork unitOfWork, IRedisCacheService cache)
@@ -74,11 +87,12 @@ public class ReviewService : IReviewService
             await _unitOfWork.SaveChangesAsync();
             await _unitOfWork.CommitAsync();
 
-            _logger.LogInformation("Review successfully created: {reviewId}", newReview.Id);
-
             await _cache.RemoveDataAsync(GetReviewsCacheKey(productId));
+            await _cache.RemoveDataAsync(GetReviewsCacheKey());
 
             _logger.LogInformation("Reviews deleted from redis cache");
+
+            _logger.LogInformation("Review successfully created: {reviewId}", newReview.Id);
 
             return new ReviewResponseDto
             {
@@ -134,6 +148,11 @@ public class ReviewService : IReviewService
             await _unitOfWork.SaveChangesAsync();
             await _unitOfWork.CommitAsync();
 
+            await _cache.RemoveDataAsync(GetReviewsCacheKey());
+            await _cache.RemoveDataAsync(GetReviewCacheKey(reviewId));
+
+            _logger.LogInformation("Reviews delete from redis cache");
+
             _logger.LogInformation("Review sucessfully updated: {reviewId}", reviewId);
 
             return true;
@@ -163,6 +182,11 @@ public class ReviewService : IReviewService
             await _reviewRepository.DeleteAsync(review);
             await _unitOfWork.SaveChangesAsync();
             await _unitOfWork.CommitAsync();
+
+            await _cache.RemoveDataAsync(GetReviewsCacheKey());
+            await _cache.RemoveDataAsync(GetReviewCacheKey(reviewId));
+
+            _logger.LogInformation("Reviews delete from redis cache");
 
             _logger.LogInformation("Review successfully deleted: {reviewId}", reviewId);
 
@@ -211,6 +235,106 @@ public class ReviewService : IReviewService
 
         _logger.LogInformation("Successfull response of reviews by product: {productId}", productId);
         
+        return result;
+    }
+
+    public async Task<bool> DeleteReviewAdminAsync(Guid reviewId)
+    {
+        await _unitOfWork.BeginTransactionAsync();
+        var review = await _helper.GetReviewOr404(reviewId);
+
+        try
+        {
+            await _reviewRepository.DeleteAsync(review);
+            await _unitOfWork.SaveChangesAsync();
+            await _unitOfWork.CommitAsync();
+
+            await _cache.RemoveDataAsync(GetReviewsCacheKey());
+            await _cache.RemoveDataAsync(GetReviewCacheKey(reviewId));
+
+            _logger.LogInformation("Reviews delete from redis cache");
+
+            _logger.LogInformation("Review successfully delete: {reviewId}", reviewId);
+            
+            return true;
+        }
+        catch (DbUpdateException ex)
+        {
+            await _unitOfWork.RollbackAsync();
+            _logger.LogError(ex, "A database error occurred while deleting the review: {Message}.", ex.Message);
+            throw new DatabaseException("Could not delete the review to the database.");
+        }
+    }
+
+    public async Task<List<ReviewResponseDto>> GetAllReviewsAdminAsync()
+    {
+        var cacheKey = GetReviewsCacheKey();
+
+        var cachedReviews = await _cache.GetDataAsync<List<ReviewResponseDto>>(cacheKey);
+
+        if (cachedReviews is not null)
+        {
+            _logger.LogInformation("Reviews retrieved from redis cache");
+            return cachedReviews;
+        }
+
+        var reviews = await _reviewRepository.GetAllAsync();
+
+        var result = reviews.Select(review => new ReviewResponseDto
+        {
+            Id = review.Id,
+            UserId = review.UserId,
+            ProductId = review.ProductId,
+            Comment = review.Comment,
+            Rating = review.Rating,
+            CreatedAt = review.CreatedAt,
+            UpdatedAt = review.UpdatedAt
+        }).ToList();
+
+        await _cache.SetDataAsync(
+            cacheKey,
+            result,
+            TimeSpan.FromMinutes(5)
+        );
+
+        _logger.LogInformation("Successfull response of reviews");
+
+        return result;
+    }
+
+    public async Task<ReviewResponseDto> GetReviewByIdAdminAsync(Guid reviewId)
+    {
+        var review = await _helper.GetReviewOr404(reviewId);
+
+        var cacheKey = GetReviewCacheKey(reviewId);
+
+        var cachedReview = await _cache.GetDataAsync<ReviewResponseDto>(cacheKey);
+
+        if (cachedReview is not null)
+        {
+            _logger.LogInformation("Review retrieved from redis cache: {reviewId}", reviewId);
+            return cachedReview;
+        }
+
+        var result = new ReviewResponseDto
+        {
+            Id = review.Id,
+            UserId = review.UserId,
+            ProductId = review.ProductId,
+            Comment = review.Comment,
+            Rating = review.Rating,
+            CreatedAt = review.CreatedAt,
+            UpdatedAt = review.UpdatedAt
+        };
+
+        await _cache.SetDataAsync(
+            cacheKey,
+            result,
+            TimeSpan.FromMinutes(5)
+        );
+
+        _logger.LogInformation("Successfull response of review: {reviewId}", reviewId);
+
         return result;
     }
 }

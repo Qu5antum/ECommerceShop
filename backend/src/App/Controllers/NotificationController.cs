@@ -21,8 +21,6 @@ public class NotificationController : ControllerBase
 
     [Authorize]
     [HttpGet("Notifications")]
-    [ProducesResponseType(200)]
-    [ProducesResponseType(401)]
     public async Task<IActionResult> GetNotifications(int? take = null!, bool? isRead = null)
     {
         Guid UserId = _helper.GetUserId();
@@ -34,8 +32,6 @@ public class NotificationController : ControllerBase
 
     [Authorize]
     [HttpGet("Notifications/count")]
-    [ProducesResponseType(200)]
-    [ProducesResponseType(401)]
     public async Task<IActionResult> GetCountNotifications()
     {
         Guid UserId = _helper.GetUserId();

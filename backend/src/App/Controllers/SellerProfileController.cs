@@ -22,9 +22,6 @@ public class SellerProfileController : ControllerBase
     }
 
     [HttpPost]
-    [ProducesResponseType(200)]
-    [ProducesResponseType(400)]
-    [ProducesResponseType(401)]
     public async Task<IActionResult> CreateSellerProfile(SellerProfileCreateDto profileCreateDto)
     {
         Guid userId = _helper.GetUserId();
@@ -34,9 +31,6 @@ public class SellerProfileController : ControllerBase
     }
 
     [HttpPut("{profileId:guid}")]
-    [ProducesResponseType(200)]
-    [ProducesResponseType(400)]
-    [ProducesResponseType(401)]
     public async Task<IActionResult> UpdateSellerProfile(Guid profileId, SellerProfileUpdateDto profileUpdateDto)
     {
         Guid userId = _helper.GetUserId();
@@ -46,9 +40,6 @@ public class SellerProfileController : ControllerBase
     }
 
     [HttpGet]
-    [ProducesResponseType(200)]
-    [ProducesResponseType(400)]
-    [ProducesResponseType(401)]
     public async Task<IActionResult> GetCurrentUserSellerProfile()
     {
         Guid userId = _helper.GetUserId();
@@ -58,9 +49,6 @@ public class SellerProfileController : ControllerBase
     }
 
     [HttpGet("{userId:guid}")]
-    [ProducesResponseType(200)]
-    [ProducesResponseType(400)]
-    [ProducesResponseType(401)]
     public async Task<IActionResult> GetUserSellerProfile(Guid userId)
     {
         var sellerProfile = await _service.GetUserSellerProfileAsync(userId);
@@ -70,9 +58,6 @@ public class SellerProfileController : ControllerBase
 
     [Authorize(Roles = "Admin, Moderator")]
     [HttpGet("Status")]
-    [ProducesResponseType(200)]
-    [ProducesResponseType(400)]
-    [ProducesResponseType(401)]
     public async Task<IActionResult> GetSellers(SellerStatus status)
     {
         var sellers = await _service.GetSellersAsync(status);
@@ -82,9 +67,6 @@ public class SellerProfileController : ControllerBase
 
     [Authorize(Roles = "Admin, Moderator")]
     [HttpPut("{sellerId:guid}/Status")]
-    [ProducesResponseType(200)]
-    [ProducesResponseType(400)]
-    [ProducesResponseType(401)]
     public async Task<IActionResult> UpdateStatusOfSellerProfile(Guid sellerId, SellerStatus status)
     {
         Guid userId = _helper.GetUserId();

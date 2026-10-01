@@ -22,8 +22,6 @@ public class UserController : ControllerBase{
     
     [Authorize(Roles = "Admin, Moderator")]
     [HttpGet("/Admin/Users")]
-    [ProducesResponseType(200)]
-    [ProducesResponseType(401)]
     public async Task<IActionResult> GetAllUsersNotAdmin()
     {
         var users = await _userService.GetAllUsersNotAdmin();
@@ -33,9 +31,6 @@ public class UserController : ControllerBase{
 
     [Authorize(Roles = "Admin, Moderator")]
     [HttpGet("Admin/{userId:guid}")]
-    [ProducesResponseType(200)]
-    [ProducesResponseType(404)]
-    [ProducesResponseType(401)]
     public async Task<IActionResult> GetUserById(Guid userId)
     {
         var user = await _userService.GetUserById(userId);
@@ -45,9 +40,6 @@ public class UserController : ControllerBase{
 
     [Authorize]
     [HttpPut]
-    [ProducesResponseType(200)]
-    [ProducesResponseType(401)]
-    [ProducesResponseType(404)]
     public async Task<IActionResult> UpdateUserProfile(UserUpdateDto userUpdateDto)
     {
         Guid userId = _helper.GetUserId();
@@ -59,9 +51,6 @@ public class UserController : ControllerBase{
 
     [Authorize(Roles = "Admin, Moderator")]
     [HttpDelete("Admin/{userId:guid}")]
-    [ProducesResponseType(200)]
-    [ProducesResponseType(401)]
-    [ProducesResponseType(404)]
     public async Task<IActionResult> DeleteUser(Guid userId)
     {
         await _userService.DeleteUserAsync(userId);
@@ -71,9 +60,6 @@ public class UserController : ControllerBase{
 
     [Authorize(Roles = "Admin, Moderator")]
     [HttpPut("Admin/{userId:guid}/ActiveStatus")]
-    [ProducesResponseType(200)]
-    [ProducesResponseType(401)]
-    [ProducesResponseType(404)]
     public async Task<IActionResult> ActivateOrDiactivateUser(Guid userId, bool isActive)
     {
         await _userService.ActivateOrDiactivateUserAsync(userId, isActive);
@@ -83,9 +69,6 @@ public class UserController : ControllerBase{
 
     [Authorize(Roles = "Admin, Moderator")]
     [HttpPut("Admin/{userId:guid}/RoleAdd")]
-    [ProducesResponseType(200)]
-    [ProducesResponseType(401)]
-    [ProducesResponseType(404)]
     public async Task<IActionResult> AddRoleToUser(Guid userId, UserRole role)
     {
         await _userService.AddRoleToUserAsync(userId, role);
@@ -95,9 +78,6 @@ public class UserController : ControllerBase{
 
     [Authorize(Roles = "Admin, Moderator")]
     [HttpPut("Admin/{userId:guid}/RoleRemove")]
-    [ProducesResponseType(200)]
-    [ProducesResponseType(401)]
-    [ProducesResponseType(404)]
     public async Task<IActionResult> RemoveRoleToUser(Guid userId, UserRole role)
     {
         await _userService.RemoveRoleFromUserAsync(userId, role);

@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace App.Controllers;
 
 
+[Authorize]
 [ApiController]
 [Route("api/[controller]")]
 public class PaymentController : ControllerBase
@@ -20,11 +21,7 @@ public class PaymentController : ControllerBase
         _helper = helper;
     }
 
-    [Authorize]
     [HttpPost("Order/{orderId:guid}")]
-    [ProducesResponseType(200)]
-    [ProducesResponseType(401)]
-    [ProducesResponseType(404)]
     public async Task<IActionResult> CreatePayment(Guid orderId)
     {
         Guid userId = _helper.GetUserId();
@@ -34,11 +31,7 @@ public class PaymentController : ControllerBase
         return Ok(payment);
     }
 
-    [Authorize]
     [HttpGet("{paymentId:guid}/Order/{orderId:guid}")]
-    [ProducesResponseType(200)]
-    [ProducesResponseType(401)]
-    [ProducesResponseType(404)]
     public async Task<IActionResult> GetPayment(Guid orderId, Guid paymentId)
     {
         Guid userId = _helper.GetUserId();
@@ -50,9 +43,6 @@ public class PaymentController : ControllerBase
     
     [Authorize(Roles = "Admin, Moderator, Manager")]
     [HttpPut("Admin/Webhook")]
-    [ProducesResponseType(200)]
-    [ProducesResponseType(401)]
-    [ProducesResponseType(404)]
     public async Task<IActionResult> Webhook([FromBody] PaymentWebhookDto webhookDto)
     {
         
@@ -63,8 +53,6 @@ public class PaymentController : ControllerBase
 
     [Authorize(Roles = "Admin, Moderator, Manager")]
     [HttpGet("Payments")]
-    [ProducesResponseType(200)]
-    [ProducesResponseType(401)]
     public async Task<IActionResult> GetPaymentsAdmin(PaymentStatus? status)
     {
         var payments = await _service.GetPaymentsAdminAsync(status);
@@ -74,9 +62,6 @@ public class PaymentController : ControllerBase
 
     [Authorize(Roles = "Admin, Moderator, Manager")]
     [HttpGet("{paymentId:guid}")]
-    [ProducesResponseType(200)]
-    [ProducesResponseType(404)]
-    [ProducesResponseType(401)]
     public async Task<IActionResult> GetPaymentAdmin(Guid paymentId)
     {
         var payment = await _service.GetPaymentAdminAsync(paymentId);
@@ -86,8 +71,6 @@ public class PaymentController : ControllerBase
 
     [Authorize(Roles = "Admin, Moderator, Manager")]
     [HttpGet("Payments/Statistics")]
-    [ProducesResponseType(200)]
-    [ProducesResponseType(401)]
     public async Task<IActionResult> GetPaymentsStatistics()
     {
         var statistics = await _service.GetPaymentsStatisticAsync();

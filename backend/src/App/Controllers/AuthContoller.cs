@@ -17,9 +17,6 @@ public class AuthController : ControllerBase
     }
 
     [HttpPost("Register")]
-    [ProducesResponseType(200)]
-    [ProducesResponseType(404)]
-    [ProducesResponseType(400)]
     public async Task<IActionResult> Register(RegisterRequest registerRequest)
     {
         await _authService.RegisterUser(registerRequest);
@@ -31,9 +28,6 @@ public class AuthController : ControllerBase
     }
 
     [HttpPost("AdminRegister")]
-    [ProducesResponseType(200)]
-    [ProducesResponseType(404)]
-    [ProducesResponseType(400)]
     public async Task<IActionResult> CreateUserAdmin(RegisterRequest registerRequest)
     {
         await _authService.CreateUserAdmin(registerRequest);
@@ -45,9 +39,6 @@ public class AuthController : ControllerBase
     }
 
     [HttpPost("Login")]
-    [ProducesResponseType(200)]
-    [ProducesResponseType(404)]
-    [ProducesResponseType(400)]
     public async Task<IActionResult> Login(LoginRequest loginRequest)
     {
         var response = await _authService.LoginUser(loginRequest);
