@@ -9,6 +9,6 @@ public class Notification : BaseModel
     public User User { get; set; } = null!;
     public string Title { get; set; } = string.Empty;
     public string Message { get; set; } = string.Empty;
-    public bool IsRead { get; set; }
-    public NotificationType Type { get; set; }
+    public bool IsRead { get; set; } = false;
+    public NotificationType Type { get; set; } = NotificationType.General;
 }

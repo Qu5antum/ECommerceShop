@@ -15,6 +15,7 @@ public interface IHelperService
     Task<Order> GetOrderOr404(Guid orderId);
     Task<Payment> GetPaymentOr404(Guid paymentId);
     Task<Review> GetReviewOr404(Guid reviewId);
+    Task<Notification> GetNotificationOr404(Guid notificationId);
 }
 public class HelperService : IHelperService
 {
@@ -26,6 +27,7 @@ public class HelperService : IHelperService
     private readonly IOrderRepository _orderRepository;
     private readonly IPaymentRepository _paymentRepository;
     private readonly IReviewRepository _reviewRepository;
+    private readonly INotificationRepository _notificationRepository;
     private readonly ILogger<HelperService> _logger;
 
     public HelperService
@@ -38,6 +40,7 @@ public class HelperService : IHelperService
         IOrderRepository orderRepository,
         IPaymentRepository paymentRepository,
         IReviewRepository reviewRepository,
+        INotificationRepository notificationRepository,
         ILogger<HelperService> logger
     )
     {
@@ -49,6 +52,7 @@ public class HelperService : IHelperService
         _orderRepository = orderRepository;
         _paymentRepository = paymentRepository;
         _reviewRepository = reviewRepository;
+        _notificationRepository = notificationRepository;
         _logger = logger;
     }
 
@@ -154,5 +158,18 @@ public class HelperService : IHelperService
         }
 
         return review;
+    }
+
+    public async Task<Notification> GetNotificationOr404(Guid notificationId)
+    {
+        var notification = await _notificationRepository.GetByIdAsync(notificationId);
+
+        if (notification == null)
+        {
+            _logger.LogWarning("Notification not found by this id: {notificationId}", notificationId);
+            throw new NotFoundException("Notification not found");
+        }
+
+        return notification;
     }
 }

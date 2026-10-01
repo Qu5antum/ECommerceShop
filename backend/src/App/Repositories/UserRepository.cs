@@ -11,6 +11,7 @@ public interface IUserRepository : IBaseRepository<User>
     Task<User?> GetUserByEmail(string Email);
     Task<User?> GetUserByUserName(string UserName);
     Task<List<User>> GetAllUsersNotAdminAsync();
+    Task<List<Guid>> GetUserIdsWithDefaultRolesAsync();
 }
 
 
@@ -49,5 +50,15 @@ public class UserRepository(AppDbContext context) : BaseRepository<User>(context
             .ToListAsync();
 
         return nonAdminUsers;
+    }
+
+    public async Task<List<Guid>> GetUserIdsWithDefaultRolesAsync()
+    {
+        var userIds = await _context.Users
+            .Where(u => u.Roles == UserRole.DefaultUser || u.Roles == UserRole.Seller)
+            .Select(u => u.Id)
+            .ToListAsync();
+
+        return userIds;
     }
 }

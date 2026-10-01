@@ -1,3 +1,4 @@
+using App.DTOs;
 using App.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -19,7 +20,6 @@ public class NotificationController : ControllerBase
         _helper = helper;
     }
 
-    [Authorize]
     [HttpGet("Notifications")]
     public async Task<IActionResult> GetNotifications(int? take = null!, bool? isRead = null)
     {
@@ -30,7 +30,16 @@ public class NotificationController : ControllerBase
         return Ok(notifications);
     }
 
-    [Authorize]
+    [HttpGet("{notificationId:guid}")]
+    public async Task<IActionResult> GetNotifiction(Guid notificationId)
+    {
+        Guid UserId = _helper.GetUserId();
+
+        var notification = await _service.GetUserNotificationAsync(UserId, notificationId);
+
+        return Ok(notification);
+    }
+
     [HttpGet("Notifications/count")]
     public async Task<IActionResult> GetCountNotifications()
     {
@@ -39,5 +48,41 @@ public class NotificationController : ControllerBase
         var notificationsCount = await _service.GetCountOfUnreadNotificationsAsync(UserId);
 
         return Ok(notificationsCount);
+    }
+
+    [Authorize(Roles = "Admin, Moderator, Manager")]
+    [HttpPost("All")]
+    public async Task<IActionResult> SendNotificationsForUsers(CreateNotificationDto notificationDto)
+    {
+        await _service.SendNotificationsAdminAsync(notificationDto);
+
+        return Ok("Notifications successfully sended to users");
+    }
+
+    [Authorize(Roles = "Admin, Moderator, Manager")]
+    [HttpGet("Admin/Notifications")]
+    public async Task<IActionResult> GetNotificationsAdmin()
+    {
+        var notifications = await _service.GetAllNotificationsAdminAsync();
+
+        return Ok(notifications);
+    }
+
+    [Authorize(Roles = "Admin, Moderator, Manager")]
+    [HttpGet("{notificationId:guid}/Admin")]
+    public async Task<IActionResult> GetNotificationAdmin(Guid notificationId)
+    {
+        var notification = await _service.GetNotificationAdminAsync(notificationId);
+
+        return Ok(notification);
+    }
+
+    [Authorize(Roles = "Admin, Moderator, Manager")]
+    [HttpDelete("{notificationId:guid}/Admin")]
+    public async Task<IActionResult> DeleteNotificationAdmin(Guid notificationId)
+    {
+        await _service.DeleteNotificationAdminAsync(notificationId);
+
+        return Ok("Notification successfully deleted");
     }
 }

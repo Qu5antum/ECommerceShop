@@ -12,6 +12,7 @@ public interface IBaseRepository<T> where T : BaseModel
     Task DeleteAsync(T entity);
     Task<T?> GetByIdAsync(Guid id);
     Task<List<T>> GetAllAsync();
+    Task AddRangeAsync(IEnumerable<T> entities);
 }
 
 
@@ -44,5 +45,12 @@ public class BaseRepository<T>(AppDbContext context) : IBaseRepository<T> where 
     public async Task<List<T>> GetAllAsync()
     {
         return await _dbSet.AsNoTracking().ToListAsync();
+    }
+
+    public async Task AddRangeAsync(IEnumerable<T> entities)
+    {
+        if (entities == null || !entities.Any()) return;
+
+        await _dbSet.AddRangeAsync(entities);
     }
 }
