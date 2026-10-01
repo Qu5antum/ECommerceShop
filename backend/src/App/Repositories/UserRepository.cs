@@ -12,6 +12,7 @@ public interface IUserRepository : IBaseRepository<User>
     Task<User?> GetUserByUserName(string UserName);
     Task<List<User>> GetAllUsersNotAdminAsync();
     Task<List<Guid>> GetUserIdsWithDefaultRolesAsync();
+    Task<int> GetUsersCountAsync();
 }
 
 
@@ -60,5 +61,15 @@ public class UserRepository(AppDbContext context) : BaseRepository<User>(context
             .ToListAsync();
 
         return userIds;
+    }
+
+    public async Task<int> GetUsersCountAsync()
+    {
+        var userCount = await _context.Users
+            .Where(u => u.Roles == UserRole.DefaultUser)
+            .Select(u => u.Id)
+            .CountAsync();
+
+        return userCount;
     }
 }

@@ -13,6 +13,7 @@ public interface IBaseRepository<T> where T : BaseModel
     Task<T?> GetByIdAsync(Guid id);
     Task<List<T>> GetAllAsync();
     Task AddRangeAsync(IEnumerable<T> entities);
+    Task<int> GetEntitysCountAsync();
 }
 
 
@@ -52,5 +53,12 @@ public class BaseRepository<T>(AppDbContext context) : IBaseRepository<T> where 
         if (entities == null || !entities.Any()) return;
 
         await _dbSet.AddRangeAsync(entities);
+    }
+
+    public async Task<int> GetEntitysCountAsync()
+    {
+        return await _dbSet
+            .Select(e => e.Id)
+            .CountAsync();
     }
 }

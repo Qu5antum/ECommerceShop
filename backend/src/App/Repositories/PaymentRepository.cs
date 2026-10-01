@@ -12,6 +12,8 @@ public interface IPaymentRepository : IBaseRepository<Payment>
     Task<Payment?> GetPaymentWithProviderId(string paymentProviderId);
     Task<List<Payment>> GetPaymetsByStatusAsync(PaymentStatus? status = null);
     Task<PaymentStatisticsDto> GetPaymentsStatisticsAsync();
+    Task<int> GetPendingPaymentsCountAsync();
+    Task<decimal> GetTotalRevenueAsync();
 }
 
 
@@ -54,5 +56,20 @@ public class PaymentRepository(AppDbContext context) : BaseRepository<Payment>(c
             })
             .FirstOrDefaultAsync();
         return stats ?? new PaymentStatisticsDto();
+    }
+
+    public async Task<int> GetPendingPaymentsCountAsync()
+    {
+        return await _context.Payments
+            .Where(p => p.Status == PaymentStatus.Pending)
+            .Select(p => p.Id)
+            .CountAsync();
+    }
+
+    public async Task<decimal> GetTotalRevenueAsync()
+    {
+        return await _context.Payments
+            .Where(p => p.Status == PaymentStatus.Succeeded)
+            .SumAsync(p => p.Amount);
     }
 }

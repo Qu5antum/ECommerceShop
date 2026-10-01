@@ -336,6 +336,7 @@ public class PaymentService : IPaymentService
         return result;
     }
 
+    // TODO: add redis cache
     public async Task<PaymentStatisticsDto> GetPaymentsStatisticAsync()
     {
         var stats = await _paymentRepository.GetPaymentsStatisticsAsync();

@@ -3,6 +3,7 @@ using App.Controllers;
 using App.Database;
 using App.Repositories;
 using App.Services;
+using App.Services.Analtytics;
 using App.Services.Caching;
 using App.Transactions;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -103,6 +104,7 @@ builder.Services.AddScoped<IPaymentService, PaymentService>();
 builder.Services.AddScoped<IReviewService, ReviewService>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddScoped<IRedisCacheService, RedisCacheService>();
+builder.Services.AddScoped<IAnalyticService, AnalyticService>();
 
 // Repositories
 builder.Services.AddScoped<IUserRepository, UserRepository>();

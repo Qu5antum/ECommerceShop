@@ -12,6 +12,7 @@ public interface IOrderRepository : IBaseRepository<Order>
     Task<Order?> GetOrderWithItemsById(Guid orderId);
     Task<List<Order>> GetOrdersWithStatus(OrderStatus? status = null);
     Task<List<Order>> GetOrderWithDate(DateTime fromDate, DateTime toDate);
+    Task<int> GetPendingOrdersCountAsync();
 }
 
 
@@ -57,5 +58,13 @@ public class OrderRepository(AppDbContext context) : BaseRepository<Order>(conte
             .AsNoTracking()
             .Where(o => o.CreatedAt >= fromDate && o.CreatedAt <= endOfDay)
             .ToListAsync();
+    }
+
+    public async Task<int> GetPendingOrdersCountAsync()
+    {
+        return await _context.Orders
+            .Where(o => o.status == OrderStatus.Pending)
+            .Select(o => o.Id)
+            .CountAsync();
     }
 }
