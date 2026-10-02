@@ -217,9 +217,6 @@ public class AuthService : IAuthService
         {
             AccessToken = accessToken,
             ExpiresAt = expiresAt,
-            userId = user.Id,
-            UserName = user.UserName,
-            Email = user.Email
         };
     }
 

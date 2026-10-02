@@ -17,6 +17,17 @@ var connectionString = builder.Configuration.GetConnectionString("DefaultConnect
 
 builder.Services.AddEndpointsApiExplorer();
 
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("FrontendCorsPolicy", policy =>
+    {
+        policy.WithOrigins("http://localhost:3000", "https://myfrontend.com") 
+              .AllowAnyMethod()                                            
+              .AllowAnyHeader()                                           
+              .AllowCredentials();                                        
+    });
+});
+
 builder.Services.AddSwaggerGen(setup =>
 {
     var jwtSecurityScheme = new OpenApiSecurityScheme
@@ -130,6 +141,13 @@ var app = builder.Build();
 app.UseStaticFiles();
 app.UseSwagger();
 app.UseSwaggerUI();
+
+app.UseHttpsRedirection();
+app.UseStaticFiles();
+
+app.UseRouting(); 
+
+app.UseCors();
 
 app.UseAuthentication();
 app.UseAuthorization();
