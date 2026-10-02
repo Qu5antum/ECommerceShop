@@ -147,7 +147,7 @@ app.UseStaticFiles();
 
 app.UseRouting(); 
 
-app.UseCors();
+app.UseCors("FrontendCorsPolicy");
 
 app.UseAuthentication();
 app.UseAuthorization();
