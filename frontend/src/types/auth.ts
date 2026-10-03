@@ -13,6 +13,6 @@ export interface LoginRequest
 
 export interface LoginResponse
 {
-    AccessToken?: string;
-    ExpiresAt: Date;
+    accessToken: string;
+    expiresAt: string;
 }

@@ -68,7 +68,7 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    container_name: code_reviewer_frontend
+    container_name: ecommerce_frontend
     restart: unless-stopped
     depends_on:
       - backend
