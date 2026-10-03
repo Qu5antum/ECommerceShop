@@ -1,110 +1,177 @@
+import { useEffect, useState } from 'react'
+import { categoryApi } from '../api/category'
+import { productApi } from '../api/product'
+import type { CategoryResponseDto } from '../types/category'
+import type { ProductResponseDto } from '../types/product'
 import Brand from '../components/Brand'
 
 export default function MainPage() {
+  const [categories, setCategories] = useState<CategoryResponseDto[]>([])
+  const [products, setProducts] = useState<ProductResponseDto[]>([])
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [sortOrder, setSortOrder] = useState<'default' | 'asc' | 'desc'>('default')
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    async function loadInitialData() {
+      try {
+        const [cats, prods] = await Promise.all([
+          categoryApi.getAllCategories(),
+          productApi.getProducts()
+        ])
+        setCategories(cats)
+        setProducts(prods)
+      } catch (err: any) {
+        setError(err.message || 'Failed to load data')
+      } finally {
+        setLoading(false)
+      }
+    }
+    loadInitialData()
+  }, [])
+
+  async function handleCategorySelect(categoryId: string | null) {
+    setSelectedCategory(categoryId)
+    setSearchQuery('')
+    setSortOrder('default')
+    setLoading(true)
+    try {
+      const data = categoryId 
+        ? await productApi.getProductsByCategoryId(categoryId)
+        : await productApi.getProducts()
+      setProducts(data)
+    } catch (err: any) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function handleSearch(e: React.FormEvent) {
+    e.preventDefault()
+    if (!searchQuery.trim()) return
+    setLoading(true)
+    setSelectedCategory(null)
+    try {
+      let data: ProductResponseDto[]
+      if (sortOrder === 'asc') {
+        data = await productApi.searchProductAsc(searchQuery)
+      } else if (sortOrder === 'desc') {
+        data = await productApi.searchProductDesc(searchQuery)
+      } else {
+        data = await productApi.searchProduct(searchQuery)
+      }
+      setProducts(data)
+    } catch (err: any) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function handleSortChange(order: 'default' | 'asc' | 'desc') {
+    setSortOrder(order)
+    setLoading(true)
+    try {
+      let data: ProductResponseDto[]
+      if (searchQuery) {
+        if (order === 'asc') data = await productApi.searchProductAsc(searchQuery)
+        else if (order === 'desc') data = await productApi.searchProductDesc(searchQuery)
+        else data = await productApi.searchProduct(searchQuery)
+      } else {
+        data = await productApi.getProducts()
+        if (order === 'asc') data.sort((a, b) => a.price - b.price)
+        if (order === 'desc') data.sort((a, b) => b.price - a.price)
+      }
+      setProducts(data)
+    } catch (err: any) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  if (loading && categories.length === 0) return <div className="loading">Loading store...</div>
+
   return (
     <main className="home-page">
       <header className="site-header">
         <div className="site-header__inner">
           <Brand />
-          <nav className="site-nav" aria-label="Main navigation">
-            <a href="#about">About store</a>
-            <a href="#benefits">Benefits</a>
-          </nav>
+          <form className="search-form" onSubmit={handleSearch}>
+            <input 
+              type="text" 
+              placeholder="Search products..." 
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+            <button type="submit" className="button button--quiet">Search</button>
+          </form>
           <div className="site-header__actions">
-            <a className="button button--quiet" href="/login">
-              Log in
-            </a>
-            <a className="button button--dark" href="/register">
-              Sign up
-            </a>
+            <a className="button button--quiet" href="/login">Log in</a>
+            <a className="button button--dark" href="/register">Sign up</a>
           </div>
         </div>
       </header>
 
-      <section className="hero" id="about">
-        <div className="hero__copy">
-          <span className="eyebrow">
-            <span className="eyebrow__dot" />
-            A place for pleasant finds
-          </span>
-          <h1>
-            Shopping
-            <br />
-            that <span>delights.</span>
-          </h1>
-          <p>
-            Everything you want to find — all in one cozy store. Create an account to start your
-            journey with Lavka.
-          </p>
-          <div className="hero__actions">
-            <a className="button button--dark button--large" href="/register">
-              Start shopping <span aria-hidden="true">↗</span>
-            </a>
-            <a className="hero__login" href="/login">
-              Already have an account? <span>Log in</span>
-            </a>
-          </div>
-          <div className="hero__note">
-            <span className="hero__note-icon" aria-hidden="true">
-              ✳
-            </span>
-            <span>Simple registration — and you are all set</span>
-          </div>
+      <section className="catalog-section">
+        <div className="categories-sidebar">
+          <h3>Categories</h3>
+          <button 
+            className={`category-btn ${!selectedCategory ? 'active' : ''}`}
+            onClick={() => handleCategorySelect(null)}
+          >
+            All Products
+          </button>
+          {categories.map((cat) => (
+            <button 
+              key={cat.id} 
+              className={`category-btn ${selectedCategory === cat.id ? 'active' : ''}`}
+              onClick={() => handleCategorySelect(cat.id)}
+            >
+              {cat.title}
+            </button>
+          ))}
         </div>
 
-        <div className="hero-art" aria-label="Gift box illustration" role="img">
-          <div className="hero-art__sun" />
-          <div className="hero-art__spark hero-art__spark--one">✳</div>
-          <div className="hero-art__spark hero-art__spark--two">✦</div>
-          <div className="hero-art__card">
-            <span className="hero-art__card-label">small joy</span>
-            <div className="hero-art__gift">
-              <div className="hero-art__bow hero-art__bow--left" />
-              <div className="hero-art__bow hero-art__bow--right" />
-              <div className="hero-art__lid" />
-              <div className="hero-art__box">
-                <span />
-              </div>
+        <div className="products-content">
+          <div className="catalog-controls">
+            <h2>{selectedCategory ? 'Category Products' : 'All Products'}</h2>
+            <div className="sort-dropdown">
+              <label>Sort by price: </label>
+              <select value={sortOrder} onChange={(e) => handleSortChange(e.target.value as any)}>
+                <option value="default">Default</option>
+                <option value="asc">Price: Low to High</option>
+                <option value="desc">Price: High to Low</option>
+              </select>
             </div>
-            <span className="hero-art__card-caption">found for everyone</span>
           </div>
-          <div className="hero-art__badge">
-            <span>♡</span>
-            <span>choose with pleasure</span>
-          </div>
-          <div className="hero-art__dots" />
+
+          {error && <p className="error-message">{error}</p>}
+
+          {loading ? (
+            <p>Loading products...</p>
+          ) : products.length === 0 ? (
+            <p>No products found.</p>
+          ) : (
+            <div className="products-grid">
+              {products.map((product) => (
+                <div key={product.id} className="product-card">
+                  <h4>{product.name}</h4>
+                  <p className="product-desc">{product.description}</p>
+                  <div className="product-footer">
+                    <span className="product-price">${product.price}</span>
+                    <span className="product-stock">Stock: {product.stock}</span>
+                  </div>
+                  <a href={`/product/${product.id}`} className="button button--dark button--small">View</a>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </section>
-
-      <section className="benefits" id="benefits">
-        <div className="benefits__intro">
-          <span className="eyebrow">Keep it simple</span>
-          <h2>A great choice starts here</h2>
-        </div>
-        <div className="benefit">
-          <span className="benefit__number">01</span>
-          <h3>Create an account</h3>
-          <p>Registration takes just a couple of minutes.</p>
-        </div>
-        <div className="benefit">
-          <span className="benefit__number">02</span>
-          <h3>Find what's yours</h3>
-          <p>Discover shopping all in one place.</p>
-        </div>
-        <div className="benefit">
-          <span className="benefit__number">03</span>
-          <h3>Shop with joy</h3>
-          <p>Lavka is always there when you need it.</p>
-        </div>
-      </section>
-
-      <footer className="site-footer">
-        <Brand />
-        <span>Good finds — every day.</span>
-        <a href="/register">
-          Join us <span aria-hidden="true">↗</span>
-        </a>
-      </footer>
     </main>
   )
 }

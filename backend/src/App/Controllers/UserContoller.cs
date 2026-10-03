@@ -49,6 +49,17 @@ public class UserController : ControllerBase{
         return Ok("User successfully updated");
     }
 
+    [Authorize]
+    [HttpGet("Profile")]
+    public async Task<IActionResult> GetCurrentUserProfile()
+    {
+        Guid userId = _helper.GetUserId();
+
+        var user = await _userService.GetUserById(userId);
+
+        return Ok(user);
+    }
+
     [Authorize(Roles = "Admin, Moderator")]
     [HttpDelete("Admin/{userId:guid}")]
     public async Task<IActionResult> DeleteUser(Guid userId)

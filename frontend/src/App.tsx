@@ -1,19 +1,20 @@
-import MainPage from './pages/mainPage'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import LoginPage from './pages/loginPage'
 import RegisterPage from './pages/registerPage'
+import HomePage from './pages/homePage'
+import MainPage from './pages/mainPage'
 
-function App() {
-  const path = window.location.pathname.replace(/\/+$/, '') || '/'
-
-  if (path === '/login') {
-    return <LoginPage />
-  }
-
-  if (path === '/register') {
-    return <RegisterPage />
-  }
-
-  return <MainPage />
+export default function App() {
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<HomePage />} />
+        <Route path="/main" element={<MainPage />} />
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/register" element={<RegisterPage />} />
+        
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </BrowserRouter>
+  )
 }
-
-export default App
