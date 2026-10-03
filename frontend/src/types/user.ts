@@ -14,8 +14,8 @@ export interface UserResponseDto {
   email: string
   roles: UserRole
   isActive: boolean
-  createdAt: string
-  updatedAt?: string | null
+  createdAt: Date
+  updatedAt?: Date | null
 }
 
 export interface UserUpdateDto {

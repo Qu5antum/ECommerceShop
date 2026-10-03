@@ -13,5 +13,5 @@ export interface CategoryResponseDto {
   title: string
   slug: string
   createdAt: string
-  updatedAt?: string | null
+  updatedAt?: Date | null
 }

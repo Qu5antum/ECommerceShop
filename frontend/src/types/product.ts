@@ -8,8 +8,8 @@ export interface ProductResponseDto {
   sku: string
   stock: number
   imageUrl?: string | null
-  createdAt: string
-  updatedAt?: string | null
+  createdAt: Date
+  updatedAt?: Date | null
 }
 
 export interface ProductCreateData {
