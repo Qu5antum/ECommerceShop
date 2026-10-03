@@ -3,6 +3,7 @@ import LoginPage from './pages/loginPage'
 import RegisterPage from './pages/registerPage'
 import HomePage from './pages/homePage'
 import MainPage from './pages/mainPage'
+import ProductDetailPage from './pages/productDetailPage'
 
 export default function App() {
   return (
@@ -12,6 +13,7 @@ export default function App() {
         <Route path="/main" element={<MainPage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
+        <Route path="/product/:id" element={<ProductDetailPage />} />
         
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

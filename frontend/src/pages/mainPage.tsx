@@ -1,9 +1,52 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { categoryApi } from '../api/category'
 import { productApi } from '../api/product'
 import type { CategoryResponseDto } from '../types/category'
 import type { ProductResponseDto } from '../types/product'
 import Brand from '../components/Brand'
+
+function ProductCard({ product }: { product: ProductResponseDto }) {
+  const [imageUrl, setImageUrl] = useState<string | null>(null)
+
+  useEffect(() => {
+    let isMounted = true
+    async function fetchImage() {
+      try {
+        const url = await productApi.getProductImage(product.id)
+        if (isMounted) setImageUrl(url)
+      } catch {
+      }
+    }
+    fetchImage()
+    return () => {
+      isMounted = false
+    }
+  }, [product.id])
+
+  return (
+    <div className="product-card">
+      <div className="product-image-wrapper">
+        {imageUrl ? (
+          <img src={imageUrl} alt={product.name} className="product-image" />
+        ) : (
+          <div className="product-image-placeholder">No image</div>
+        )}
+      </div>
+      <div className="product-info">
+        <h4>{product.name}</h4>
+        <p className="product-desc">{product.description}</p>
+        <div className="product-footer">
+          <span className="product-price">${product.price}</span>
+          <span className="product-stock">Stock: {product.stock}</span>
+        </div>
+        <Link to={`/product/${product.id}`} className="button button--dark button--small">
+          View
+        </Link>
+      </div>
+    </div>
+  )
+}
 
 export default function MainPage() {
   const [categories, setCategories] = useState<CategoryResponseDto[]>([])
@@ -110,8 +153,8 @@ export default function MainPage() {
             <button type="submit" className="button button--quiet">Search</button>
           </form>
           <div className="site-header__actions">
-            <a className="button button--quiet" href="/login">Log in</a>
-            <a className="button button--dark" href="/register">Sign up</a>
+            <Link className="button button--quiet" to="/login">Log in</Link>
+            <Link className="button button--dark" to="/register">Sign up</Link>
           </div>
         </div>
       </header>
@@ -158,15 +201,7 @@ export default function MainPage() {
           ) : (
             <div className="products-grid">
               {products.map((product) => (
-                <div key={product.id} className="product-card">
-                  <h4>{product.name}</h4>
-                  <p className="product-desc">{product.description}</p>
-                  <div className="product-footer">
-                    <span className="product-price">${product.price}</span>
-                    <span className="product-stock">Stock: {product.stock}</span>
-                  </div>
-                  <a href={`/product/${product.id}`} className="button button--dark button--small">View</a>
-                </div>
+                <ProductCard key={product.id} product={product} />
               ))}
             </div>
           )}
