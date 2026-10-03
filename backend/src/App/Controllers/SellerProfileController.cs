@@ -56,8 +56,8 @@ public class SellerProfileController : ControllerBase
         return Ok(sellerProfile);
     }
 
-    [Authorize(Roles = "Admin, Moderator")]
-    [HttpGet("Status")]
+    [Authorize(Roles = "Admin, Moderator, Manager")]
+    [HttpGet("Sellers")]
     public async Task<IActionResult> GetSellers(SellerStatus status)
     {
         var sellers = await _service.GetSellersAsync(status);
@@ -65,7 +65,7 @@ public class SellerProfileController : ControllerBase
         return Ok(sellers);
     }
 
-    [Authorize(Roles = "Admin, Moderator")]
+    [Authorize(Roles = "Admin, Moderator, Manager")]
     [HttpPut("{sellerId:guid}/Status")]
     public async Task<IActionResult> UpdateStatusOfSellerProfile(Guid sellerId, SellerStatus status)
     {

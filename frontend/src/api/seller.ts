@@ -29,7 +29,7 @@ export const sellerProfileApi = {
   },
 
   async getSellersByStatus(status: SellerStatus): Promise<SellerProfileResponseDto[]> {
-    const response = await api.get<SellerProfileResponseDto[]>('/SellerProfile/Status', {
+    const response = await api.get<SellerProfileResponseDto[]>('/SellerProfile/Sellers', {
       params: { status }
     })
     return response.data

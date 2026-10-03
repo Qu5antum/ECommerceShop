@@ -4,6 +4,7 @@ using App.Models;
 using App.Repositories;
 using App.Services.Caching;
 using App.Transactions;
+using App.Enum;
 using Microsoft.EntityFrameworkCore;
 
 namespace App.Services;
@@ -94,6 +95,12 @@ public class ProductService : IProductService
             throw new NotFoundException("Seller profile not found, you can't add product");
         }
 
+        if (sellerProfile.Status != SellerStatus.Approved)
+        {
+            _logger.LogWarning("User seller profile status not approved, {sellerId}", sellerProfile.Id);
+            throw new BadRequestException("User seller profile status not approved");
+        }
+
         try
         {
             if (productCreateDto.Image != null && productCreateDto.Image.Length > 0)
@@ -177,6 +184,12 @@ public class ProductService : IProductService
         {
             _logger.LogWarning("Seller profile not found of this user: {userId}", userId);
             throw new NotFoundException("Seller profile not found, you can't update product");
+        }
+
+        if (sellerProfile.Status != SellerStatus.Approved)
+        {
+            _logger.LogWarning("User seller profile status not approved, {sellerId}", sellerProfile.Id);
+            throw new BadRequestException("User seller profile status not approved");
         }
 
         var product = await _helper.GetProductOr404(productId);
@@ -271,6 +284,12 @@ public class ProductService : IProductService
         {
             _logger.LogWarning("Seller profile not found of this user: {userId}", userId);
             throw new NotFoundException("Seller profile not found, you can't delete product");
+        }
+
+        if (sellerProfile.Status != SellerStatus.Approved)
+        {
+            _logger.LogWarning("User seller profile status not approved, {sellerId}", sellerProfile.Id);
+            throw new BadRequestException("User seller profile status not approved");
         }
 
         var product = await _helper.GetProductOr404(productId);
