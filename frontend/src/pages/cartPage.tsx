@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { cartApi } from '../api/cart'
 import { cartItemApi } from '../api/cart'
 import { productApi } from '../api/product'
+import { orderApi } from '../api/order' 
 import type { CartItemResponseDto, CartItemUpdateDto } from '../types/cart'
 import type { ProductResponseDto } from '../types/product'
 import Brand from '../components/Brand'
@@ -15,8 +16,10 @@ interface CartItemWithProduct extends CartItemResponseDto {
 export default function CartPage() {
   const [items, setItems] = useState<CartItemWithProduct[]>([])
   const [loading, setLoading] = useState(true)
+  const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [successMessage, setSuccessMessage] = useState('')
+  const navigate = useNavigate()
 
   useEffect(() => {
     async function loadCartData() {
@@ -76,6 +79,26 @@ export default function CartPage() {
       setTimeout(() => setSuccessMessage(''), 3000)
     } catch (err: any) {
       setError(err.message || 'Failed to delete item')
+    }
+  }
+
+  async function handleCreateOrder() {
+    try {
+      setError('')
+      setSubmitting(true)
+      
+      await orderApi.createOrder()
+      
+      setSuccessMessage('Order created successfully!')
+      setItems([]) 
+      
+      setTimeout(() => {
+        navigate('/orders') 
+      }, 2000)
+    } catch (err: any) {
+      setError(err.response?.data?.message || err.message || 'Failed to create order')
+    } finally {
+      setSubmitting(false)
     }
   }
 
@@ -168,9 +191,14 @@ export default function CartPage() {
                 <span>${totalPrice.toFixed(2)}</span>
               </div>
               
-              <Link to="/checkout" className="button button--dark button--large w-100">
-                Proceed to Checkout
-              </Link>
+              <button 
+                type="button" 
+                className="button button--dark button--large w-100"
+                onClick={handleCreateOrder}
+                disabled={submitting}
+              >
+                {submitting ? 'Creating Order...' : 'Create Order'}
+              </button>
             </div>
           </div>
         )}

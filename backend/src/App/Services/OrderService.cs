@@ -31,6 +31,7 @@ public class OrderService : IOrderService
     private readonly ICartRepository _cartRepository;
     private readonly IProductRepository _productRepository;
     private readonly ISellerProfileRepository _sellerRepository;
+    private readonly INotificationRepository _notificationRepository;
     private readonly ILogger<OrderService> _logger;
     private readonly IHelperService _helper;
     private readonly IUnitOfWork _unitOfWork;
@@ -66,6 +67,26 @@ public class OrderService : IOrderService
         return $"orders:{orderId}";
     }
 
+    private static string GetProductsCacheKey()
+    {
+        return $"products:all";
+    }
+
+    private static string GetProductCacheKeyById(Guid productId)
+    {
+        return $"products:{productId}";
+    }
+
+    private static string GetProductsOutOfStockCacheyKey()
+    {
+        return $"products:outOfStock";
+    }
+
+    private static string GetCartItemsCacheKeyByUser(Guid userId)
+    {
+        return $"cartItems:{userId}";
+    }
+
     public OrderService
     (
         IOrderRepository orderRepository, 
@@ -73,6 +94,7 @@ public class OrderService : IOrderService
         ICartRepository cartRepository, 
         IProductRepository productRepository, 
         ISellerProfileRepository sellerRepository,
+        INotificationRepository notificationRepository,
         ILogger<OrderService> logger, 
         IHelperService helper, 
         IUnitOfWork unitOfWork,
@@ -84,6 +106,7 @@ public class OrderService : IOrderService
         _cartRepository = cartRepository;
         _productRepository = productRepository;
         _sellerRepository = sellerRepository;
+        _notificationRepository = notificationRepository;
         _logger = logger;
         _helper = helper;
         _unitOfWork = unitOfWork;
@@ -174,11 +197,25 @@ public class OrderService : IOrderService
             {
                 item.orderId = newOrder.Id;
                 await _orderItemRepository.CreateAsync(item);
+
+                await _cache.RemoveDataAsync(GetProductCacheKeyById(item.productId));
+
+                _logger.LogInformation("Product deleted from redis cache: {productId}", item.productId);
                 
                 newOrder.orderItems.Add(item);
             }
 
             await _cartRepository.ClearCartAsync(cartWithItems.Id);
+
+            var notification = new Notification
+            {
+                UserId = userId,
+                Title = "New order",
+                Message = $"Successfull order create: {newOrder.Id}",
+            };
+
+            await _notificationRepository.CreateAsync(notification);
+
             await _unitOfWork.SaveChangesAsync();
             await _unitOfWork.CommitAsync();
 
@@ -195,6 +232,15 @@ public class OrderService : IOrderService
             await _cache.RemoveDataAsync(GetOrdersCacheKey());
 
             _logger.LogInformation("Orders deleted from redis cache: {userId}", userId);
+
+            await _cache.RemoveDataAsync(GetProductsCacheKey());
+            await _cache.RemoveDataAsync(GetProductsOutOfStockCacheyKey());
+
+            _logger.LogInformation("Products deleted from redis cache");
+
+            await _cache.RemoveDataAsync(GetCartItemsCacheKeyByUser(userId));
+
+            _logger.LogInformation("Cart items of user removed from redis cache: {userId}", userId);
 
             return new OrderResponseDto
             {
@@ -352,7 +398,8 @@ public class OrderService : IOrderService
             _logger.LogWarning("Cannot cancel order before Paid stage, order ID: {orderId}, status: {status}", orderId, order.status);
             throw new BadRequestException("Orders cannot be cancelled before the Paid stage.");
         }
-
+        
+        // TODO: optimize code getting products by id
         try
         {
             foreach (var item in order.orderItems)
@@ -360,10 +407,24 @@ public class OrderService : IOrderService
                 var product = await _helper.GetProductOr404(item.productId);
 
                 product.Stock += item.Quantity;
+                product.UpdatedAt = DateTime.UtcNow;
+
+                await _cache.RemoveDataAsync(GetProductCacheKeyById(product.Id));
+
+                _logger.LogInformation("Product deleted from redis cache: {productId}", product.Id);
             }
 
             order.status = OrderStatus.Cancelled;
             order.UpdatedAt = DateTime.UtcNow;
+
+            var notification = new Notification
+            {
+                UserId = userId,
+                Title = "New order",
+                Message = $"Order cancelled: {orderId}",
+            };
+
+            await _notificationRepository.CreateAsync(notification);
 
             await _unitOfWork.SaveChangesAsync();
             await _unitOfWork.CommitAsync();
@@ -373,6 +434,11 @@ public class OrderService : IOrderService
             await _cache.RemoveDataAsync(GetOrdersCacheKeyByUser(userId));
 
             _logger.LogInformation("Order deleted from redis cache: {userId}", userId);
+
+            await _cache.RemoveDataAsync(GetProductsCacheKey());
+            await _cache.RemoveDataAsync(GetProductsOutOfStockCacheyKey());
+
+            _logger.LogInformation("Products deleted from redis cache");
 
             return true;
         }
@@ -457,7 +523,8 @@ public class OrderService : IOrderService
             _logger.LogWarning("Order status backward transition not available, order ID: {orderId}", orderId);
             throw new BadRequestException("Order status transition is not available");
         }
-
+        
+        // Todo optimize the code for getting products
         try
         {
             string notificationTitle = string.Empty;
@@ -471,6 +538,11 @@ public class OrderService : IOrderService
                     var product = await _helper.GetProductOr404(item.productId);
 
                     product.Stock += item.Quantity;
+                    product.UpdatedAt = DateTime.UtcNow;
+
+                    await _cache.RemoveDataAsync(GetProductCacheKeyById(product.Id));
+
+                    _logger.LogInformation("Product deleted from redis cache: {productId}", product.Id);
                 }
 
                 order.status = orderStatusDto.Status;
@@ -495,6 +567,11 @@ public class OrderService : IOrderService
 
                 _logger.LogInformation("Orders deleted from redis cache");
                 _logger.LogInformation("Order was cancelled by Moderator order ID: {orderId}", orderId);
+
+                await _cache.RemoveDataAsync(GetProductsCacheKey());
+                await _cache.RemoveDataAsync(GetProductsOutOfStockCacheyKey());
+
+                _logger.LogInformation("Products deleted from redis cache");
 
                 return true;
             }
