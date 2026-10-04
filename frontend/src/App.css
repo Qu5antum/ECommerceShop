@@ -1667,3 +1667,130 @@
   margin-left: 6px;
   font-size: 16px;
 }
+
+.notification-btn {
+  position: relative;
+}
+
+.notification-badge {
+  background-color: #ff4d4f;
+  color: white;
+  font-size: 11px;
+  font-weight: bold;
+  padding: 1px 6px;
+  border-radius: 10px;
+  margin-left: 6px;
+  display: inline-block;
+  vertical-align: middle;
+}
+
+.notifications-container {
+  max-width: 800px;
+  margin: 40px auto;
+  padding: 0 20px;
+}
+
+.notifications-container h1 {
+  margin-bottom: 24px;
+}
+
+.empty-notifications {
+  text-align: center;
+  padding: 40px;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+}
+
+.empty-notifications p {
+  color: #666;
+  margin-bottom: 20px;
+}
+
+.notifications-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.notification-card {
+  background: #fff;
+  border-radius: 10px;
+  padding: 16px 20px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-left: 4px solid transparent;
+  transition: all 0.2s ease;
+}
+
+.notification-card.unread {
+  background: #fdfaf6;
+  border-left-color: #d97706; /* Акцентный цвет для непрочитанных */
+}
+
+.notification-card.read {
+  opacity: 0.75;
+}
+
+.notification-content {
+  flex-grow: 1;
+}
+
+.notification-header-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.notification-date {
+  font-size: 12px;
+  color: #888;
+}
+
+.unread-dot {
+  width: 8px;
+  height: 8px;
+  background-color: #d97706;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.notification-text {
+  margin: 0;
+  font-size: 15px;
+  color: #222;
+  line-height: 1.4;
+}
+
+.notification-actions {
+  flex-shrink: 0;
+  margin-left: 16px;
+}
+
+.notifications-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.notifications-header h1 {
+  margin: 0;
+}
+
+.notifications-filters {
+  display: flex;
+  gap: 8px;
+}
+
+.notification-title {
+  margin: 4px 0 6px 0;
+  font-size: 16px;
+  color: #111;
+  font-weight: 600;
+}

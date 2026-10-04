@@ -25,6 +25,11 @@ export const notificationApi = {
     return response.data
   },
 
+  async markNotificationsAsRead(): Promise<string> {
+    const response = await api.put<string>('/Notification/MarkAsRead')
+    return response.data
+  },
+
   async sendNotificationsAdmin(dto: CreateNotificationDto): Promise<string> {
     const response = await api.post<string>('/Notification/All', dto)
     return response.data

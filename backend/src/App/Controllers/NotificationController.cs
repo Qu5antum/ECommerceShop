@@ -40,6 +40,16 @@ public class NotificationController : ControllerBase
         return Ok(notification);
     }
 
+    [HttpPut("MarkAsRead")]
+    public async Task<IActionResult> MarkNotificationsAsRead()
+    {
+        Guid userId = _helper.GetUserId();
+
+        await _service.MarkAllAsReadAsync(userId);
+
+        return Ok("All notifications marked as read");
+    }
+
     [HttpGet("Notifications/count")]
     public async Task<IActionResult> GetCountNotifications()
     {

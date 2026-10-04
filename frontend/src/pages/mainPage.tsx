@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { categoryApi } from '../api/category'
 import { productApi } from '../api/product'
+import { notificationApi } from '../api/notification' 
 import type { CategoryResponseDto } from '../types/category'
 import type { ProductResponseDto } from '../types/product'
 import Brand from '../components/Brand'
@@ -56,16 +57,18 @@ export default function MainPage() {
   const [sortOrder, setSortOrder] = useState<'default' | 'asc' | 'desc'>('default')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-
+  const [unreadCount, setUnreadCount] = useState<number>(0) 
   useEffect(() => {
     async function loadInitialData() {
       try {
-        const [cats, prods] = await Promise.all([
+        const [cats, prods, unreadNotificationsCount] = await Promise.all([
           categoryApi.getAllCategories(),
-          productApi.getProducts()
+          productApi.getProducts(),
+          notificationApi.getCountOfUnreadNotifications().catch(() => 0)
         ])
         setCategories(cats)
         setProducts(prods)
+        setUnreadCount(unreadNotificationsCount)
       } catch (err: any) {
         setError(err.message || 'Failed to load data')
       } finally {
@@ -153,6 +156,9 @@ export default function MainPage() {
             <button type="submit" className="button button--quiet">Search</button>
           </form>
           <div className="site-header__actions">
+            <Link className="button button--quiet notification-btn" to="/notifications">
+              Notifications {unreadCount > 0 && <span className="notification-badge">{unreadCount}</span>}
+            </Link>
             <Link className="button button--quiet" to="/orders">Orders</Link>
             <Link className="button button--quiet" to="/cart">Cart</Link>
             <Link className="button button--quiet" to="/seller/profile">Sell on Лавка</Link>
