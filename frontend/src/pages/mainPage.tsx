@@ -153,6 +153,7 @@ export default function MainPage() {
             <button type="submit" className="button button--quiet">Search</button>
           </form>
           <div className="site-header__actions">
+            <Link className="button button--quiet" to="/cart">Cart</Link>
             <Link className="button button--quiet" to="/seller/profile">Sell on Лавка</Link>
             <Link className="button button--quiet" to="/login">Log in</Link>
             <Link className="button button--dark" to="/register">Sign up</Link>

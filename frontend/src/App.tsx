@@ -5,6 +5,7 @@ import HomePage from './pages/homePage'
 import MainPage from './pages/mainPage'
 import ProductDetailPage from './pages/productDetailPage'
 import SellerProfilePage from './pages/sellerProfilePage'
+import CartPage from './pages/cartPage'
 
 export default function App() {
   return (
@@ -16,6 +17,7 @@ export default function App() {
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/product/:id" element={<ProductDetailPage />} />
         <Route path="/seller/profile" element={<SellerProfilePage />} />
+        <Route path="/cart" element={<CartPage />} />
         
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

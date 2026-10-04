@@ -15,17 +15,14 @@ export default function SellerProfilePage() {
   const [error, setError] = useState('')
   const [successMessage, setSuccessMessage] = useState('')
 
-  // Поля формы создания
   const [storeName, setStoreName] = useState('')
   const [description, setDescription] = useState('')
 
-  // Поля формы редактирования
   const [editStoreName, setEditStoreName] = useState('')
   const [editDescription, setEditDescription] = useState('')
   const [isEditing, setIsEditing] = useState(false)
   const [submitting, setSubmitting] = useState(false)
 
-  // Проверяем наличие профиля при загрузке страницы
   useEffect(() => {
     async function fetchProfile() {
       try {
@@ -35,7 +32,6 @@ export default function SellerProfilePage() {
         setEditStoreName(data.storeName)
         setEditDescription(data.description || '')
       } catch (err: any) {
-        // Если профиль не найден (обычно 404), оставляем profile = null для отображения формы создания
         if (err.response?.status !== 404) {
           setError(err.message || 'Failed to load seller profile')
         }
@@ -47,7 +43,6 @@ export default function SellerProfilePage() {
     fetchProfile()
   }, [])
 
-  // Обработка создания профиля
   async function handleCreate(e: FormEvent) {
     e.preventDefault()
     if (!storeName.trim()) return
@@ -69,7 +64,6 @@ export default function SellerProfilePage() {
     }
   }
 
-  // Обработка обновления профиля
   async function handleUpdate(e: FormEvent) {
     e.preventDefault()
     if (!profile) return
@@ -84,7 +78,6 @@ export default function SellerProfilePage() {
       
       await sellerProfileApi.updateSellerProfile(profile.id, updateDto)
       
-      // Обновляем локальное состояние
       setProfile({
         ...profile,
         storeName: editStoreName,
@@ -101,7 +94,6 @@ export default function SellerProfilePage() {
     }
   }
 
-  // Функция для отображения статуса продавца текстом
   function renderStatus(status: SellerStatus) {
     switch (status) {
       case SellerStatus.Pending:
@@ -134,7 +126,6 @@ export default function SellerProfilePage() {
         {successMessage && <p className="form-message form-message--success">{successMessage}</p>}
         {error && <p className="form-message form-message--error">{error}</p>}
 
-        {/* Если профиля нет — показываем форму создания */}
         {!profile ? (
           <div className="profile-card">
             <h2>Create Your Store</h2>
@@ -168,7 +159,6 @@ export default function SellerProfilePage() {
             </form>
           </div>
         ) : (
-          /* Если профиль есть — показываем информацию или форму редактирования */
           <div className="profile-card">
             <div className="profile-header-info">
               <div className="store-title-status">
