@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useParams, Link, useNavigate } from 'react-router-dom'
 import { orderApi } from '../api/order'
 import { productApi } from '../api/product'
 import { OrderStatus, type OrderResponseDto } from '../types/order'
@@ -11,6 +11,8 @@ interface OrderItemWithImage extends OrderResponseDto {
 
 export default function OrderDetailPage() {
   const { id } = useParams<{ id: string }>()
+  const navigate = useNavigate()
+
   const [order, setOrder] = useState<OrderItemWithImage | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -96,6 +98,8 @@ export default function OrderDetailPage() {
 
   if (!order) return <div className="loading">Order not found.</div>
 
+  const isPaymentPending = order.status === OrderStatus.Pending || order.status === OrderStatus.PaymentPending
+
   return (
     <main className="order-detail-page">
       <header className="site-header">
@@ -134,6 +138,22 @@ export default function OrderDetailPage() {
 
         {successMessage && <p className="form-message form-message--success">{successMessage}</p>}
         {error && <p className="form-message form-message--error">{error}</p>}
+
+        {isPaymentPending && (
+          <div className="payment-pending-banner">
+            <div className="payment-banner-info">
+              <h3>Payment Required</h3>
+              <p>This order has not been paid yet. Please proceed to payment to complete your purchase.</p>
+            </div>
+            <button 
+              type="button" 
+              className="button button--dark"
+              onClick={() => navigate(`/payment/${order.id}`)}
+            >
+              Proceed to Payment
+            </button>
+          </div>
+        )}
 
         <div className="order-items-section">
           <h2>Items in this order</h2>

@@ -9,6 +9,7 @@ import CartPage from './pages/cartPage'
 import OrdersPage from './pages/orderPage'
 import NotificationsPage from './pages/notificationPage'
 import OrderDetailPage from './pages/orderDetailPage'
+import CheckoutPaymentPage from './pages/checkoutPaymentPage'
 
 
 export default function App() {
@@ -25,6 +26,7 @@ export default function App() {
         <Route path="/orders" element={<OrdersPage />} />
         <Route path="/notifications" element={<NotificationsPage />} />
         <Route path="/orders/:id" element={<OrderDetailPage />} />
+        <Route path="/payment/:orderId" element={<CheckoutPaymentPage />} />
         
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
