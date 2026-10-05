@@ -4,7 +4,8 @@ export const NotificationType = {
     PaymentFailed: 2,
     OrderShipped: 3,
     OrderDelivered: 4,
-    OrderCancelled: 5
+    OrderCancelled: 5,
+    System: 6
 } as const;
 
 export type NotificationType = (typeof NotificationType)[keyof typeof NotificationType];

@@ -48,6 +48,19 @@ public class SellerProfileController : ControllerBase
         return Ok(sellerProfile);
     }
 
+    [HttpGet("{sellerId:guid}/Image")]
+    public async Task<IActionResult> GetSellerProfileImage(Guid sellerId)
+    {
+        var file = await _service.GetSellerProfileImageAsync(sellerId);
+
+        if (file is null)
+        {
+            return NotFound("Seller profile image not found.");
+        }
+
+        return File(file.Value.FileStream, file.Value.ContentType);
+    }
+
     [HttpGet("{userId:guid}")]
     public async Task<IActionResult> GetUserSellerProfile(Guid userId)
     {

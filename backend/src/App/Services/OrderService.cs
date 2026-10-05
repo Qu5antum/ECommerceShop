@@ -152,37 +152,44 @@ public class OrderService : IOrderService
 
         decimal totalAmount = 0;
         var orderItems = new List<OrderItem>();
-
-        foreach (var item in cartWithItems.Items)
-        {
-            if (!productDict.TryGetValue(item.ProductId, out var product))
-            {
-                _logger.LogInformation("Product with ID not found: {productId}", item.ProductId);
-                throw new NotFoundException("Product not found");
-            }
-
-            if (product.Stock < item.Quantity)
-            {
-                _logger.LogWarning($"Not enough stock for product {product.Name}. Available: {product.Stock}, requested: {item.Quantity}, Product id: {product.Id}");
-                throw new BadRequestException($"Not enough stock for product {product.Name}. Available: {product.Stock}, requested: {item.Quantity}");
-            }
-
-            decimal itemTotal = product.Price * item.Quantity;
-            totalAmount += itemTotal;
-
-            orderItems.Add(new OrderItem
-            {
-                productId = product.Id,
-                ProductName = product.Name,
-                Price = product.Price,
-                Quantity = item.Quantity
-            });
-
-            product.Stock -= item.Quantity;
-        }
+        var sellerIds = new List<Guid>();
 
         try
         {
+            foreach (var item in cartWithItems.Items)
+            {
+                if (!productDict.TryGetValue(item.ProductId, out var product))
+                {
+                    _logger.LogInformation("Product with ID not found: {productId}", item.ProductId);
+                    throw new NotFoundException("Product not found");
+                }
+
+                if (product.Stock < item.Quantity)
+                {
+                    _logger.LogWarning($"Not enough stock for product {product.Name}. Available: {product.Stock}, requested: {item.Quantity}, Product id: {product.Id}");
+                    throw new BadRequestException($"Not enough stock for product {product.Name}. Available: {product.Stock}, requested: {item.Quantity}");
+                }
+
+                decimal itemTotal = product.Price * item.Quantity;
+                totalAmount += itemTotal;
+
+                orderItems.Add(new OrderItem
+                {
+                    productId = product.Id,
+                    ProductName = product.Name,
+                    Price = product.Price,
+                    Quantity = item.Quantity
+                });
+
+                product.Stock -= item.Quantity;
+
+                sellerIds.Add(product.SellerProfileId);
+            }
+
+            var uniqueSellerIds = sellerIds.Distinct().ToList();
+
+            var sellerUserIds = await _sellerRepository.GetUserIdsBySellerIds(uniqueSellerIds);
+
             var newOrder = new Order
             {
                 userId = userId,
@@ -215,6 +222,16 @@ public class OrderService : IOrderService
             };
 
             await _notificationRepository.CreateAsync(notification);
+
+            var sellerNotifications = sellerUserIds.Select(sellerUserId => new Notification
+            {
+                UserId = sellerUserId,
+                Title = "New Order Item",
+                Message = $"A product from your store has been ordered in Order #{newOrder.Id}.",
+                Type = NotificationType.System
+            }).ToList();
+
+            await _notificationRepository.AddRangeAsync(sellerNotifications);
 
             await _unitOfWork.SaveChangesAsync();
             await _unitOfWork.CommitAsync();
@@ -402,6 +419,8 @@ public class OrderService : IOrderService
         // TODO: optimize code getting products by id
         try
         {
+            var sellerIds = new List<Guid>();
+
             foreach (var item in order.orderItems)
             {
                 var product = await _helper.GetProductOr404(item.productId);
@@ -414,6 +433,10 @@ public class OrderService : IOrderService
                 _logger.LogInformation("Product deleted from redis cache: {productId}", product.Id);
             }
 
+            var uniqueSellerIds = sellerIds.Distinct().ToList();
+
+            var sellerUserIds = await _sellerRepository.GetUserIdsBySellerIds(uniqueSellerIds);
+
             order.status = OrderStatus.Cancelled;
             order.UpdatedAt = DateTime.UtcNow;
 
@@ -425,6 +448,16 @@ public class OrderService : IOrderService
             };
 
             await _notificationRepository.CreateAsync(notification);
+
+            var sellerNotifications = sellerUserIds.Select(sellerUserId => new Notification
+            {
+                UserId = sellerUserId,
+                Title = "Order Item Cancel",
+                Message = $"A order from your store has been canceled in Order #{orderId}.",
+                Type = NotificationType.System
+            }).ToList();
+
+            await _notificationRepository.AddRangeAsync(sellerNotifications);
 
             await _unitOfWork.SaveChangesAsync();
             await _unitOfWork.CommitAsync();

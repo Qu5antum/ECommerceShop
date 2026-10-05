@@ -7,6 +7,7 @@ public class SellerProfileCreateDto
 {
     public string StoreName { get; set; } = string.Empty;
     public string? Description { get; set; }
+    public IFormFile? Image { get; set; }
 }
 
 
@@ -14,6 +15,7 @@ public class SellerProfileUpdateDto
 {
     public string? StoreName { get; set; }
     public string? Description { get; set; }
+    public IFormFile? Image { get; set; }
 }
 
 
@@ -23,6 +25,7 @@ public class SellerProfileResponseDto
     public Guid userId { get; set; }
     public string StoreName { get; set; } = string.Empty;
     public string? Description { get; set; }
+    public string? ImageUrl { get; set; }
     public SellerStatus Status { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime? UpdatedAt { get; set; }
