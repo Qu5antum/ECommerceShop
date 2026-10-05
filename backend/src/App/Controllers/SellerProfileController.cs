@@ -61,10 +61,10 @@ public class SellerProfileController : ControllerBase
         return File(file.Value.FileStream, file.Value.ContentType);
     }
 
-    [HttpGet("{userId:guid}")]
-    public async Task<IActionResult> GetUserSellerProfile(Guid userId)
+    [HttpGet("{sellerId:guid}")]
+    public async Task<IActionResult> GetUserSellerProfile(Guid sellerId)
     {
-        var sellerProfile = await _service.GetUserSellerProfileAsync(userId);
+        var sellerProfile = await _service.GetUserSellerProfileAsync(sellerId);
 
         return Ok(sellerProfile);
     }

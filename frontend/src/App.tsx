@@ -10,6 +10,7 @@ import OrdersPage from './pages/orderPage'
 import NotificationsPage from './pages/notificationPage'
 import OrderDetailPage from './pages/orderDetailPage'
 import CheckoutPaymentPage from './pages/checkoutPaymentPage'
+import SellerProfileDetailPage from './pages/sellerProfileDetailPage'
 
 
 export default function App() {
@@ -27,6 +28,7 @@ export default function App() {
         <Route path="/notifications" element={<NotificationsPage />} />
         <Route path="/orders/:id" element={<OrderDetailPage />} />
         <Route path="/payment/:orderId" element={<CheckoutPaymentPage />} />
+        <Route path="/seller/:id" element={<SellerProfileDetailPage />} />
         
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

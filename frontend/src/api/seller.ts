@@ -60,8 +60,8 @@ export const sellerProfileApi = {
     return URL.createObjectURL(response.data)
   },
 
-  async getUserSellerProfile(userId: string): Promise<SellerProfileResponseDto> {
-    const response = await api.get<SellerProfileResponseDto>(`/SellerProfile/${userId}`)
+  async getUserSellerProfile(sellerId: string): Promise<SellerProfileResponseDto> {
+    const response = await api.get<SellerProfileResponseDto>(`/SellerProfile/${sellerId}`)
     return response.data
   },
 

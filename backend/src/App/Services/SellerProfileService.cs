@@ -13,7 +13,7 @@ namespace App.Services;
 public interface ISellerProfileService
 {
     Task<SellerProfileResponseDto> CreateSellerProfileAsync(Guid currentUserId, SellerProfileCreateDto profileCreateDto);
-    Task<SellerProfileResponseDto> GetUserSellerProfileAsync(Guid userId);
+    Task<SellerProfileResponseDto> GetUserSellerProfileAsync(Guid sellerId);
     Task<bool> UpdateSellerProfileAsync(Guid userId, Guid profileId, SellerProfileUpdateDto profileUpdateDto);
     Task<List<SellerProfileResponseDto>> GetSellersAsync(SellerStatus status);
     Task<bool> UpdateStatusOfSellerProfile(Guid userId, Guid sellerId, SellerStatus status);
@@ -31,9 +31,9 @@ public class SellerProfileService : ISellerProfileService
     private readonly IUnitOfWork _unitOfWork;
     private readonly IRedisCacheService _cache;
 
-    private static string GetSellerProfileCacheKey(Guid userId)
+    private static string GetSellerProfileCacheKey(Guid sellerId)
     {
-        return $"seller:{userId}";
+        return $"seller:{sellerId}";
     }
 
     private static string GetSellerProfileWithStatusCacheyKey(SellerStatus status)
@@ -179,7 +179,7 @@ public class SellerProfileService : ISellerProfileService
 
             _logger.LogInformation("Seller profile successfully updated: {userId}", userId);
 
-            await _cache.RemoveDataAsync(GetSellerProfileCacheKey(userId));
+            await _cache.RemoveDataAsync(GetSellerProfileCacheKey(profileId));
             await _cache.RemoveDataAsync(GetSellerProfileWithStatusCacheyKey(SellerStatus.Approved));
             await _cache.RemoveDataAsync(GetSellerProfileWithStatusCacheyKey(SellerStatus.Pending));
             await _cache.RemoveDataAsync(GetSellerProfileWithStatusCacheyKey(SellerStatus.Rejected));
@@ -203,11 +203,11 @@ public class SellerProfileService : ISellerProfileService
         }
     }
     
-    public async Task<SellerProfileResponseDto> GetUserSellerProfileAsync(Guid userId)
+    public async Task<SellerProfileResponseDto> GetUserSellerProfileAsync(Guid sellerId)
     {
-        await _helper.GetUserOr404(userId);
-
-        var cacheKey = GetSellerProfileCacheKey(userId);
+        var sellerProfile = await _helper.GetSellerProfileOr404(sellerId);
+        
+        var cacheKey = GetSellerProfileCacheKey(sellerId);
 
         var cachedSellerProfile = await _cache.GetDataAsync<SellerProfileResponseDto>(cacheKey);
 
@@ -215,14 +215,6 @@ public class SellerProfileService : ISellerProfileService
         {
             _logger.LogInformation("Seller profile retrieved from redis cache");
             return cachedSellerProfile;
-        }
-        
-        var sellerProfile = await _profileRepository.GetSellerProfileByUserIdAsync(userId);
-
-        if (sellerProfile == null)
-        {
-            _logger.LogWarning("User don't have seller profile: {userId}", userId);
-            throw new NotFoundException("User don't have seller profile");
         }
 
         var result = new SellerProfileResponseDto
@@ -242,7 +234,7 @@ public class SellerProfileService : ISellerProfileService
             TimeSpan.FromMinutes(5)
         );
 
-        _logger.LogInformation("Successfull response of seller profile: {userId}", userId);
+        _logger.LogInformation("Successfull response of seller profile: {sellerId}", sellerId);
 
         return result;
     }
@@ -324,6 +316,7 @@ public class SellerProfileService : ISellerProfileService
 
             _logger.LogInformation("Status of seller successfully updated: {sellerId}", sellerId);
 
+            await _cache.RemoveDataAsync(GetSellerProfileCacheKey(sellerId));
             await _cache.RemoveDataAsync(GetSellerProfileWithStatusCacheyKey(SellerStatus.Approved));
             await _cache.RemoveDataAsync(GetSellerProfileWithStatusCacheyKey(SellerStatus.Pending));
             await _cache.RemoveDataAsync(GetSellerProfileWithStatusCacheyKey(SellerStatus.Rejected));
@@ -340,7 +333,8 @@ public class SellerProfileService : ISellerProfileService
             throw new DatabaseException("Could not update the seller profile to the database.");
         }
     }
-
+    
+    // TODO: implement redis service
     public async Task<SellerPreviewResponseDto> GetSellerProfilePreviewAsync(Guid sellerId)
     {
         var sellerPreview = await _profileRepository.GetSellerStoreNameDescriptionAsync(sellerId);
