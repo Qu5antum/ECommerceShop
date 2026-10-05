@@ -125,8 +125,11 @@ export default function OrdersPage() {
                       {new Date(order.createdAt).toLocaleDateString()} {new Date(order.createdAt).toLocaleTimeString()}
                     </span>
                   </div>
-                  <div className="order-status-wrapper">
+                  <div className="order-header-right">
                     {renderStatusBadge(order.status)}
+                    <Link to={`/orders/${order.id}`} className="button button--quiet button--small">
+                      View Details
+                    </Link>
                   </div>
                 </div>
 

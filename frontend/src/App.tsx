@@ -8,6 +8,7 @@ import SellerProfilePage from './pages/sellerProfilePage'
 import CartPage from './pages/cartPage'
 import OrdersPage from './pages/orderPage'
 import NotificationsPage from './pages/notificationPage'
+import OrderDetailPage from './pages/orderDetailPage'
 
 
 export default function App() {
@@ -23,6 +24,7 @@ export default function App() {
         <Route path="/cart" element={<CartPage />} />
         <Route path="/orders" element={<OrdersPage />} />
         <Route path="/notifications" element={<NotificationsPage />} />
+        <Route path="/orders/:id" element={<OrderDetailPage />} />
         
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

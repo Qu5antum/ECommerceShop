@@ -41,7 +41,7 @@ public class NotificationRepository(AppDbContext context) : BaseRepository<Notif
     public async Task<int> GetCountOfUnReadNotifications(Guid userId)
     {
         return await _context.Notifications
-            .Where(n => n.UserId == userId)
+            .Where(n => n.UserId == userId && n.IsRead == false)
             .CountAsync();
     }
 
