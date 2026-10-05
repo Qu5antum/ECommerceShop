@@ -17,6 +17,7 @@ public interface ISellerProfileService
     Task<bool> UpdateSellerProfileAsync(Guid userId, Guid profileId, SellerProfileUpdateDto profileUpdateDto);
     Task<List<SellerProfileResponseDto>> GetSellersAsync(SellerStatus status);
     Task<bool> UpdateStatusOfSellerProfile(Guid userId, Guid sellerId, SellerStatus status);
+    Task<(Stream FileStream, string ContentType)?> GetSellerProfileImageAsync(Guid sellerId);
 }
 
 
@@ -25,6 +26,7 @@ public class SellerProfileService : ISellerProfileService
     private readonly ISellerProfileRepository _profileRepository;
     private readonly ILogger<SellerProfileService> _logger;
     private readonly IHelperService _helper;
+    private readonly IFileStorageService _fileService;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IRedisCacheService _cache;
 
@@ -38,11 +40,18 @@ public class SellerProfileService : ISellerProfileService
         return $"seller:status:{status}";
     }
 
-    public SellerProfileService(ISellerProfileRepository profileRepository, ILogger<SellerProfileService> logger, IHelperService helper, IUnitOfWork unitOfWork, IRedisCacheService cache)
+    public SellerProfileService(
+        ISellerProfileRepository profileRepository, 
+        ILogger<SellerProfileService> logger, 
+        IHelperService helper, 
+        IFileStorageService fileService,
+        IUnitOfWork unitOfWork, 
+        IRedisCacheService cache)
     {
         _profileRepository = profileRepository;
         _logger = logger;
         _helper = helper;
+        _fileService = fileService;
         _unitOfWork = unitOfWork;
         _cache = cache;
     }
@@ -50,6 +59,8 @@ public class SellerProfileService : ISellerProfileService
     public async Task<SellerProfileResponseDto> CreateSellerProfileAsync(Guid currentUserId, SellerProfileCreateDto profileCreateDto)
     {
         await _unitOfWork.BeginTransactionAsync();
+
+        string? ImageUrl = null;
 
         var user = await _helper.GetUserOr404(currentUserId);
 
@@ -63,6 +74,11 @@ public class SellerProfileService : ISellerProfileService
 
         try
         {
+            if (profileCreateDto.Image != null && profileCreateDto.Image.Length > 0)
+            {
+                ImageUrl = await _fileService.UploadFileAsync(profileCreateDto.Image);
+            }
+
             var storeNameIsTaken = await _profileRepository.IsStoreNameTakenAsync(profileCreateDto.StoreName);
 
             if (storeNameIsTaken)
@@ -76,6 +92,7 @@ public class SellerProfileService : ISellerProfileService
                 userId = user.Id,
                 StoreName = profileCreateDto.StoreName,
                 Description = profileCreateDto.Description,
+                ImageUrl = ImageUrl
             };
 
             user.AddRole(UserRole.Seller);
@@ -102,6 +119,11 @@ public class SellerProfileService : ISellerProfileService
         }
         catch (DbUpdateException ex)
         {
+            if (ImageUrl != null)
+            {
+                await _fileService.DeleteFileAsync(ImageUrl);
+            }
+
             await _unitOfWork.RollbackAsync();
             _logger.LogError(ex, "A database error occurred while creating the seller profile.");
             throw new DatabaseException("Could not save the seller profile to the database.");
@@ -112,6 +134,8 @@ public class SellerProfileService : ISellerProfileService
     {
         await _unitOfWork.BeginTransactionAsync();
         await _helper.GetUserOr404(userId);
+
+        string? newImageUrl = null;
 
         var sellerProfile = await _profileRepository.GetByIdAsync(profileId);
 
@@ -129,13 +153,28 @@ public class SellerProfileService : ISellerProfileService
         {
             sellerProfile.Description = profileUpdateDto.Description;
         }
+
+        string? oldImageUrl = sellerProfile.ImageUrl;
+
         try
         {
+            if (profileUpdateDto.Image != null && profileUpdateDto.Image.Length > 0)
+            {
+                newImageUrl = await _fileService.UploadFileAsync(profileUpdateDto.Image);
+
+                sellerProfile.ImageUrl = newImageUrl;
+            }
+
             sellerProfile.UpdatedAt = DateTime.UtcNow;
 
             await _profileRepository.UpdateAsync(sellerProfile);
             await _unitOfWork.SaveChangesAsync();
             await _unitOfWork.CommitAsync();
+
+            if (newImageUrl != null && oldImageUrl != null)
+            {
+                await _fileService.DeleteFileAsync(oldImageUrl);
+            }
 
             _logger.LogInformation("Seller profile successfully updated: {userId}", userId);
 
@@ -152,6 +191,11 @@ public class SellerProfileService : ISellerProfileService
         }
         catch (DbUpdateException ex)
         {
+            if (newImageUrl != null)
+            {
+                await _fileService.DeleteFileAsync(newImageUrl);
+            }
+
             await _unitOfWork.RollbackAsync();
             _logger.LogError(ex, "A database error occurred while updating the seller profile.");
             throw new DatabaseException("Could not update the seller profile to the database.");
@@ -236,6 +280,18 @@ public class SellerProfileService : ISellerProfileService
         _logger.LogInformation("Successfull response for sellers by status: {status}", status);
 
         return result;
+    }
+
+    public async Task<(Stream FileStream, string ContentType)?> GetSellerProfileImageAsync(Guid sellerId)
+    {
+        var seller = await _helper.GetSellerProfileOr404(sellerId);
+
+        if (string.IsNullOrWhiteSpace(seller.ImageUrl))
+        {
+            return null;
+        }
+
+        return await _fileService.GetFileAsync(seller.ImageUrl);
     }
     
     // TODO: Add notification sender for user 
