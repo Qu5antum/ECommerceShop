@@ -1,4 +1,5 @@
 using App.Database;
+using App.DTOs;
 using App.Enum;
 using App.Models;
 using Microsoft.EntityFrameworkCore;
@@ -12,6 +13,7 @@ public interface ISellerProfileRepository : IBaseRepository<SellerProfile>
     Task<bool> IsStoreNameTakenAsync(string storeName);
     Task<List<SellerProfile>> GetSellersByStatusAsync(SellerStatus status);
     Task<List<Guid>> GetUserIdsBySellerIds(List<Guid> sellerIds);
+    Task<SellerPreviewResponseDto?> GetSellerStoreNameDescriptionAsync(Guid sellerId);
 }
 
 
@@ -46,5 +48,17 @@ public class SellerProfileRepository(AppDbContext context) : BaseRepository<Sell
             .Where(u => sellerIds.Contains(u.Id))
             .Select(u => u.userId)
             .ToListAsync(); 
+    }
+
+    public async Task<SellerPreviewResponseDto?> GetSellerStoreNameDescriptionAsync(Guid sellerId)
+    {
+        return await _context.SellerProfiles
+            .Where(s => s.Id == sellerId)
+            .Select(s => new SellerPreviewResponseDto
+            {
+                StoreName = s.StoreName,
+                Description = s.Description
+            })
+            .FirstOrDefaultAsync();
     }
 }

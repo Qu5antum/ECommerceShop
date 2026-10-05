@@ -18,6 +18,7 @@ public interface ISellerProfileService
     Task<List<SellerProfileResponseDto>> GetSellersAsync(SellerStatus status);
     Task<bool> UpdateStatusOfSellerProfile(Guid userId, Guid sellerId, SellerStatus status);
     Task<(Stream FileStream, string ContentType)?> GetSellerProfileImageAsync(Guid sellerId);
+    Task<SellerPreviewResponseDto> GetSellerProfilePreviewAsync(Guid sellerId);
 }
 
 
@@ -338,5 +339,22 @@ public class SellerProfileService : ISellerProfileService
             _logger.LogError(ex, "A database error occurred while updating the seller profile.");
             throw new DatabaseException("Could not update the seller profile to the database.");
         }
+    }
+
+    public async Task<SellerPreviewResponseDto> GetSellerProfilePreviewAsync(Guid sellerId)
+    {
+        var sellerPreview = await _profileRepository.GetSellerStoreNameDescriptionAsync(sellerId);
+
+        if (sellerPreview is null)
+        {
+            _logger.LogInformation("Seller not found: {sellerId}", sellerId);
+            throw new NotFoundException("Seller not found");
+        }
+
+        return new SellerPreviewResponseDto
+        {
+            StoreName = sellerPreview.StoreName,
+            Description = sellerPreview.Description
+        };
     }
 }

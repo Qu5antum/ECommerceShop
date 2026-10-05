@@ -3,8 +3,10 @@ import { useParams, Link } from 'react-router-dom'
 import { productApi } from '../api/product'
 import { reviewApi } from '../api/review'
 import { cartItemApi } from '../api/cart' 
+import { sellerProfileApi } from '../api/seller'
 import type { ProductResponseDto } from '../types/product'
 import type { ReviewResponseDto } from '../types/review'
+import type { SellerPreviewResponseDto } from '../types/seller'
 import Brand from '../components/Brand'
 
 export default function ProductDetailPage() {
@@ -16,6 +18,9 @@ export default function ProductDetailPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [successMessage, setSuccessMessage] = useState('')
+
+  const [sellerPreview, setSellerPreview] = useState<SellerPreviewResponseDto | null>(null)
+  const [sellerImageUrl, setSellerImageUrl] = useState<string | null>(null)
 
   const [quantity, setQuantity] = useState(1)
   const [addingToCart, setAddingToCart] = useState(false)
@@ -35,9 +40,25 @@ export default function ProductDetailPage() {
           reviewApi.getReviewsByProduct(id!),
           productApi.getProductImage(id!).catch(() => null)
         ])
+        
         setProduct(prodData)
         setReviews(reviewsData)
         setImageUrl(imgUrl)
+
+        const sellerProfileId = (prodData as any).sellerProfileId
+
+        if (sellerProfileId) {
+          try {
+            const [previewData, avatarUrl] = await Promise.all([
+              sellerProfileApi.getSellerProfilePreview(sellerProfileId),
+              sellerProfileApi.getSellerProfileImage(sellerProfileId).catch(() => null)
+            ])
+            setSellerPreview(previewData)
+            setSellerImageUrl(avatarUrl)
+          } catch (err) {
+          }
+        }
+
       } catch (err: any) {
         setError(err.message || 'Failed to load product details')
       } finally {
@@ -96,6 +117,8 @@ export default function ProductDetailPage() {
   if (error && !product) return <div className="error-container"><h2>Error</h2><p>{error}</p><Link to="/main">Back to catalog</Link></div>
   if (!product) return <div className="loading">Product not found</div>
 
+  const sellerProfileId = (product as any).sellerProfileId
+
   return (
     <main className="product-detail-page">
       <header className="site-header">
@@ -123,6 +146,25 @@ export default function ProductDetailPage() {
               <span className="product-detail-price">${product.price}</span>
               <span className="product-detail-stock">In stock: {product.stock}</span>
             </div>
+
+            {sellerPreview && sellerProfileId && (
+              <Link to={`/seller/${sellerProfileId}`} className="seller-card-preview">
+                <div className="seller-avatar-wrapper">
+                  {sellerImageUrl ? (
+                    <img src={sellerImageUrl} alt={sellerPreview.storeName} className="seller-avatar" />
+                  ) : (
+                    <div className="seller-avatar-placeholder">🏪</div>
+                  )}
+                </div>
+                <div className="seller-preview-info">
+                  <span className="seller-label">Sold by</span>
+                  <h4 className="seller-store-name">{sellerPreview.storeName}</h4>
+                  {sellerPreview.description && (
+                    <p className="seller-preview-desc">{sellerPreview.description}</p>
+                  )}
+                </div>
+              </Link>
+            )}
 
             {successMessage && <p className="form-message form-message--success">{successMessage}</p>}
             {error && <p className="form-message form-message--error">{error}</p>}

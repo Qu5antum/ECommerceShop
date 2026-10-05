@@ -31,3 +31,10 @@ public class SellerProfileResponseDto
     public DateTime? UpdatedAt { get; set; }
 
 }
+
+
+public class SellerPreviewResponseDto
+{
+    public string StoreName { get; set; } = string.Empty;
+    public string? Description { get; set; }
+}

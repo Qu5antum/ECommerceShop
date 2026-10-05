@@ -69,6 +69,14 @@ public class SellerProfileController : ControllerBase
         return Ok(sellerProfile);
     }
 
+    [HttpGet("{sellerId:guid}/Preview")]
+    public async Task<IActionResult> GetSellerProfilePreview(Guid sellerId)
+    {
+        var sellerPreview = await _service.GetSellerProfilePreviewAsync(sellerId);
+
+        return Ok(sellerPreview);
+    }
+
     [Authorize(Roles = "Admin, Moderator, Manager")]
     [HttpGet("Sellers")]
     public async Task<IActionResult> GetSellers(SellerStatus status)

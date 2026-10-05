@@ -3,18 +3,48 @@ import type {
   SellerProfileCreateDto, 
   SellerProfileUpdateDto, 
   SellerProfileResponseDto,
-  SellerStatus 
+  SellerStatus,
+  SellerPreviewResponseDto
 } from '../types/seller'
 
 
 export const sellerProfileApi = {
   async createSellerProfile(dto: SellerProfileCreateDto): Promise<SellerProfileResponseDto> {
-    const response = await api.post<SellerProfileResponseDto>('/SellerProfile', dto)
+    const formData = new FormData()
+    formData.append('StoreName', dto.storeName)
+    if (dto.description) {
+      formData.append('Description', dto.description)
+    }
+    if (dto.image) {
+      formData.append('Image', dto.image) 
+    }
+
+    const response = await api.post<SellerProfileResponseDto>('/SellerProfile', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    })
     return response.data
   },
 
   async updateSellerProfile(profileId: string, dto: SellerProfileUpdateDto): Promise<string> {
-    const response = await api.put<string>(`/SellerProfile/${profileId}`, dto)
+    const formData = new FormData()
+
+    if (dto.storeName) {
+      formData.append('StoreName', dto.storeName)
+    }
+    if (dto.description) {
+      formData.append('Description', dto.description)
+    }
+    if (dto.image) {
+      formData.append('Image', dto.image) 
+    }
+
+    const response = await api.put<string>(`/SellerProfile/${profileId}`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    })
     return response.data
   },
 
@@ -23,8 +53,20 @@ export const sellerProfileApi = {
     return response.data
   },
 
+  async getSellerProfileImage(sellerId: string): Promise<string> {
+    const response = await api.get(`/SellerProfile/${sellerId}/Image`, {
+      responseType: 'blob',
+    })
+    return URL.createObjectURL(response.data)
+  },
+
   async getUserSellerProfile(userId: string): Promise<SellerProfileResponseDto> {
     const response = await api.get<SellerProfileResponseDto>(`/SellerProfile/${userId}`)
+    return response.data
+  },
+
+  async getSellerProfilePreview(sellerId: string): Promise<SellerPreviewResponseDto> {
+    const response = await api.get<SellerPreviewResponseDto>(`/SellerProfile/${sellerId}/Preview`)
     return response.data
   },
 
