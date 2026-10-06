@@ -43,7 +43,7 @@ public class SellerProfileController : ControllerBase
     public async Task<IActionResult> GetCurrentUserSellerProfile()
     {
         Guid userId = _helper.GetUserId();
-        var sellerProfile = await _service.GetUserSellerProfileAsync(userId);
+        var sellerProfile = await _service.GetCurrentUserProfileAsync(userId);
 
         return Ok(sellerProfile);
     }

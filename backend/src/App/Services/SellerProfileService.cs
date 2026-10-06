@@ -14,6 +14,7 @@ public interface ISellerProfileService
 {
     Task<SellerProfileResponseDto> CreateSellerProfileAsync(Guid currentUserId, SellerProfileCreateDto profileCreateDto);
     Task<SellerProfileResponseDto> GetUserSellerProfileAsync(Guid sellerId);
+    Task<SellerProfileResponseDto> GetCurrentUserProfileAsync(Guid userId);
     Task<bool> UpdateSellerProfileAsync(Guid userId, Guid profileId, SellerProfileUpdateDto profileUpdateDto);
     Task<List<SellerProfileResponseDto>> GetSellersAsync(SellerStatus status);
     Task<bool> UpdateStatusOfSellerProfile(Guid userId, Guid sellerId, SellerStatus status);
@@ -34,6 +35,11 @@ public class SellerProfileService : ISellerProfileService
     private static string GetSellerProfileCacheKey(Guid sellerId)
     {
         return $"seller:{sellerId}";
+    }
+
+    private static string GetSellerProfileByUserCacheKey(Guid userId)
+    {
+        return $"seller:{userId}";
     }
 
     private static string GetSellerProfileWithStatusCacheyKey(SellerStatus status)
@@ -201,6 +207,48 @@ public class SellerProfileService : ISellerProfileService
             _logger.LogError(ex, "A database error occurred while updating the seller profile.");
             throw new DatabaseException("Could not update the seller profile to the database.");
         }
+    }
+
+    public async Task<SellerProfileResponseDto> GetCurrentUserProfileAsync(Guid userId)
+    {
+        var sellerProfile = await _profileRepository.GetSellerProfileByUserIdAsync(userId);
+        
+        if (sellerProfile is null)
+        {
+            _logger.LogWarning("Seller profile not found by user ID: {userId}", userId);
+            throw new NotFoundException("Seller profile not found");
+        }
+
+        var cacheKey = GetSellerProfileByUserCacheKey(userId);
+
+        var cachedSellerProfile = await _cache.GetDataAsync<SellerProfileResponseDto>(cacheKey);
+
+        if (cachedSellerProfile is not null)
+        {
+            _logger.LogInformation("Seller profile retrieved from redis cache: {userId}", userId);
+            return cachedSellerProfile;
+        }
+
+        var result = new SellerProfileResponseDto
+        {
+            Id = sellerProfile.Id,
+            userId = sellerProfile.userId,
+            StoreName = sellerProfile.StoreName,
+            Description = sellerProfile.Description,
+            Status = sellerProfile.Status,
+            CreatedAt = sellerProfile.CreatedAt,
+            UpdatedAt = sellerProfile.UpdatedAt
+        };
+
+        await _cache.SetDataAsync(
+            cacheKey,
+            result,
+            TimeSpan.FromMinutes(5)
+        );
+
+        _logger.LogInformation("Successfull response of seller profile: {userId}", userId);
+
+        return result;
     }
     
     public async Task<SellerProfileResponseDto> GetUserSellerProfileAsync(Guid sellerId)
