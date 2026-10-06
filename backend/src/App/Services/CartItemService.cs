@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using App.DTOs;
 using App.Exceptions;
 using App.Models;
@@ -55,16 +56,16 @@ public class CartItemService : ICartItemService
 
     public async Task<CartItemResponseDto> CreateCartItemAsync(Guid userId, CartItemCreateDto itemCreateDto)
     {
-        await _unitOfWork.BeginTransactionAsync();
         await _helper.GetUserOr404(userId);
+        await _unitOfWork.BeginTransactionAsync();
 
         var product = await _helper.GetProductOr404(itemCreateDto.ProductId);
 
-        var cartId = await _cartRepository.GetCartIdByUserId(userId);
+        var cart = await _cartRepository.GetCartWithItemsByUserIdAsync(userId);
 
-        if (cartId == null || cartId == Guid.Empty)
+        if (cart is null)
         {
-            _logger.LogWarning("Cart not found by this id: {cartId}", cartId);
+            _logger.LogWarning("Cart not found by this user id: {userId}", userId);
             throw new NotFoundException("Cart not found");
         }
 
@@ -76,11 +77,26 @@ public class CartItemService : ICartItemService
             throw new BadRequestException("Product already exists in cart");
         }
 
+        if (cart.Items.Any())
+        {
+            var firstCartItemProductId = cart.Items.First().ProductId;
+            var productInCart = await _helper.GetProductOr404(firstCartItemProductId);
+
+            if (productInCart.SellerProfileId != product.SellerProfileId)
+            {
+                _logger.LogWarning(
+                    "Attempted to add item from another seller. Existing seller ID: {existingSeller}, New seller ID: {newSeller}, User ID: {userId}", 
+                    productInCart.SellerProfileId, product.SellerProfileId, userId);
+                
+                throw new BadRequestException("You can only add items from the same seller to the cart. Please clear your cart first.");
+            }
+        }
+
         try
         {
             var newItem = new CartItem
             {
-                CartId = cartId.Value,
+                CartId = cart.Id,
                 ProductId = itemCreateDto.ProductId,
                 Quantity = itemCreateDto.Quantity,
             };
@@ -89,7 +105,7 @@ public class CartItemService : ICartItemService
             await _unitOfWork.SaveChangesAsync();
             await _unitOfWork.CommitAsync();
 
-            _logger.LogInformation("Cart item successfully created, cartID: {cartId}", cartId);
+            _logger.LogInformation("Cart item successfully created, cartID: {cartId}", cart.Id);
 
             await _cache.RemoveDataAsync(GetCartItemsCacheKeyByUser(userId));
 
