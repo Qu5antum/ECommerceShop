@@ -24,6 +24,7 @@ public interface IProductService
     Task<List<ProductResponseDto>> SearchProductByPriceAsc(string productName);
     Task<bool> DeleteProductByIdAdminAsync(Guid productId);
     Task<List<ProductResponseDto>> GetProductThatOutOfStockAsync();
+    Task<List<ProductResponseDto>> GetProductsOfSellerAsync(Guid sellerId);
 }
 
 
@@ -55,6 +56,11 @@ public class ProductService : IProductService
     private static string GetProductsOutOfStockCacheyKey()
     {
         return $"products:outOfStock";
+    }
+
+    private static string GetProductsOfSellerCacheKey(Guid sellerId)
+    {
+        return $"products:{sellerId}";
     }
 
     public ProductService
@@ -594,6 +600,48 @@ public class ProductService : IProductService
             TimeSpan.FromMinutes(5)
         );
         
+        return result;
+    }
+
+    public async Task<List<ProductResponseDto>> GetProductsOfSellerAsync(Guid sellerId)
+    {
+        await _helper.GetSellerProfileOr404(sellerId);
+
+        var cacheKey = GetProductsOfSellerCacheKey(sellerId);
+
+        var cachedProducts = await _cache.GetDataAsync<List<ProductResponseDto>>(cacheKey);
+        
+        if (cachedProducts is not null)
+        {
+            _logger.LogInformation("Products retrieved from redis cache: {sellerId}", sellerId);
+            return cachedProducts;
+        }
+
+        var products = await _productRepository.GetProductsOfSellerAsync(sellerId);
+
+        var result = products.Select(product => new ProductResponseDto
+        {
+            Id = product.Id,
+            SellerProfileId = product.SellerProfileId,
+            CategoryId = product.CategoryId,
+            Name = product.Name,
+            Description = product.Description,
+            Price = product.Price,
+            SKU = product.SKU,
+            Stock = product.Stock,
+            ImageUrl = product.ImageUrl,
+            CreatedAt = product.CreatedAt,
+            UpdatedAt = product.UpdatedAt
+        }).ToList();
+
+        await _cache.SetDataAsync(
+            cacheKey,
+            result,
+            TimeSpan.FromMinutes(5)
+        );
+
+        _logger.LogInformation("Successfull response of products of seller: {sellerId}", sellerId);
+
         return result;
     }
 }

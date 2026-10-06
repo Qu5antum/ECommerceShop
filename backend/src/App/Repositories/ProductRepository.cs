@@ -1,4 +1,5 @@
 using App.Database;
+using App.DTOs;
 using App.Models;
 using Microsoft.EntityFrameworkCore;
 
@@ -13,6 +14,7 @@ public interface IProductRepository : IBaseRepository<Product>
     Task<List<Product>> SearchProductByPriceDesc(string ProductName);
     Task<List<Product>> SearchProductByPriceAsc(string ProductName);
     Task<List<Product>> GetProductsOutOfStockAsync();
+    Task<List<Product>> GetProductsOfSellerAsync(Guid sellerId);
 }
 
 
@@ -71,6 +73,14 @@ public class ProductRepository(AppDbContext context) : BaseRepository<Product>(c
         return await _context.Products
             .AsNoTracking()
             .Where(p => p.Stock == 0)
+            .ToListAsync();
+    }
+
+    public async Task<List<Product>> GetProductsOfSellerAsync(Guid sellerId)
+    {
+        return await _context.Products
+            .AsNoTracking()
+            .Where(p => p.SellerProfileId == sellerId)
             .ToListAsync();
     }
 }

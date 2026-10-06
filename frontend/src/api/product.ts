@@ -96,6 +96,11 @@ export const productApi = {
     return response.data
   },
 
+  async getProductsOfSeller(sellerId: string): Promise<ProductResponseDto[]> {
+    const response = await api.get<ProductResponseDto[]>(`/Product/Seller/${sellerId}/Products`)
+    return response.data
+  },
+
   async deleteProductAdmin(productId: string): Promise<string> {
     const response = await api.delete<string>(`/Product/Admin/${productId}`)
     return response.data

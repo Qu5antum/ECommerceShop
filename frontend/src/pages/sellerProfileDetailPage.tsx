@@ -12,6 +12,7 @@ export default function SellerProfileDetailPage() {
   const [seller, setSeller] = useState<SellerProfileResponseDto | null>(null)
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
   const [products, setProducts] = useState<ProductResponseDto[]>([])
+  const [productImages, setProductImages] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -23,22 +24,34 @@ export default function SellerProfileDetailPage() {
         setLoading(true)
         setError('')
 
-        const [profileData, img] = await Promise.all([
+        const [profileData, img, productsData] = await Promise.all([
           sellerProfileApi.getUserSellerProfile(id!),
           sellerProfileApi.getSellerProfileImage(id!).catch(() => null),
+          productApi.getProductsOfSeller(id!).catch(() => []),
         ])
 
         setSeller(profileData)
         setAvatarUrl(img)
+        setProducts(productsData)
 
-        // TODO: add get products of seller from product service
-        try {
-          const allProducts = await productApi.getProducts() 
-          const sellerProducts = allProducts.filter(
-            (p: any) => p.sellerProfileId === id || p.sellerId === id
-          )
-          setProducts(sellerProducts)
-        } catch {
+        if (productsData.length > 0) {
+          const imagePromises = productsData.map(async (product) => {
+            try {
+              const productImgUrl = await productApi.getProductImage(product.id)
+              return { id: product.id, url: productImgUrl }
+            } catch {
+              return { id: product.id, url: null }
+            }
+          })
+
+          const imagesResults = await Promise.all(imagePromises)
+          const imagesMap: Record<string, string> = {}
+          imagesResults.forEach((item) => {
+            if (item.url) {
+              imagesMap[item.id] = item.url
+            }
+          })
+          setProductImages(imagesMap)
         }
 
       } catch (err: any) {
@@ -97,14 +110,24 @@ export default function SellerProfileDetailPage() {
             <p className="no-products">This seller hasn't added any products yet.</p>
           ) : (
             <div className="products-grid">
-              {products.map((product) => (
-                <Link to={`/product/${product.id}`} key={product.id} className="product-card">
-                  <div className="product-card__info">
-                    <h3>{product.name}</h3>
-                    <p className="product-card__price">${product.price}</p>
-                  </div>
-                </Link>
-              ))}
+              {products.map((product) => {
+                const productImg = productImages[product.id]
+                return (
+                  <Link to={`/product/${product.id}`} key={product.id} className="product-card">
+                    <div className="product-card__image-wrapper">
+                      {productImg ? (
+                        <img src={productImg} alt={product.name} className="product-card__image" />
+                      ) : (
+                        <div className="product-card__placeholder">No image</div>
+                      )}
+                    </div>
+                    <div className="product-card__info">
+                      <h3>{product.name}</h3>
+                      <p className="product-card__price">${product.price}</p>
+                    </div>
+                  </Link>
+                )
+              })}
             </div>
           )}
         </section>

@@ -53,7 +53,6 @@ public class ProductController : ControllerBase
         return Ok("Product successfully deleted");
     }
 
-    [Authorize]
     [HttpGet("{productId:guid}")]
     public async Task<IActionResult> GetProductById(Guid productId)
     {
@@ -62,7 +61,6 @@ public class ProductController : ControllerBase
         return Ok(product);
     }
 
-    [Authorize]
     [HttpGet("Products")]
     public async Task<IActionResult> GetProducts()
     {
@@ -71,7 +69,6 @@ public class ProductController : ControllerBase
         return Ok(products);
     }
     
-    [Authorize]
     [HttpGet("{ProductId:guid}/image")]
     public async Task<IActionResult> GetProductImage(Guid productId)
     {
@@ -85,7 +82,6 @@ public class ProductController : ControllerBase
         return File(file.Value.FileStream, file.Value.ContentType);
     }
 
-    [Authorize]
     [HttpGet("Category/{categoryId:guid}")]
     public async Task<IActionResult> GetProductsByCategoryId(Guid categoryId)
     {
@@ -94,7 +90,6 @@ public class ProductController : ControllerBase
         return Ok(products);
     }
 
-    [Authorize]
     [HttpGet("Search")]
     public async Task<IActionResult> SearchProduct(string productName)
     {
@@ -103,7 +98,6 @@ public class ProductController : ControllerBase
         return Ok(products);
     }
 
-    [Authorize]
     [HttpGet("Search/Min")]
     public async Task<IActionResult> SearchProductAsc(string productName)
     {
@@ -112,11 +106,18 @@ public class ProductController : ControllerBase
         return Ok(products);
     }
 
-    [Authorize]
     [HttpGet("Search/Max")]
     public async Task<IActionResult> SearchProductDesc(string productName)
     {
         var products = await _service.SearchProductByPriceDesc(productName);
+
+        return Ok(products);
+    }
+    
+    [HttpGet("Seller/{sellerId:guid}/Products")]
+    public async Task<IActionResult> GetProductsOfSeller(Guid sellerId)
+    {
+        var products = await _service.GetProductsOfSellerAsync(sellerId);
 
         return Ok(products);
     }
