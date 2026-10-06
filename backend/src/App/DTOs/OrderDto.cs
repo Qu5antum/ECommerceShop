@@ -16,6 +16,17 @@ public class OrderResponseDto
 }
 
 
+public class OrderResponseWithOutItemsDto
+{
+    public Guid Id { get; set; }
+    public Guid userId { get; set; }
+    public decimal TotalAmount { get; set; }
+    public OrderStatus status { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public DateTime? UpdatedAt { get; set; }
+}
+
+
 public class UpdateOrderStatusDto
 {
     [Required]

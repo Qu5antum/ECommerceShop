@@ -2,7 +2,8 @@ import api from './client'
 import type { 
   OrderResponseDto, 
   UpdateOrderStatusDto, 
-  OrderStatus 
+  OrderStatus,
+  OrderResponseWithOutItemsDto
 } from '../types/order'
 
 
@@ -27,8 +28,8 @@ export const orderApi = {
     return response.data
   },
 
-  async getOrdersOfSeller(): Promise<OrderResponseDto[]> {
-    const response = await api.get<OrderResponseDto[]>('/Order/Admin/Orders')
+  async getOrdersOfSeller(): Promise<OrderResponseWithOutItemsDto[]> {
+    const response = await api.get<OrderResponseWithOutItemsDto[]>('/Order/Orders/Seller')
     return response.data
   },
 

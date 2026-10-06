@@ -62,7 +62,7 @@ public class OrderController : ControllerBase
     }
 
     [Authorize(Roles = "Seller")]
-    [HttpGet("Admin/Orders")]
+    [HttpGet("Orders/Seller")]
     public async Task<IActionResult> GetOrdersOfSeller()
     {
         Guid userId = _helper.GetUserId();

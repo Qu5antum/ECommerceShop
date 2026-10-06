@@ -21,6 +21,15 @@ export interface OrderItemResponseDto {
   updatedAt?: string | null
 }
 
+export interface OrderResponseWithOutItemsDto {
+  id: string
+  userId: string
+  totalAmount: number
+  status: OrderStatus
+  createdAt: string
+  updatedAt?: string | null
+}
+
 export interface OrderResponseDto {
   id: string
   userId: string

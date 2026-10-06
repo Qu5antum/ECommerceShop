@@ -186,6 +186,7 @@ public class SellerProfileService : ISellerProfileService
             _logger.LogInformation("Seller profile successfully updated: {userId}", userId);
 
             await _cache.RemoveDataAsync(GetSellerProfileCacheKey(profileId));
+            await _cache.RemoveDataAsync(GetSellerProfileByUserCacheKey(userId));
             await _cache.RemoveDataAsync(GetSellerProfileWithStatusCacheyKey(SellerStatus.Approved));
             await _cache.RemoveDataAsync(GetSellerProfileWithStatusCacheyKey(SellerStatus.Pending));
             await _cache.RemoveDataAsync(GetSellerProfileWithStatusCacheyKey(SellerStatus.Rejected));
@@ -365,6 +366,7 @@ public class SellerProfileService : ISellerProfileService
             _logger.LogInformation("Status of seller successfully updated: {sellerId}", sellerId);
 
             await _cache.RemoveDataAsync(GetSellerProfileCacheKey(sellerId));
+            await _cache.RemoveDataAsync(GetSellerProfileByUserCacheKey(userId));
             await _cache.RemoveDataAsync(GetSellerProfileWithStatusCacheyKey(SellerStatus.Approved));
             await _cache.RemoveDataAsync(GetSellerProfileWithStatusCacheyKey(SellerStatus.Pending));
             await _cache.RemoveDataAsync(GetSellerProfileWithStatusCacheyKey(SellerStatus.Rejected));

@@ -1,4 +1,5 @@
 using App.Database;
+using App.DTOs;
 using App.Enum;
 using App.Models;
 using Microsoft.EntityFrameworkCore;
@@ -13,6 +14,7 @@ public interface IOrderRepository : IBaseRepository<Order>
     Task<List<Order>> GetOrdersWithStatus(OrderStatus? status = null);
     Task<List<Order>> GetOrderWithDate(DateTime fromDate, DateTime toDate);
     Task<int> GetPendingOrdersCountAsync();
+    Task<List<OrderResponseWithOutItemsDto>> GetOrderOfSellerAsync(Guid sellerId);
 }
 
 
@@ -66,5 +68,22 @@ public class OrderRepository(AppDbContext context) : BaseRepository<Order>(conte
             .Where(o => o.status == OrderStatus.Pending)
             .Select(o => o.Id)
             .CountAsync();
+    }
+
+    public async Task<List<OrderResponseWithOutItemsDto>> GetOrderOfSellerAsync(Guid sellerId)
+    {
+        return await _context.Orders
+            .AsNoTracking()
+            .Where(o => o.orderItems.Any(oi => oi.Product.SellerProfileId == sellerId))
+            .Select(o => new OrderResponseWithOutItemsDto
+            {
+                Id = o.Id,
+                userId = o.userId,
+                TotalAmount = o.TotalAmount,
+                status = o.status,
+                CreatedAt = o.CreatedAt,
+                UpdatedAt = o.UpdatedAt
+            })
+            .ToListAsync();
     }
 }

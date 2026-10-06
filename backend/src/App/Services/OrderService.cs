@@ -16,7 +16,7 @@ public interface IOrderService
     Task<List<OrderResponseDto>> GetOrdersByUserIdAsync(Guid userId);
     Task<OrderResponseDto> GetOrderByUserIdAsync(Guid userId, Guid orderId);
     Task<bool> CancelOrderAsync(Guid userId, Guid orderId);
-    Task<List<SellerOrderItemResponseDto>> GetOrdersOfSellerAsync(Guid userId);
+    Task<List<OrderResponseWithOutItemsDto>> GetOrdersOfSellerAsync(Guid userId);
     Task<bool> UpdateOrderStatusAsync(Guid orderId, UpdateOrderStatusDto orderStatusDto);
     Task<List<OrderResponseDto>> GetOrdersForAdminAsync(OrderStatus? status = null);
     Task<OrderResponseDto> GetOrderAdminAsync(Guid orderId);
@@ -483,7 +483,7 @@ public class OrderService : IOrderService
         }
     }
 
-    public async Task<List<SellerOrderItemResponseDto>> GetOrdersOfSellerAsync(Guid userId)
+    public async Task<List<OrderResponseWithOutItemsDto>> GetOrdersOfSellerAsync(Guid userId)
     {
         var seller = await _sellerRepository.GetSellerProfileByUserIdAsync(userId);
 
@@ -495,7 +495,7 @@ public class OrderService : IOrderService
 
         var cacheKey = GetOrdersCacheKeyOfSeller(userId);
 
-        var cachedOrders = await _cache.GetDataAsync<List<SellerOrderItemResponseDto>>(cacheKey);
+        var cachedOrders = await _cache.GetDataAsync<List<OrderResponseWithOutItemsDto>>(cacheKey);
 
         if (cachedOrders is not null)
         {
@@ -503,17 +503,16 @@ public class OrderService : IOrderService
             return cachedOrders;
         }
 
-        var orderItems = await _orderItemRepository.GetOrderItemsBySellerIdAsync(seller.Id);
+        var orders = await _orderRepository.GetOrderOfSellerAsync(seller.Id);
 
-        var result = orderItems.Select(item => new SellerOrderItemResponseDto
+        var result = orders.Select(order => new OrderResponseWithOutItemsDto
         {
-            OrderId = item.orderId,
-            OrderStatus = item.Order.status,
-            CreatedAt = item.Order.CreatedAt,
-            ProductId = item.productId,
-            ProductName = item.ProductName,
-            Price = item.Price,
-            Quantity = item.Quantity
+            Id = order.Id,
+            userId = order.userId,
+            TotalAmount = order.TotalAmount,
+            status = order.status,
+            CreatedAt = order.CreatedAt,
+            UpdatedAt = order.UpdatedAt,
         }).ToList();
 
         await _cache.SetDataAsync(

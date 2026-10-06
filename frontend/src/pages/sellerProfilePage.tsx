@@ -1,16 +1,20 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { sellerProfileApi } from '../api/seller'
+import { orderApi } from '../api/order'
 import type { 
   SellerProfileResponseDto, 
   SellerProfileCreateDto, 
   SellerProfileUpdateDto 
 } from '../types/seller'
+import type { OrderResponseWithOutItemsDto } from '../types/order'
 import { SellerStatus } from '../types/seller'
+import { OrderStatus } from '../types/order' 
 import Brand from '../components/Brand'
 
 export default function SellerProfilePage() {
   const [profile, setProfile] = useState<SellerProfileResponseDto | null>(null)
+  const [orders, setOrders] = useState<OrderResponseWithOutItemsDto[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [successMessage, setSuccessMessage] = useState('')
@@ -24,23 +28,33 @@ export default function SellerProfilePage() {
   const [submitting, setSubmitting] = useState(false)
 
   useEffect(() => {
-    async function fetchProfile() {
+    async function fetchSellerData() {
       try {
         setLoading(true)
-        const data = await sellerProfileApi.getCurrentUserSellerProfile()
-        setProfile(data)
-        setEditStoreName(data.storeName)
-        setEditDescription(data.description || '')
-      } catch (err: any) {
-        if (err.response?.status !== 404) {
-          setError(err.message || 'Failed to load seller profile')
+        
+        const [profileData, ordersData] = await Promise.all([
+          sellerProfileApi.getCurrentUserSellerProfile().catch((err) => {
+            if (err.response?.status !== 404) throw err
+            return null
+          }),
+          orderApi.getOrdersOfSeller().catch(() => [])
+        ])
+
+        if (profileData) {
+          setProfile(profileData)
+          setEditStoreName(profileData.storeName)
+          setEditDescription(profileData.description || '')
         }
+        
+        setOrders(ordersData)
+      } catch (err: any) {
+        setError(err.message || 'Failed to load seller profile data')
       } finally {
         setLoading(false)
       }
     }
 
-    fetchProfile()
+    fetchSellerData()
   }, [])
 
   async function handleCreate(e: FormEvent) {
@@ -94,7 +108,7 @@ export default function SellerProfilePage() {
     }
   }
 
-  function renderStatus(status: SellerStatus) {
+  function renderSellerStatus(status: SellerStatus) {
     switch (status) {
       case SellerStatus.Pending:
         return <span className="status-badge status-pending">Pending Review</span>
@@ -106,6 +120,27 @@ export default function SellerProfilePage() {
         return <span className="status-badge status-suspended">Suspended</span>
       default:
         return <span>Unknown</span>
+    }
+  }
+
+  function renderOrderStatus(status: number) {
+    switch (status) {
+      case OrderStatus.Pending:
+        return <span className="status-badge status-pending">Pending</span>
+      case OrderStatus.PaymentPending:
+        return <span className="status-badge status-pending">Payment Pending</span>
+      case OrderStatus.Paid:
+        return <span className="status-badge status-approved">Paid</span>
+      case OrderStatus.Processing:
+        return <span className="status-badge status-pending">Processing</span>
+      case OrderStatus.Shipped:
+        return <span className="status-badge status-approved">Shipped</span>
+      case OrderStatus.Delivered:
+        return <span className="status-badge status-completed">Delivered</span>
+      case OrderStatus.Cancelled:
+        return <span className="status-badge status-cancelled">Cancelled</span>
+      default:
+        return <span className="status-badge status-suspended">Unknown</span>
     }
   }
 
@@ -159,61 +194,91 @@ export default function SellerProfilePage() {
             </form>
           </div>
         ) : (
-          <div className="profile-card">
-            <div className="profile-header-info">
-              <div className="store-title-status">
-                <h2>{profile.storeName}</h2>
-                {renderStatus(profile.status)}
+          <>
+            <div className="profile-card">
+              <div className="profile-header-info">
+                <div className="store-title-status">
+                  <h2>{profile.storeName}</h2>
+                  {renderSellerStatus(profile.status)}
+                </div>
+                {!isEditing && (
+                  <button className="button button--quiet" onClick={() => setIsEditing(true)}>
+                    Edit Profile
+                  </button>
+                )}
               </div>
-              {!isEditing && (
-                <button className="button button--quiet" onClick={() => setIsEditing(true)}>
-                  Edit Profile
-                </button>
+
+              {!isEditing ? (
+                <div className="profile-details">
+                  <p className="profile-desc">
+                    <strong>Description:</strong> {profile.description || 'No description provided.'}
+                  </p>
+                  <div className="profile-dates">
+                    <span>Created: {new Date(profile.createdAt).toLocaleDateString()}</span>
+                    {profile.updatedAt && <span>Updated: {new Date(profile.updatedAt).toLocaleDateString()}</span>}
+                  </div>
+                </div>
+              ) : (
+                <form onSubmit={handleUpdate} className="profile-form">
+                  <label className="form-field">
+                    <span>Store Name</span>
+                    <input 
+                      type="text" 
+                      value={editStoreName}
+                      onChange={(e) => setEditStoreName(e.target.value)}
+                      required
+                    />
+                  </label>
+
+                  <label className="form-field">
+                    <span>Description</span>
+                    <textarea 
+                      rows={4} 
+                      value={editDescription}
+                      onChange={(e) => setEditDescription(e.target.value)}
+                    />
+                  </label>
+
+                  <div className="form-actions">
+                    <button type="submit" className="button button--dark" disabled={submitting}>
+                      {submitting ? 'Saving...' : 'Save Changes'}
+                    </button>
+                    <button type="button" className="button button--quiet" onClick={() => setIsEditing(false)}>
+                      Cancel
+                    </button>
+                  </div>
+                </form>
               )}
             </div>
 
-            {!isEditing ? (
-              <div className="profile-details">
-                <p className="profile-desc">
-                  <strong>Description:</strong> {profile.description || 'No description provided.'}
-                </p>
-                <div className="profile-dates">
-                  <span>Created: {new Date(profile.createdAt).toLocaleDateString()}</span>
-                  {profile.updatedAt && <span>Updated: {new Date(profile.updatedAt).toLocaleDateString()}</span>}
-                </div>
-              </div>
-            ) : (
-              <form onSubmit={handleUpdate} className="profile-form">
-                <label className="form-field">
-                  <span>Store Name</span>
-                  <input 
-                    type="text" 
-                    value={editStoreName}
-                    onChange={(e) => setEditStoreName(e.target.value)}
-                    required
-                  />
-                </label>
+            <section className="seller-orders-section">
+              <h2>Store Orders ({orders.length})</h2>
 
-                <label className="form-field">
-                  <span>Description</span>
-                  <textarea 
-                    rows={4} 
-                    value={editDescription}
-                    onChange={(e) => setEditDescription(e.target.value)}
-                  />
-                </label>
-
-                <div className="form-actions">
-                  <button type="submit" className="button button--dark" disabled={submitting}>
-                    {submitting ? 'Saving...' : 'Save Changes'}
-                  </button>
-                  <button type="button" className="button button--quiet" onClick={() => setIsEditing(false)}>
-                    Cancel
-                  </button>
+              {orders.length === 0 ? (
+                <p className="no-orders">No orders received yet.</p>
+              ) : (
+                <div className="orders-list">
+                  {orders.map((order) => (
+                    <div key={order.id} className="order-card">
+                      <div className="order-info">
+                        <h4>Order ID: {order.id}</h4>
+                        <p className="order-date">
+                          Date: {new Date(order.createdAt).toLocaleDateString()}
+                        </p>
+                      </div>
+                      <div className="order-meta">
+                        <span className="order-amount">${order.totalAmount}</span>
+                        {renderOrderStatus(order.status)}
+                        <Link to={`/seller/order/${order.id}/items`} className="button button--quiet order-details-link">
+                          View Details →
+                        </Link>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              </form>
-            )}
-          </div>
+              )}
+            </section>
+          </>
         )}
       </div>
     </main>

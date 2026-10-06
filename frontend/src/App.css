@@ -2288,3 +2288,130 @@
   font-size: 13px;
   color: #999;
 }
+
+.seller-orders-section {
+  margin-top: 48px;
+}
+
+.seller-orders-section h2 {
+  font-size: 22px;
+  font-weight: 700;
+  color: #1a1a1a;
+  margin-bottom: 20px;
+}
+
+.no-orders {
+  color: #71717a;
+  font-size: 15px;
+  background: #fafafa;
+  border: 1px dashed #e4e4e7;
+  padding: 24px;
+  border-radius: 12px;
+  text-align: center;
+}
+
+.orders-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.order-card {
+  background: #ffffff;
+  border: 1px solid #e4e4e7;
+  border-radius: 14px;
+  padding: 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
+  transition: all 0.2s ease-in-out;
+}
+
+.order-card:hover {
+  border-color: #cbd5e1;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.04);
+  transform: translateY(-2px);
+}
+
+.order-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.order-info h4 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #09090b;
+}
+
+.order-date {
+  margin: 0;
+  font-size: 13px;
+  color: #71717a;
+}
+
+.order-meta {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.order-amount {
+  font-weight: 700;
+  font-size: 18px;
+  color: #09090b;
+}
+
+.order-details-link {
+  font-size: 13px;
+  font-weight: 500;
+  padding: 8px 14px;
+  border-radius: 8px;
+  text-decoration: none;
+  background: #f4f4f5;
+  color: #18181b;
+  transition: background 0.15s ease;
+}
+
+.order-details-link:hover {
+  background: #e4e4e7;
+}
+
+.status-badge {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: 30px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.status-pending { 
+  background: #fef9c3; 
+  color: #854d0e; 
+  border: 1px solid #fde047;
+}
+
+.status-approved, .status-completed { 
+  background: #dcfce7; 
+  color: #166534; 
+  border: 1px solid #bbf7d0;
+}
+
+.status-rejected, .status-cancelled { 
+  background: #fee2e2; 
+  color: #991b1b; 
+  border: 1px solid #fecaca;
+}
+
+.status-suspended { 
+  background: #f1f5f9; 
+  color: #475569; 
+  border: 1px solid #e2e8f0;
+}
