@@ -23,3 +23,9 @@ export interface UserUpdateDto {
   email?: string | null
   password?: string | null
 }
+
+export interface UserPreviewResponseDto {
+  id: string
+  userName: string
+  email: string
+}

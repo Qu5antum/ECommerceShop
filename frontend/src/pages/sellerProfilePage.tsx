@@ -269,7 +269,7 @@ export default function SellerProfilePage() {
                       <div className="order-meta">
                         <span className="order-amount">${order.totalAmount}</span>
                         {renderOrderStatus(order.status)}
-                        <Link to={`/seller/order/${order.id}/items`} className="button button--quiet order-details-link">
+                        <Link to={`/seller/order/${order.id}/detail`} className="button button--quiet order-details-link">
                           View Details →
                         </Link>
                       </div>

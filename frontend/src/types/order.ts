@@ -1,3 +1,5 @@
+import type { UserPreviewResponseDto } from "./user";
+
 export const  OrderStatus = {
   Pending: 1,
   PaymentPending: 2,
@@ -28,6 +30,16 @@ export interface OrderResponseWithOutItemsDto {
   status: OrderStatus
   createdAt: string
   updatedAt?: string | null
+}
+
+export interface OrderResponseWithItemsAndUser {
+  id: string
+  totalAmount: number
+  status: OrderStatus
+  createdAt: string
+  updatedAt?: string | null
+  orderItems: OrderItemResponseDto[]
+  user?: UserPreviewResponseDto | null
 }
 
 export interface OrderResponseDto {

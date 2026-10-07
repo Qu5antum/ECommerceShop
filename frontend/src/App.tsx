@@ -11,6 +11,7 @@ import NotificationsPage from './pages/notificationPage'
 import OrderDetailPage from './pages/orderDetailPage'
 import CheckoutPaymentPage from './pages/checkoutPaymentPage'
 import SellerProfileDetailPage from './pages/sellerProfileDetailPage'
+import SellerOrderItemsDetailPage from './pages/sellerOrderItemsPage'
 
 
 export default function App() {
@@ -29,6 +30,7 @@ export default function App() {
         <Route path="/orders/:id" element={<OrderDetailPage />} />
         <Route path="/payment/:orderId" element={<CheckoutPaymentPage />} />
         <Route path="/seller/:id" element={<SellerProfileDetailPage />} />
+        <Route path="/seller/order/:id/detail" element={<SellerOrderItemsDetailPage />} />
         
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
