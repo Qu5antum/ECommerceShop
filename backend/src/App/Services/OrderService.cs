@@ -6,6 +6,7 @@ using App.Transactions;
 using App.Enum;
 using Microsoft.EntityFrameworkCore;
 using App.Services.Caching;
+using Microsoft.AspNetCore.Http.HttpResults;
 
 namespace App.Services;
 
@@ -21,6 +22,7 @@ public interface IOrderService
     Task<List<OrderResponseDto>> GetOrdersForAdminAsync(OrderStatus? status = null);
     Task<OrderResponseDto> GetOrderAdminAsync(Guid orderId);
     Task<List<OrderResponseDto>> GetOrdersFromDateToDateAsync(DateTime fromDate, DateTime toDate);
+    Task<OrderResponseWithItemsAndUser> GetOrderOfSellerWithItemAndUserAsync(Guid userId, Guid orderId);
 }
 
 
@@ -503,7 +505,7 @@ public class OrderService : IOrderService
             return cachedOrders;
         }
 
-        var orders = await _orderRepository.GetOrderOfSellerAsync(seller.Id);
+        var orders = await _orderRepository.GetOrdersOfSellerAsync(seller.Id);
 
         var result = orders.Select(order => new OrderResponseWithOutItemsDto
         {
@@ -524,6 +526,29 @@ public class OrderService : IOrderService
         _logger.LogInformation("Successfully retrieved orders for seller: {sellerProfileId}", seller.Id);
 
         return result;
+    }
+
+    public async Task<OrderResponseWithItemsAndUser> GetOrderOfSellerWithItemAndUserAsync(Guid userId, Guid orderId)
+    {
+        await _helper.GetUserOr404(userId);
+
+        var seller = await _sellerRepository.GetSellerProfileByUserIdAsync(userId);
+
+        if (seller is null)
+        {
+            _logger.LogInformation("Seller not found by user ID: {userId}", userId);
+            throw new NotFoundException("Seller not found");
+        }
+
+        var order = await _orderRepository.GetOrderOfSellerAsync(seller.Id, orderId);
+
+        if (order is null)
+        {
+            _logger.LogInformation("Order not found: {orderId}", orderId);
+            throw new NotFoundException("Order not found");
+        }
+
+        return order;
     }
 
     public async Task<bool> UpdateOrderStatusAsync(Guid orderId, UpdateOrderStatusDto orderStatusDto)

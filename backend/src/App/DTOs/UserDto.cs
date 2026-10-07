@@ -15,6 +15,14 @@ public class UserResponseDto
 }
 
 
+public class UserPreviewResponseDto
+{
+    public Guid Id { get; set; }
+    public string UserName { get; set; } = string.Empty;
+    public string Email { get; set; } = string.Empty;
+}
+
+
 public class UserUpdateDto
 {
     public string? UserName { get; set; }

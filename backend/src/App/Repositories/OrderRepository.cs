@@ -14,7 +14,8 @@ public interface IOrderRepository : IBaseRepository<Order>
     Task<List<Order>> GetOrdersWithStatus(OrderStatus? status = null);
     Task<List<Order>> GetOrderWithDate(DateTime fromDate, DateTime toDate);
     Task<int> GetPendingOrdersCountAsync();
-    Task<List<OrderResponseWithOutItemsDto>> GetOrderOfSellerAsync(Guid sellerId);
+    Task<List<OrderResponseWithOutItemsDto>> GetOrdersOfSellerAsync(Guid sellerId);
+    Task<OrderResponseWithItemsAndUser?> GetOrderOfSellerAsync(Guid sellerId, Guid orderId);
 }
 
 
@@ -70,7 +71,7 @@ public class OrderRepository(AppDbContext context) : BaseRepository<Order>(conte
             .CountAsync();
     }
 
-    public async Task<List<OrderResponseWithOutItemsDto>> GetOrderOfSellerAsync(Guid sellerId)
+    public async Task<List<OrderResponseWithOutItemsDto>> GetOrdersOfSellerAsync(Guid sellerId)
     {
         return await _context.Orders
             .AsNoTracking()
@@ -82,8 +83,52 @@ public class OrderRepository(AppDbContext context) : BaseRepository<Order>(conte
                 TotalAmount = o.TotalAmount,
                 status = o.status,
                 CreatedAt = o.CreatedAt,
-                UpdatedAt = o.UpdatedAt
+                UpdatedAt = o.UpdatedAt,
             })
             .ToListAsync();
+    }
+
+    public async Task<OrderResponseWithItemsAndUser?> GetOrderOfSellerAsync(Guid sellerId, Guid orderId)
+    {
+        var order = await _context.Orders
+            .AsNoTracking()
+            .Where(o => o.Id == orderId && o.orderItems.Any(oi => oi.Product.SellerProfileId == sellerId))
+            .Include(o => o.User)
+            .Include(o => o.orderItems)
+            .Select(o => new OrderResponseWithItemsAndUser 
+            {
+                Id = o.Id,
+                TotalAmount = o.TotalAmount,
+                status = o.status,
+                CreatedAt = o.CreatedAt,
+                UpdatedAt = o.UpdatedAt,
+                orderItems = o.orderItems
+                    .Select(item => new OrderItemResponseDto
+                    {
+                        Id = item.Id,
+                        orderId = item.orderId,
+                        productId = item.productId,
+                        ProductName = item.ProductName,
+                        Price = item.Price,
+                        Quantity = item.Quantity,
+                        CreatedAt = item.CreatedAt,
+                        UpdatedAt = item.UpdatedAt
+                    })
+                    .ToList(), 
+                User = o.User == null ? null : new UserPreviewResponseDto
+                {
+                    Id = o.User.Id,
+                    UserName = o.User.UserName,
+                    Email = o.User.Email
+                }
+            })
+            .FirstOrDefaultAsync();
+
+        if (order is null)
+        {
+            return null; 
+        }
+
+        return order;
     }
 }

@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using App.Enum;
+using App.Models;
 
 namespace App.DTOs;
 
@@ -24,6 +25,18 @@ public class OrderResponseWithOutItemsDto
     public OrderStatus status { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime? UpdatedAt { get; set; }
+}
+
+
+public class OrderResponseWithItemsAndUser
+{
+    public Guid Id { get; set; }
+    public decimal TotalAmount { get; set; }
+    public OrderStatus status { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public DateTime? UpdatedAt { get; set; }
+    public List<OrderItemResponseDto> orderItems { get; set; } = [];
+    public UserPreviewResponseDto? User { get; set; }
 }
 
 

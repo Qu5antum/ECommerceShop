@@ -72,6 +72,17 @@ public class OrderController : ControllerBase
         return Ok(orders);
     }
 
+    [Authorize(Roles = "Seller")]
+    [HttpGet("{orderId:guid}/Detail")]
+    public async Task<IActionResult> GetOrderWithItemsAndUser(Guid orderId)
+    {
+        Guid userId = _helper.GetUserId();
+
+        var order = await _service.GetOrderOfSellerWithItemAndUserAsync(userId, orderId);
+
+        return Ok(order);
+    }
+
     [Authorize(Roles = "Moderator, Admin, Manager")]
     [HttpPut("{orderId:guid}/Status")]
     public async Task<IActionResult> UpdateStatusOfOrder(Guid orderId, UpdateOrderStatusDto orderStatusDto)
