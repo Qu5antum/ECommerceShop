@@ -206,6 +206,9 @@ export default function SellerProfilePage() {
                     Edit Profile
                   </button>
                 )}
+                <Link to="/seller/products" className="button button--quiet">
+                  Manage Products
+                </Link>
               </div>
 
               {!isEditing ? (

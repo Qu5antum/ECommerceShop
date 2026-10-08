@@ -131,8 +131,8 @@ public class ProductController : ControllerBase
         return Ok("Product successfully deleted");
     }
 
-    [Authorize(Roles = "Admin, Moderator")]
-    [HttpGet("Admin")]
+    [Authorize(Roles = "Seller")]
+    [HttpGet("/OutOfStock")]
     public async Task<IActionResult> GetProductsOutOfStock()
     {
         var products = await _service.GetProductThatOutOfStockAsync();

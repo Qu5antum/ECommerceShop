@@ -107,7 +107,7 @@ export const productApi = {
   },
 
   async getProductsOutOfStock(): Promise<ProductResponseDto[]> {
-    const response = await api.get<ProductResponseDto[]>('/Product/Admin')
+    const response = await api.get<ProductResponseDto[]>('/Product/OutOfStock')
     return response.data
   },
 }

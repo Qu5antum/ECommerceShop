@@ -134,6 +134,7 @@ public class ProductService : IProductService
 
             await _cache.RemoveDataAsync(GetProductsCacheKey());
             await _cache.RemoveDataAsync(GetProductsOutOfStockCacheyKey());
+            await _cache.RemoveDataAsync(GetProductsOfSellerCacheKey(sellerProfile.Id));
 
             _logger.LogInformation("Products deleted from redis cache");
 
