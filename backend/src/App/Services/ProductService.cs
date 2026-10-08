@@ -23,7 +23,7 @@ public interface IProductService
     Task<List<ProductResponseDto>> SearchProductByPriceDesc(string productName);
     Task<List<ProductResponseDto>> SearchProductByPriceAsc(string productName);
     Task<bool> DeleteProductByIdAdminAsync(Guid productId);
-    Task<List<ProductResponseDto>> GetProductThatOutOfStockAsync();
+    Task<List<ProductResponseDto>> GetProductThatOutOfStockAsync(Guid userId);
     Task<List<ProductResponseDto>> GetProductsOfSellerAsync(Guid sellerId);
 }
 
@@ -53,9 +53,9 @@ public class ProductService : IProductService
         return $"products:{categoryId}";
     }
 
-    private static string GetProductsOutOfStockCacheyKey()
+    private static string GetProductsOutOfStockCacheyKey(Guid sellerId)
     {
-        return $"products:outOfStock";
+        return $"products:{sellerId}:outOfStock";
     }
 
     private static string GetProductsOfSellerCacheKey(Guid sellerId)
@@ -133,7 +133,7 @@ public class ProductService : IProductService
             _logger.LogInformation("Product successfully create: {productId}", newProduct.Id);
 
             await _cache.RemoveDataAsync(GetProductsCacheKey());
-            await _cache.RemoveDataAsync(GetProductsOutOfStockCacheyKey());
+            await _cache.RemoveDataAsync(GetProductsOutOfStockCacheyKey(sellerProfile.Id));
             await _cache.RemoveDataAsync(GetProductsOfSellerCacheKey(sellerProfile.Id));
 
             _logger.LogInformation("Products deleted from redis cache");
@@ -254,7 +254,7 @@ public class ProductService : IProductService
 
             await _cache.RemoveDataAsync(GetProductsCacheKey());
             await _cache.RemoveDataAsync(GetProductCacheKeyById(productId));
-            await _cache.RemoveDataAsync(GetProductsOutOfStockCacheyKey());
+            await _cache.RemoveDataAsync(GetProductsOutOfStockCacheyKey(sellerProfile.Id));
 
             _logger.LogInformation("Products deleted from redis cache");
 
@@ -322,7 +322,7 @@ public class ProductService : IProductService
 
             await _cache.RemoveDataAsync(GetProductsCacheKey());
             await _cache.RemoveDataAsync(GetProductCacheKeyById(productId));
-            await _cache.RemoveDataAsync(GetProductsOutOfStockCacheyKey());
+            await _cache.RemoveDataAsync(GetProductsOutOfStockCacheyKey(sellerProfile.Id));
 
             _logger.LogInformation("Products deleted from redis cache");
 
@@ -552,7 +552,6 @@ public class ProductService : IProductService
 
             await _cache.RemoveDataAsync(GetProductsCacheKey());
             await _cache.RemoveDataAsync(GetProductCacheKeyById(productId));
-            await _cache.RemoveDataAsync(GetProductsOutOfStockCacheyKey());
 
             _logger.LogInformation("Products deleted from redis cache");
 
@@ -566,9 +565,19 @@ public class ProductService : IProductService
         }
     }
 
-    public async Task<List<ProductResponseDto>> GetProductThatOutOfStockAsync()
+    public async Task<List<ProductResponseDto>> GetProductThatOutOfStockAsync(Guid userId)
     {
-        var cacheKey = GetProductsOutOfStockCacheyKey();
+        await _helper.GetUserOr404(userId);
+
+        var sellerProfile = await _profileRepository.GetSellerProfileByUserIdAsync(userId);
+
+        if (sellerProfile is null)
+        {
+            _logger.LogInformation("Seller profile not found by user: {userId}", userId);
+            throw new NotFoundException("Seller profile not found");
+        }
+
+        var cacheKey = GetProductsOutOfStockCacheyKey(sellerProfile.Id);
 
         var cachedProducts = await _cache.GetDataAsync<List<ProductResponseDto>>(cacheKey);
 
@@ -578,7 +587,7 @@ public class ProductService : IProductService
             return cachedProducts;
         }
         
-        var products = await _productRepository.GetProductsOutOfStockAsync();
+        var products = await _productRepository.GetProductsOutOfStockAsync(sellerProfile.Id);
         
         var result = products.Select(product => new ProductResponseDto
         {

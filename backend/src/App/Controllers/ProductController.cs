@@ -132,10 +132,12 @@ public class ProductController : ControllerBase
     }
 
     [Authorize(Roles = "Seller")]
-    [HttpGet("/OutOfStock")]
+    [HttpGet("OutOfStock")]
     public async Task<IActionResult> GetProductsOutOfStock()
     {
-        var products = await _service.GetProductThatOutOfStockAsync();
+        Guid userId = _helper.GetUserId();
+
+        var products = await _service.GetProductThatOutOfStockAsync(userId);
 
         return Ok(products);
     }

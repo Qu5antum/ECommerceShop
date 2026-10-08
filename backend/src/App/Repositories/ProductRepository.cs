@@ -13,7 +13,7 @@ public interface IProductRepository : IBaseRepository<Product>
     Task<List<Product>> GetProductsByMultipleIds(List<Guid> productIds);
     Task<List<Product>> SearchProductByPriceDesc(string ProductName);
     Task<List<Product>> SearchProductByPriceAsc(string ProductName);
-    Task<List<Product>> GetProductsOutOfStockAsync();
+    Task<List<Product>> GetProductsOutOfStockAsync(Guid sellerId);
     Task<List<Product>> GetProductsOfSellerAsync(Guid sellerId);
 }
 
@@ -68,11 +68,11 @@ public class ProductRepository(AppDbContext context) : BaseRepository<Product>(c
             .ToListAsync();
     }
 
-    public async Task<List<Product>> GetProductsOutOfStockAsync()
+    public async Task<List<Product>> GetProductsOutOfStockAsync(Guid sellerId)
     {
         return await _context.Products
             .AsNoTracking()
-            .Where(p => p.Stock == 0)
+            .Where(p => p.Stock == 0 && p.SellerProfileId == sellerId)
             .ToListAsync();
     }
 

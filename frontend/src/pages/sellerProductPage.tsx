@@ -8,15 +8,19 @@ import type {
   ProductCreateData, 
   ProductUpdateData 
 } from '../types/product'
-import type { CategoryResponseDto } from '../types/category' 
+import type { CategoryResponseDto } from '../types/category'
 import Brand from '../components/Brand'
 import '../style/sellerProductsPage.css'
 
 export default function SellerProductsPage() {
   const [sellerId, setSellerId] = useState<string | null>(null)
   const [products, setProducts] = useState<ProductResponseDto[]>([])
-  const [categories, setCategories] = useState<CategoryResponseDto[]>([]) 
+  const [outOfStockProducts, setOutOfStockProducts] = useState<ProductResponseDto[]>([])
+  const [categories, setCategories] = useState<CategoryResponseDto[]>([])
   const [productImages, setProductImages] = useState<Record<string, string>>({})
+  
+  const [activeTab, setActiveTab] = useState<'all' | 'outofstock'>('all')
+
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [successMessage, setSuccessMessage] = useState('')
@@ -66,7 +70,7 @@ export default function SellerProductsPage() {
           setCategoryId(categoriesData[0].id)
         }
 
-        await fetchProducts(profile.id)
+        await fetchAllData(profile.id)
       } catch (err: any) {
         setError(err.response?.data?.message || err.message || 'Failed to initialize seller page')
         setLoading(false)
@@ -76,19 +80,30 @@ export default function SellerProductsPage() {
     initPageData()
   }, [])
 
-  async function fetchProducts(targetSellerId: string) {
+  async function fetchAllData(targetSellerId: string) {
     try {
       setLoading(true)
-      const data = await productApi.getProductsOfSeller(targetSellerId)
-      setProducts(data)
+      const [allProductsData, outOfStockData] = await Promise.all([
+        productApi.getProductsOfSeller(targetSellerId),
+        productApi.getProductsOutOfStock().catch(() => [])
+      ])
 
-      if (data.length > 0) {
-        const imagePromises = data.map(async (product: ProductResponseDto) => {
+      const sellerOutOfStock = outOfStockData.filter(
+        (p: ProductResponseDto) => p.sellerProfileId === targetSellerId || allProductsData.some(ap => ap.id === p.id && ap.stock === 0)
+      )
+
+      setProducts(allProductsData)
+      setOutOfStockProducts(sellerOutOfStock)
+
+      const allIds = Array.from(new Set([...allProductsData.map(p => p.id), ...sellerOutOfStock.map(p => p.id)]))
+
+      if (allIds.length > 0) {
+        const imagePromises = allIds.map(async (productId) => {
           try {
-            const url = await productApi.getProductImage(product.id)
-            return { id: product.id, url }
+            const url = await productApi.getProductImage(productId)
+            return { id: productId, url }
           } catch {
-            return { id: product.id, url: null }
+            return { id: productId, url: null }
           }
         })
 
@@ -128,7 +143,7 @@ export default function SellerProductsPage() {
       setSuccessMessage('Product successfully created!')
       setIsCreateOpen(false)
       resetCreateForm()
-      await fetchProducts(sellerId) 
+      await fetchAllData(sellerId) 
     } catch (err: any) {
       setError(err.response?.data?.message || err.message || 'Failed to create product')
     } finally {
@@ -157,7 +172,7 @@ export default function SellerProductsPage() {
       await productApi.updateProduct(editingProduct.id, updateData)
       setSuccessMessage('Product successfully updated!')
       setEditingProduct(null)
-      await fetchProducts(sellerId) 
+      await fetchAllData(sellerId) 
     } catch (err: any) {
       setError(err.response?.data?.message || err.message || 'Failed to update product')
     } finally {
@@ -174,6 +189,7 @@ export default function SellerProductsPage() {
       await productApi.deleteProduct(productId)
       setSuccessMessage('Product deleted successfully')
       setProducts(products.filter((p) => p.id !== productId))
+      setOutOfStockProducts(outOfStockProducts.filter((p) => p.id !== productId))
     } catch (err: any) {
       setError(err.response?.data?.message || err.message || 'Failed to delete product')
     }
@@ -201,6 +217,8 @@ export default function SellerProductsPage() {
     if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
+  const displayedProducts = activeTab === 'all' ? products : outOfStockProducts
+
   if (loading) return <div className="loading">Loading products...</div>
 
   return (
@@ -214,22 +232,41 @@ export default function SellerProductsPage() {
 
       <div className="products-container">
         <div className="products-header-row">
-          <h1>Manage Products ({products.length})</h1>
+          <h1>Manage Products</h1>
           <button className="button button--dark" onClick={() => setIsCreateOpen(true)}>
             + Add New Product
+          </button>
+        </div>
+
+        <div className="products-tabs-row" style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
+          <button 
+            className={`button ${activeTab === 'all' ? 'button--dark' : 'button--quiet'}`}
+            onClick={() => setActiveTab('all')}
+          >
+            All Products ({products.length})
+          </button>
+          <button 
+            className={`button ${activeTab === 'outofstock' ? 'button--dark' : 'button--quiet'}`}
+            onClick={() => setActiveTab('outofstock')}
+          >
+            Out of Stock ({outOfStockProducts.length})
           </button>
         </div>
 
         {successMessage && <p className="form-message form-message--success">{successMessage}</p>}
         {error && <p className="form-message form-message--error">{error}</p>}
 
-        {products.length === 0 ? (
+        {displayedProducts.length === 0 ? (
           <div className="no-products-card">
-            <p>You haven't added any products yet.</p>
+            <p>
+              {activeTab === 'all' 
+                ? "You haven't added any products yet." 
+                : "Great! You have no out-of-stock products."}
+            </p>
           </div>
         ) : (
           <div className="seller-products-grid">
-            {products.map((product) => {
+            {displayedProducts.map((product) => {
               const imgUrl = productImages[product.id]
               return (
                 <div key={product.id} className="seller-product-card">
@@ -239,6 +276,9 @@ export default function SellerProductsPage() {
                     ) : (
                       <span className="no-image-placeholder">No Image</span>
                     )}
+                    {product.stock === 0 && (
+                      <span className="out-of-stock-badge">Out of Stock</span>
+                    )}
                   </div>
                   <div className="product-card-body">
                     <h3>{product.name}</h3>
@@ -246,7 +286,9 @@ export default function SellerProductsPage() {
                     <p className="product-desc">{product.description}</p>
                     <div className="product-meta-row">
                       <span className="product-price">${product.price.toFixed(2)}</span>
-                      <span className="product-stock">Stock: {product.stock}</span>
+                      <span className={`product-stock ${product.stock === 0 ? 'text-danger' : ''}`}>
+                        Stock: {product.stock}
+                      </span>
                     </div>
                   </div>
                   <div className="product-card-actions">
