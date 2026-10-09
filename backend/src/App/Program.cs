@@ -6,6 +6,8 @@ using App.Services;
 using App.Services.Analtytics;
 using App.Services.Caching;
 using App.Transactions;
+using App.Validator;
+using FluentValidation;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -132,6 +134,9 @@ builder.Services.AddScoped<INotificationRepository, NotificationRepository>();
 
 // Transactions
 builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
+
+// Validator
+builder.Services.AddValidatorsFromAssemblyContaining<UserRegisterDtoValidator>();
 
 builder.Services.AddHttpContextAccessor(); 
 builder.Services.AddScoped<Helper>();
