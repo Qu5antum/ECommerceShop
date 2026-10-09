@@ -1,5 +1,6 @@
 using App.DTOs;
 using App.Services;
+using FluentValidation;
 using Microsoft.AspNetCore.Mvc;
 
 namespace App.Controllers;
@@ -10,15 +11,24 @@ namespace App.Controllers;
 public class AuthController : ControllerBase
 {
     private readonly IAuthService _authService;
+    private readonly IValidator<RegisterRequest> _validator;
 
-    public AuthController(IAuthService authService)
+    public AuthController(IAuthService authService, IValidator<RegisterRequest> validator)
     {
         _authService = authService;
+        _validator = validator;
     }
 
     [HttpPost("Register")]
     public async Task<IActionResult> Register(RegisterRequest registerRequest)
     {
+        var validationResult = await _validator.ValidateAsync(registerRequest);
+        
+        if (!validationResult.IsValid)
+        {
+            return BadRequest(validationResult.ToDictionary());
+        }
+
         await _authService.RegisterUser(registerRequest);
 
         return Ok(new
