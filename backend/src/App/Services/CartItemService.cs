@@ -1,4 +1,3 @@
-using System.ComponentModel.DataAnnotations;
 using App.DTOs;
 using App.Exceptions;
 using App.Models;

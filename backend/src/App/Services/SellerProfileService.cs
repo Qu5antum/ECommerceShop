@@ -26,6 +26,7 @@ public interface ISellerProfileService
 public class SellerProfileService : ISellerProfileService
 {
     private readonly ISellerProfileRepository _profileRepository;
+    private readonly INotificationRepository _notificationRepository;
     private readonly ILogger<SellerProfileService> _logger;
     private readonly IHelperService _helper;
     private readonly IFileStorageService _fileService;
@@ -47,8 +48,14 @@ public class SellerProfileService : ISellerProfileService
         return $"seller:status:{status}";
     }
 
+    public static string GetSellerProfilePreviewCacheKey(Guid sellerId)
+    {
+        return $"seller:{sellerId}:preview";
+    }
+
     public SellerProfileService(
         ISellerProfileRepository profileRepository, 
+        INotificationRepository notificationRepository,
         ILogger<SellerProfileService> logger, 
         IHelperService helper, 
         IFileStorageService fileService,
@@ -56,6 +63,7 @@ public class SellerProfileService : ISellerProfileService
         IRedisCacheService cache)
     {
         _profileRepository = profileRepository;
+        _notificationRepository = notificationRepository;
         _logger = logger;
         _helper = helper;
         _fileService = fileService;
@@ -186,6 +194,7 @@ public class SellerProfileService : ISellerProfileService
             _logger.LogInformation("Seller profile successfully updated: {userId}", userId);
 
             await _cache.RemoveDataAsync(GetSellerProfileCacheKey(profileId));
+            await _cache.RemoveDataAsync(GetSellerProfilePreviewCacheKey(profileId));
             await _cache.RemoveDataAsync(GetSellerProfileByUserCacheKey(userId));
             await _cache.RemoveDataAsync(GetSellerProfileWithStatusCacheyKey(SellerStatus.Approved));
             await _cache.RemoveDataAsync(GetSellerProfileWithStatusCacheyKey(SellerStatus.Pending));
@@ -336,7 +345,6 @@ public class SellerProfileService : ISellerProfileService
         return await _fileService.GetFileAsync(seller.ImageUrl);
     }
     
-    // TODO: Add notification sender for user 
     public async Task<bool> UpdateStatusOfSellerProfile(Guid userId, Guid sellerId, SellerStatus status)
     {
         await _helper.GetUserOr404(userId);
@@ -360,12 +368,23 @@ public class SellerProfileService : ISellerProfileService
         {
             seller.Status = status;
             await _profileRepository.UpdateAsync(seller);
+
+            var newNotification = new Notification
+            {
+                Title = "Seller profile status update",
+                Message = $"Dear Seller your profile was updated: {status}",
+                UserId = seller.userId,
+                Type = NotificationType.System
+            };
+            
+            await _notificationRepository.CreateAsync(newNotification);
             await _unitOfWork.SaveChangesAsync();
             await _unitOfWork.CommitAsync();
 
             _logger.LogInformation("Status of seller successfully updated: {sellerId}", sellerId);
 
             await _cache.RemoveDataAsync(GetSellerProfileCacheKey(sellerId));
+            await _cache.RemoveDataAsync(GetSellerProfilePreviewCacheKey(sellerId));
             await _cache.RemoveDataAsync(GetSellerProfileByUserCacheKey(userId));
             await _cache.RemoveDataAsync(GetSellerProfileWithStatusCacheyKey(SellerStatus.Approved));
             await _cache.RemoveDataAsync(GetSellerProfileWithStatusCacheyKey(SellerStatus.Pending));
@@ -384,9 +403,18 @@ public class SellerProfileService : ISellerProfileService
         }
     }
     
-    // TODO: implement redis service
     public async Task<SellerPreviewResponseDto> GetSellerProfilePreviewAsync(Guid sellerId)
     {
+        var cacheKey = GetSellerProfilePreviewCacheKey(sellerId);
+
+        var cachedSellerProfile = await _cache.GetDataAsync<SellerPreviewResponseDto>(cacheKey);
+
+        if (cachedSellerProfile is not null)
+        {
+            _logger.LogInformation("Seller profile preview retrieved from redis cache: {sellerId}", sellerId);
+            return cachedSellerProfile;
+        }
+
         var sellerPreview = await _profileRepository.GetSellerStoreNameDescriptionAsync(sellerId);
 
         if (sellerPreview is null)
@@ -395,10 +423,18 @@ public class SellerProfileService : ISellerProfileService
             throw new NotFoundException("Seller not found");
         }
 
-        return new SellerPreviewResponseDto
+        var result = new SellerPreviewResponseDto
         {
             StoreName = sellerPreview.StoreName,
             Description = sellerPreview.Description
         };
+
+        await _cache.SetDataAsync(
+            cacheKey, 
+            result,
+            TimeSpan.FromMinutes(5)
+        );
+
+        return result;
     }
 }

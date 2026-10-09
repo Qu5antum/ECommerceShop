@@ -124,9 +124,9 @@ public class ProductController : ControllerBase
 
     [Authorize(Roles = "Admin, Moderator")]
     [HttpDelete("Admin/{productId:guid}")]
-    public async Task<IActionResult> DeleteProductAdmin(Guid productId)
+    public async Task<IActionResult> DeleteProductAdmin(Guid productId, CreateNotificationDto createNotificationDto)
     {
-        await _service.DeleteProductByIdAdminAsync(productId);
+        await _service.DeleteProductByIdAdminAsync(productId, createNotificationDto);
 
         return Ok("Product successfully deleted");
     }

@@ -22,7 +22,7 @@ public interface IProductService
     Task<List<ProductResponseDto>> SearchProductAsync(string productName);
     Task<List<ProductResponseDto>> SearchProductByPriceDesc(string productName);
     Task<List<ProductResponseDto>> SearchProductByPriceAsc(string productName);
-    Task<bool> DeleteProductByIdAdminAsync(Guid productId);
+    Task<bool> DeleteProductByIdAdminAsync(Guid productId, CreateNotificationDto createNotificationDto);
     Task<List<ProductResponseDto>> GetProductThatOutOfStockAsync(Guid userId);
     Task<List<ProductResponseDto>> GetProductsOfSellerAsync(Guid sellerId);
 }
@@ -32,6 +32,7 @@ public class ProductService : IProductService
 {
     private readonly IProductRepository _productRepository;
     private readonly ISellerProfileRepository _profileRepository;
+    private readonly INotificationRepository _notificationRepository;
     private readonly IFileStorageService _fileService;
     private readonly ILogger<ProductService> _logger;
     private readonly IHelperService _helper;
@@ -67,6 +68,7 @@ public class ProductService : IProductService
     (
         IProductRepository productRepository,
         ISellerProfileRepository profileRepository,
+        INotificationRepository notificationRepository,
         IFileStorageService fileService,
         ILogger<ProductService> logger,
         IHelperService helper,
@@ -76,6 +78,7 @@ public class ProductService : IProductService
     {
         _productRepository = productRepository;
         _profileRepository = profileRepository;
+        _notificationRepository = notificationRepository;
         _fileService = fileService;
         _logger = logger;
         _helper = helper;
@@ -536,14 +539,30 @@ public class ProductService : IProductService
         }).ToList();
     }
     
-    // TODO: Add notification for seller after deleting product
-    public async Task<bool> DeleteProductByIdAdminAsync(Guid productId)
+    public async Task<bool> DeleteProductByIdAdminAsync(Guid productId, CreateNotificationDto createNotificationDto)
     {
         await _unitOfWork.BeginTransactionAsync();
         var product = await _helper.GetProductOr404(productId);
 
+        Guid userId = await _productRepository.GetUserIdByProductId(productId);
+
+        if (userId == Guid.Empty)
+        {
+            _logger.LogInformation("User id not found by product: {productId}", productId);
+            throw new NotFoundException("User profile not found");
+        }
+
         try
         {
+            var newNotification = new Notification
+            {
+                Title = createNotificationDto.Title,
+                Message = createNotificationDto.Message,
+                UserId = userId,
+                Type = NotificationType.System
+            };
+
+            await _notificationRepository.CreateAsync(newNotification);
             await _productRepository.DeleteAsync(product);
             await _unitOfWork.SaveChangesAsync();
             await _unitOfWork.CommitAsync();

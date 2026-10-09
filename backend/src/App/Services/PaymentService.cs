@@ -45,6 +45,11 @@ public class PaymentService : IPaymentService
         return $"payments:{status}";
     }
 
+    private static string GetPaymentTotalStatisticsCacheKey()
+    {
+        return $"payments:total_statistic";
+    }
+
     public PaymentService(
         IPaymentRepository paymentRepository, 
         INotificationRepository notificationRepository, 
@@ -105,6 +110,7 @@ public class PaymentService : IPaymentService
 
             
             await _cache.RemoveDataAsync(GetPaymentsCacheKey());
+            await _cache.RemoveDataAsync(GetPaymentTotalStatisticsCacheKey());
             await _cache.RemoveDataAsync(GetPaymentsWithStatusCacheKey(PaymentStatus.Succeeded));
             await _cache.RemoveDataAsync(GetPaymentsWithStatusCacheKey(PaymentStatus.Pending));
             await _cache.RemoveDataAsync(GetPaymentsWithStatusCacheKey(PaymentStatus.Failed));
@@ -253,6 +259,7 @@ public class PaymentService : IPaymentService
             _logger.LogInformation("Payment status updated: {paymentId}", payment.Id);
 
             await _cache.RemoveDataAsync(GetPaymentCacheKey(payment.Id));
+            await _cache.RemoveDataAsync(GetPaymentTotalStatisticsCacheKey());
 
             _logger.LogInformation("Payment deleted from redis cache: {paymentId}", payment.Id);
 
@@ -336,10 +343,25 @@ public class PaymentService : IPaymentService
         return result;
     }
 
-    // TODO: add redis cache
     public async Task<PaymentStatisticsDto> GetPaymentsStatisticAsync()
     {
+        var cacheKey = GetPaymentTotalStatisticsCacheKey();
+
+        var cachedPayments = await _cache.GetDataAsync<PaymentStatisticsDto>(cacheKey);
+
+        if (cachedPayments is not null)
+        {
+            _logger.LogInformation("Total payments statistic retrieved from redis cache");
+            return cachedPayments;
+        }
+
         var stats = await _paymentRepository.GetPaymentsStatisticsAsync();
+
+        await _cache.SetDataAsync(
+            cacheKey, 
+            stats,
+            TimeSpan.FromMinutes(5)
+        );
 
         return stats;
     }

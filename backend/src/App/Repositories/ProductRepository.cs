@@ -15,6 +15,7 @@ public interface IProductRepository : IBaseRepository<Product>
     Task<List<Product>> SearchProductByPriceAsc(string ProductName);
     Task<List<Product>> GetProductsOutOfStockAsync(Guid sellerId);
     Task<List<Product>> GetProductsOfSellerAsync(Guid sellerId);
+    Task<Guid> GetUserIdByProductId(Guid productId);
 }
 
 
@@ -82,5 +83,13 @@ public class ProductRepository(AppDbContext context) : BaseRepository<Product>(c
             .AsNoTracking()
             .Where(p => p.SellerProfileId == sellerId)
             .ToListAsync();
+    }
+
+    public async Task<Guid> GetUserIdByProductId(Guid productId)
+    {
+        return await _context.Products
+            .Where(p => p.Id == productId)
+            .Select(p => p.SellerProfile.userId)
+            .FirstOrDefaultAsync();
     }
 }
