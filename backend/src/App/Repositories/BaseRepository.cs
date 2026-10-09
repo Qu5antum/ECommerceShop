@@ -14,6 +14,7 @@ public interface IBaseRepository<T> where T : BaseModel
     Task<List<T>> GetAllAsync();
     Task AddRangeAsync(IEnumerable<T> entities);
     Task<int> GetEntitysCountAsync();
+    Task<List<T>> GetObjectsByMultipleIdsAsync(List<Guid> ids);
 }
 
 
@@ -60,5 +61,12 @@ public class BaseRepository<T>(AppDbContext context) : IBaseRepository<T> where 
         return await _dbSet
             .Select(e => e.Id)
             .CountAsync();
+    }
+
+    public async Task<List<T>> GetObjectsByMultipleIdsAsync(List<Guid> ids)
+    {
+        return await _dbSet
+            .Where(o => ids.Contains(o.Id))
+            .ToListAsync();
     }
 }

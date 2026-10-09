@@ -12,8 +12,8 @@ public interface ISellerProfileRepository : IBaseRepository<SellerProfile>
     Task<SellerProfile?> GetSellerProfileByUserIdAsync(Guid userId);
     Task<bool> IsStoreNameTakenAsync(string storeName);
     Task<List<SellerProfile>> GetSellersByStatusAsync(SellerStatus status);
-    Task<List<Guid>> GetUserIdsBySellerIds(List<Guid> sellerIds);
     Task<SellerPreviewResponseDto?> GetSellerStoreNameDescriptionAsync(Guid sellerId);
+    Task<Guid> GetUserIdBySellerProfileId(Guid sellerId);
 }
 
 
@@ -42,14 +42,6 @@ public class SellerProfileRepository(AppDbContext context) : BaseRepository<Sell
             .ToListAsync();
     }
 
-    public async Task<List<Guid>> GetUserIdsBySellerIds(List<Guid> sellerIds)
-    {
-        return await _context.SellerProfiles
-            .Where(u => sellerIds.Contains(u.Id))
-            .Select(u => u.userId)
-            .ToListAsync(); 
-    }
-
     public async Task<SellerPreviewResponseDto?> GetSellerStoreNameDescriptionAsync(Guid sellerId)
     {
         return await _context.SellerProfiles
@@ -59,6 +51,14 @@ public class SellerProfileRepository(AppDbContext context) : BaseRepository<Sell
                 StoreName = s.StoreName,
                 Description = s.Description
             })
+            .FirstOrDefaultAsync();
+    }
+
+    public async Task<Guid> GetUserIdBySellerProfileId(Guid sellerId)
+    {
+        return await _context.SellerProfiles
+            .Where(s => s.Id == sellerId)
+            .Select(s => s.userId)
             .FirstOrDefaultAsync();
     }
 }

@@ -113,7 +113,7 @@ public class OrderService : IOrderService
         _unitOfWork = unitOfWork;
         _cache = cache;
     }
-
+    
     public async Task<OrderResponseDto> CreateOrderAsync(Guid userId)
     {
         await _unitOfWork.BeginTransactionAsync();
@@ -133,30 +133,25 @@ public class OrderService : IOrderService
             _logger.LogWarning("Cart can't be empty: {cartId}", cartWithItems.Id);
             throw new BadRequestException("Cart can't be empty");
         }
-
-        List<Guid> productIds = new List<Guid>();
-
-        foreach (var item in cartWithItems.Items)
-        {
-            productIds.Add(item.ProductId);
-        }
-
-        var products = await _productRepository.GetProductsByMultipleIds(productIds);
-
-        if (products.Count() != productIds.Count())
-        {
-            _logger.LogWarning("Some products not found in list: {productsIds}", productIds);
-            throw new NotFoundException("Some products not found in list");
-        }
-
-        var productDict = products.ToDictionary(p => p.Id);
-
-        decimal totalAmount = 0;
-        var orderItems = new List<OrderItem>();
-        var sellerIds = new List<Guid>();
-
+        
         try
         {
+            decimal totalAmount = 0;
+            var orderItems = new List<OrderItem>();
+            var productIds = cartWithItems.Items.Select(i => i.ProductId).ToList();
+
+            var products = await _productRepository.GetObjectsByMultipleIdsAsync(productIds);
+
+            if (products.Count() != productIds.Count())
+            {
+                _logger.LogWarning("Some products not found in list: {productsIds}", productIds);
+                throw new NotFoundException("Some products not found in list");
+            }
+
+            var productDict = products.ToDictionary(p => p.Id);
+            var firstProductId = cartWithItems.Items.First().ProductId;
+            var sellerProfileId = productDict[firstProductId].SellerProfileId;
+
             foreach (var item in cartWithItems.Items)
             {
                 if (!productDict.TryGetValue(item.ProductId, out var product))
@@ -183,13 +178,9 @@ public class OrderService : IOrderService
                 });
 
                 product.Stock -= item.Quantity;
-
-                sellerIds.Add(product.SellerProfileId);
             }
 
-            var uniqueSellerIds = sellerIds.Distinct().ToList();
-
-            var sellerUserIds = await _sellerRepository.GetUserIdsBySellerIds(uniqueSellerIds);
+            var sellerUserId = await _sellerRepository.GetUserIdBySellerProfileId(sellerProfileId);
 
             var newOrder = new Order
             {
@@ -224,22 +215,22 @@ public class OrderService : IOrderService
 
             await _notificationRepository.CreateAsync(notification);
 
-            var sellerNotifications = sellerUserIds.Select(sellerUserId => new Notification
+            var sellerNotification = new Notification
             {
                 UserId = sellerUserId,
                 Title = "New Order Item",
                 Message = $"A product from your store has been ordered in Order #{newOrder.Id}.",
                 Type = NotificationType.System
-            }).ToList();
+            };
 
-            await _notificationRepository.AddRangeAsync(sellerNotifications);
-
+            await _notificationRepository.CreateAsync(sellerNotification);
             await _unitOfWork.SaveChangesAsync();
             await _unitOfWork.CommitAsync();
 
             _logger.LogInformation("Order successfully created, order ID: {orderId}, user ID: {userId}", newOrder.Id, userId);
 
             await _cache.RemoveDataAsync(GetOrdersCacheKeyByUser(userId));
+            await _cache.RemoveDataAsync(GetOrdersCacheKeyOfSeller(sellerUserId));
             await _cache.RemoveDataAsync(GetOrdersWithStatusCacheKey(OrderStatus.Pending));
             await _cache.RemoveDataAsync(GetOrdersWithStatusCacheKey(OrderStatus.PaymentPending));
             await _cache.RemoveDataAsync(GetOrdersWithStatusCacheKey(OrderStatus.Paid));
@@ -417,16 +408,28 @@ public class OrderService : IOrderService
             throw new BadRequestException("Orders cannot be cancelled before the Paid stage.");
         }
         
-        // TODO: optimize code getting products by id
         try
         {
-            var sellerIds = new List<Guid>();
+            var productIds = order.orderItems.Select(i => i.productId).ToList();
+
+            var products = await _productRepository.GetObjectsByMultipleIdsAsync(productIds);
+
+            var productDict = products.ToDictionary(p => p.Id);
+
+            if (products.Count() != productIds.Count())
+            {
+                _logger.LogInformation("Some products are missing: {productsIds}", productIds);
+                throw new NotFoundException("Some products are missing");
+            }
+
+            var firstProductId = order.orderItems.First().productId;
+            var sellerProfileId = productDict[firstProductId].SellerProfileId;
 
             foreach (var item in order.orderItems)
             {
-                var product = await _helper.GetProductOr404(item.productId);
+                var product = productDict[item.productId];
 
-                product.Stock += item.Quantity;
+                product.Stock += item.Quantity; 
                 product.UpdatedAt = DateTime.UtcNow;
 
                 await _cache.RemoveDataAsync(GetProductCacheKeyById(product.Id));
@@ -434,9 +437,7 @@ public class OrderService : IOrderService
                 _logger.LogInformation("Product deleted from redis cache: {productId}", product.Id);
             }
 
-            var uniqueSellerIds = sellerIds.Distinct().ToList();
-
-            var sellerUserIds = await _sellerRepository.GetUserIdsBySellerIds(uniqueSellerIds);
+            var sellerUserId = await _sellerRepository.GetUserIdBySellerProfileId(sellerProfileId);
 
             order.status = OrderStatus.Cancelled;
             order.UpdatedAt = DateTime.UtcNow;
@@ -450,16 +451,15 @@ public class OrderService : IOrderService
 
             await _notificationRepository.CreateAsync(notification);
 
-            var sellerNotifications = sellerUserIds.Select(sellerUserId => new Notification
+            var sellerNotification = new Notification
             {
                 UserId = sellerUserId,
-                Title = "Order Item Cancel",
-                Message = $"A order from your store has been canceled in Order #{orderId}.",
+                Title = "Order Cancelled",
+                Message = $"An order from your store has been canceled. Order ID: #{orderId}.",
                 Type = NotificationType.System
-            }).ToList();
+            };
 
-            await _notificationRepository.AddRangeAsync(sellerNotifications);
-
+            await _notificationRepository.CreateAsync(sellerNotification);
             await _unitOfWork.SaveChangesAsync();
             await _unitOfWork.CommitAsync();
 
@@ -471,6 +471,7 @@ public class OrderService : IOrderService
 
             await _cache.RemoveDataAsync(GetProductsCacheKey());
             await _cache.RemoveDataAsync(GetProductsOutOfStockCacheyKey());
+            await _cache.RemoveDataAsync(GetOrdersCacheKeyOfSeller(sellerUserId));
 
             _logger.LogInformation("Products deleted from redis cache");
 
@@ -580,7 +581,6 @@ public class OrderService : IOrderService
             throw new BadRequestException("Order status transition is not available");
         }
         
-        // Todo optimize the code for getting products
         try
         {
             string notificationTitle = string.Empty;
@@ -589,9 +589,21 @@ public class OrderService : IOrderService
 
             if (orderStatusDto.Status == OrderStatus.Cancelled)
             {
+                var productIds = order.orderItems.Select(p => p.productId).ToList();
+
+                var products = await _productRepository.GetObjectsByMultipleIdsAsync(productIds);
+
+                if (products.Count() != productIds.Count())
+                {
+                    _logger.LogInformation("Some products are missing: {productsIds}", productIds);
+                    throw new NotFoundException("Some products are missing");
+                }
+
+                var productDict = products.ToDictionary(p => p.Id);
+
                 foreach (var item in order.orderItems)
                 {
-                    var product = await _helper.GetProductOr404(item.productId);
+                    var product = productDict[item.productId];
 
                     product.Stock += item.Quantity;
                     product.UpdatedAt = DateTime.UtcNow;
@@ -731,7 +743,7 @@ public class OrderService : IOrderService
             return cachedOrder;
         }
 
-        var order = await _orderRepository.GetByIdAsync(orderId);
+        var order = await _helper.GetOrderOr404(orderId);
 
         var result = new OrderResponseDto
         {
