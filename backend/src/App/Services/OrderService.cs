@@ -791,7 +791,13 @@ public class OrderService : IOrderService
             return cachedOrder;
         }
 
-        var order = await _helper.GetOrderOr404(orderId);
+        var order = await _orderRepository.GetOrderWithItemsById(orderId);
+
+        if (order is null)
+        {
+            _logger.LogInformation("Order not found by id: {orderId}", orderId);
+            throw new NotFoundException("Order not found");
+        }
 
         var result = new OrderResponseDto
         {

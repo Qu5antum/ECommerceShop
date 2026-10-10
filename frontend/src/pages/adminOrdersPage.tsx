@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { orderApi } from '../api/order'
 import { userApi } from '../api/user'
 import type { OrderResponseDto } from '../types/order'
@@ -10,6 +10,7 @@ import Brand from '../components/Brand'
 import '../style/adminOrdersPage.css'
 
 export default function AdminOrdersPage() {
+  const navigate = useNavigate() 
   const [currentUser, setCurrentUser] = useState<UserResponseDto | null>(null)
   const [orders, setOrders] = useState<OrderResponseDto[]>([])
   const [loading, setLoading] = useState(true)
@@ -58,7 +59,6 @@ export default function AdminOrdersPage() {
           data = data.filter((o) => o.status === statusFilter)
         }
       } else {
-        // Теперь здесь тип строго соответствует OrderStatus | undefined
         data = await orderApi.getOrdersAdmin(statusFilter)
       }
 
@@ -73,8 +73,6 @@ export default function AdminOrdersPage() {
   function handleStatusChange(e: React.ChangeEvent<HTMLSelectElement>) {
     const val = e.target.value
     setSelectedStatus(val)
-    
-    // Приводим к типу OrderStatus (или undefined, если выбрано 'all')
     const statusNum = val === 'all' ? undefined : (Number(val) as OrderStatus)
     fetchOrders(statusNum, fromDate, toDate)
   }
@@ -154,10 +152,8 @@ export default function AdminOrdersPage() {
           </span>
         </div>
 
-        {/* Панель фильтров */}
         <div className="filters-card">
           <form onSubmit={handleDateFilterSubmit} className="filters-grid">
-            
             <div className="filter-field">
               <label>Filter by Status</label>
               <select value={selectedStatus} onChange={handleStatusChange}>
@@ -200,7 +196,6 @@ export default function AdminOrdersPage() {
                 </button>
               )}
             </div>
-
           </form>
         </div>
 
@@ -220,15 +215,19 @@ export default function AdminOrdersPage() {
                     <th>User ID</th>
                     <th>Total Amount</th>
                     <th>Status</th>
-                    <th>Items Count</th>
                     <th>Created At</th>
+                    <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {orders.map((order) => {
                     const statusInfo = getStatusLabel(order.status)
                     return (
-                      <tr key={order.id}>
+                      <tr 
+                        key={order.id} 
+                        className="order-row-clickable" 
+                        onClick={() => navigate(`/admin/orders/${order.id}`)} 
+                      >
                         <td className="order-id-cell">{order.id}</td>
                         <td className="order-user-id-cell">{order.userId}</td>
                         <td className="order-amount-cell">${order.totalAmount.toFixed(2)}</td>
@@ -237,8 +236,16 @@ export default function AdminOrdersPage() {
                             {statusInfo.label}
                           </span>
                         </td>
-                        <td>{order.orderItems?.length || 0} items</td>
                         <td className="order-date-cell">{new Date(order.createdAt).toLocaleString()}</td>
+                        <td>
+                          <Link 
+                            to={`/admin/orders/${order.id}`} 
+                            className="button button--quiet"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            Details →
+                          </Link>
+                        </td>
                       </tr>
                     )
                   })}
