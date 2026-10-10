@@ -202,3 +202,12 @@
 .payment-date-cell {
   color: #52525b;
 }
+
+.payment-row-clickable {
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.payment-row-clickable:hover {
+  background-color: #fafafa;
+}

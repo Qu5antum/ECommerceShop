@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { paymentApi } from '../api/payment'
 import { userApi } from '../api/user'
 import type { PaymentResponseDto, PaymentStatisticsDto, PaymentStatus } from '../types/payment'
@@ -10,6 +10,7 @@ import Brand from '../components/Brand'
 import '../style/adminPaymentsPage.css'
 
 export default function AdminPaymentsPage() {
+  const navigate = useNavigate()
   const [currentUser, setCurrentUser] = useState<UserResponseDto | null>(null)
   const [payments, setPayments] = useState<PaymentResponseDto[]>([])
   const [statistics, setStatistics] = useState<PaymentStatisticsDto | null>(null)
@@ -114,7 +115,7 @@ export default function AdminPaymentsPage() {
       <header className="site-header">
         <div className="site-header__inner">
           <Brand />
-          <Link to="user/profile" className="button button--quiet">← Back to Admin Panel</Link>
+          <Link to="/user/profile" className="button button--quiet">← Back to Admin Panel</Link>
         </div>
       </header>
 
@@ -187,13 +188,18 @@ export default function AdminPaymentsPage() {
                     <th>Status</th>
                     <th>Provider ID</th>
                     <th>Created At</th>
+                    <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {payments.map((payment) => {
                     const statusInfo = getStatusLabel(payment.status)
                     return (
-                      <tr key={payment.id}>
+                      <tr 
+                        key={payment.id} 
+                        className="payment-row-clickable"
+                        onClick={() => navigate(`/admin/payments/${payment.id}`)}
+                      >
                         <td className="payment-id-cell">{payment.id}</td>
                         <td className="payment-order-cell">{payment.orderId}</td>
                         <td className="payment-user-cell">{payment.userId}</td>
@@ -208,6 +214,15 @@ export default function AdminPaymentsPage() {
                         </td>
                         <td className="payment-date-cell">
                           {new Date(payment.createdAt).toLocaleString()}
+                        </td>
+                        <td>
+                          <Link 
+                            to={`/admin/payments/${payment.id}`} 
+                            className="button button--quiet"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            Details →
+                          </Link>
                         </td>
                       </tr>
                     )
