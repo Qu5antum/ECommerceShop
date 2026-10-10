@@ -76,4 +76,16 @@ public class PaymentController : ControllerBase
 
         return Ok(statistics);
     }
+
+    [Authorize(Roles = "Admin, Moderator, Manager")]
+    [HttpGet("Payments/Date")]
+    public async Task<IActionResult> GetPaymentsFromDateToDate(DateTime fromDate, DateTime toDate)
+    {
+        var utcFrom = DateTime.SpecifyKind(fromDate, DateTimeKind.Utc);
+        var utcTo = DateTime.SpecifyKind(toDate, DateTimeKind.Utc);
+
+        var payments = await _service.GetPaymentsFromDateToDate(utcFrom, utcTo);
+
+        return Ok(payments);
+    }
 }

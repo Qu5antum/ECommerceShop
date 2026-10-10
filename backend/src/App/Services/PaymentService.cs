@@ -18,6 +18,7 @@ public interface IPaymentService
     Task<List<PaymentResponseDto>> GetPaymentsAdminAsync(PaymentStatus? status = null);
     Task<PaymentResponseDto> GetPaymentAdminAsync(Guid paymentId);
     Task<PaymentStatisticsDto> GetPaymentsStatisticAsync();
+    Task<List<PaymentResponseDto>> GetPaymentsFromDateToDate(DateTime fromDate, DateTime toDate);
 }
 
 
@@ -265,6 +266,7 @@ public class PaymentService : IPaymentService
             _logger.LogInformation("Payment status updated: {paymentId}", payment.Id);
 
             await _cache.RemoveDataAsync(GetPaymentCacheKey(payment.Id));
+            await _cache.RemoveDataAsync(GetPaymentsCacheKey());
             await _cache.RemoveDataAsync(GetPaymentTotalStatisticsCacheKey());
 
             _logger.LogInformation("Payment deleted from redis cache: {paymentId}", payment.Id);
@@ -370,5 +372,21 @@ public class PaymentService : IPaymentService
         );
 
         return stats;
+    }
+
+    public async Task<List<PaymentResponseDto>> GetPaymentsFromDateToDate(DateTime fromDate, DateTime toDate)
+    {
+        var payments = await _paymentRepository.GetPaymentWithDate(fromDate, toDate);
+
+        return payments.Select(payment => new PaymentResponseDto
+        {
+            Id = payment.Id,
+            OrderId = payment.OrderId,
+            Amount = payment.Amount,
+            Status = payment.Status,
+            ProviderPaymentId = payment.ProviderPaymentId,
+            CreatedAt = payment.CreatedAt,
+            UpdatedAt = payment.UpdatedAt
+        }).ToList();
     }
 }
