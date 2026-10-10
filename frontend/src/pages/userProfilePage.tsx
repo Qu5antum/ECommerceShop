@@ -208,6 +208,11 @@ export default function UserProfilePage() {
                             Manage Categories (Admin Panel) →
                         </Link>
                     </div>
+                    <div className="admin-dashboard-link-box" style={{ marginTop: '12px' }}>
+                        <Link to="/admin/products" className="button button--dark" style={{ background: '#7c3aed' }}>
+                            Manage Products (Admin Panel) →
+                        </Link>
+                    </div>
                 </>
             )}
               </div>

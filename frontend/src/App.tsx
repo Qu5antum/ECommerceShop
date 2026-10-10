@@ -18,6 +18,7 @@ import AdminUsersPage from './pages/adminUserPage'
 import AdminUserDetailPage from './pages/adminUserDetailPage'
 import AdminCategoriesPage from './pages/adminCategoriesPage'
 import AdminCategoryDetailPage from './pages/adminCategoryDetailPage'
+import AdminProductsPage from './pages/adminProductsPage'
 
 
 export default function App() {
@@ -43,6 +44,7 @@ export default function App() {
         <Route path="/admin/users/:id" element={<AdminUserDetailPage />} />
         <Route path="/admin/categories" element={<AdminCategoriesPage />} />
         <Route path="/admin/categories/:id" element={<AdminCategoryDetailPage />} />
+        <Route path="/admin/products" element={<AdminProductsPage />} />
         
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
