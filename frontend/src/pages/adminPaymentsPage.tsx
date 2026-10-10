@@ -18,6 +18,8 @@ export default function AdminPaymentsPage() {
   const [error, setError] = useState('')
 
   const [selectedStatus, setSelectedStatus] = useState<string>('all')
+  const [fromDate, setFromDate] = useState<string>('')
+  const [toDate, setToDate] = useState<string>('')
 
   useEffect(() => {
     async function initAdminPayments() {
@@ -35,7 +37,7 @@ export default function AdminPaymentsPage() {
           return
         }
 
-        await fetchData()
+        await fetchPaymentsData()
       } catch (err: any) {
         setError(err.response?.data?.message || err.message || 'Failed to initialize payments page')
         setLoading(false)
@@ -45,15 +47,23 @@ export default function AdminPaymentsPage() {
     initAdminPayments()
   }, [])
 
-  async function fetchData(statusFilter?: PaymentStatus) {
+  async function fetchPaymentsData(statusFilter?: PaymentStatus, start?: string, end?: string) {
     try {
       setLoading(true)
       setError('')
 
-      const [paymentsData, statsData] = await Promise.all([
-        paymentApi.getPaymentsAdmin(statusFilter),
-        paymentApi.getPaymentsStatistics()
-      ])
+      let paymentsData: PaymentResponseDto[] = []
+
+      if (start && end) {
+        paymentsData = await paymentApi.getPaymentsFromDateToDateAdmin(start, end)
+        if (statusFilter !== undefined && !isNaN(statusFilter)) {
+          paymentsData = paymentsData.filter((p) => p.status === statusFilter)
+        }
+      } else {
+        paymentsData = await paymentApi.getPaymentsAdmin(statusFilter)
+      }
+
+      const statsData = await paymentApi.getPaymentsStatistics()
 
       setPayments(paymentsData)
       setStatistics(statsData)
@@ -68,7 +78,20 @@ export default function AdminPaymentsPage() {
     const val = e.target.value
     setSelectedStatus(val)
     const statusNum = val === 'all' ? undefined : (Number(val) as PaymentStatus)
-    fetchData(statusNum)
+    fetchPaymentsData(statusNum, fromDate, toDate)
+  }
+
+  function handleDateFilterSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    const statusNum = selectedStatus === 'all' ? undefined : (Number(selectedStatus) as PaymentStatus)
+    fetchPaymentsData(statusNum, fromDate, toDate)
+  }
+
+  function handleResetFilters() {
+    setSelectedStatus('all')
+    setFromDate('')
+    setToDate('')
+    fetchPaymentsData()
   }
 
   function getStatusLabel(status: PaymentStatus): { label: string; className: string } {
@@ -159,16 +182,47 @@ export default function AdminPaymentsPage() {
         )}
 
         <div className="filters-card">
-          <div className="filter-field">
-            <label>Filter by Payment Status</label>
-            <select value={selectedStatus} onChange={handleStatusChange}>
-              <option value="all">All Statuses</option>
-              <option value={PStatus.Pending}>Pending</option>
-              <option value={PStatus.Succeeded}>Succeeded</option>
-              <option value={PStatus.Failed}>Failed</option>
-              <option value={PStatus.Refunded}>Refunded</option>
-            </select>
-          </div>
+          <form onSubmit={handleDateFilterSubmit} className="filters-grid">
+            <div className="filter-field">
+              <label>Filter by Status</label>
+              <select value={selectedStatus} onChange={handleStatusChange}>
+                <option value="all">All Statuses</option>
+                <option value={PStatus.Pending}>Pending</option>
+                <option value={PStatus.Succeeded}>Succeeded</option>
+                <option value={PStatus.Failed}>Failed</option>
+                <option value={PStatus.Refunded}>Refunded</option>
+              </select>
+            </div>
+
+            <div className="filter-field">
+              <label>From Date</label>
+              <input 
+                type="date" 
+                value={fromDate}
+                onChange={(e) => setFromDate(e.target.value)}
+              />
+            </div>
+
+            <div className="filter-field">
+              <label>To Date</label>
+              <input 
+                type="date" 
+                value={toDate}
+                onChange={(e) => setToDate(e.target.value)}
+              />
+            </div>
+
+            <div className="filter-actions">
+              <button type="submit" className="button button--dark">
+                Apply Dates
+              </button>
+              {(fromDate || toDate || selectedStatus !== 'all') && (
+                <button type="button" className="button button--quiet" onClick={handleResetFilters}>
+                  Reset
+                </button>
+              )}
+            </div>
+          </form>
         </div>
 
         <div className="payments-table-card">

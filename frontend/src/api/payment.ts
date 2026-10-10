@@ -41,4 +41,11 @@ export const paymentApi = {
     const response = await api.get<PaymentStatisticsDto>('/Payment/Payments/Statistics')
     return response.data
   },
+
+  async getPaymentsFromDateToDateAdmin(fromDate: string, toDate: string): Promise<PaymentResponseDto[]> {
+    const response = await api.get<PaymentResponseDto[]>('Payment/Payments/Date', {
+      params: { fromDate, toDate }
+    })
+    return response.data
+  }
 }

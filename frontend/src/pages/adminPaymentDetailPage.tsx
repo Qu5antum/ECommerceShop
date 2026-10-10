@@ -19,7 +19,6 @@ export default function AdminPaymentDetailPage() {
   const [successMessage, setSuccessMessage] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
-  // Поля для формы отправки вебхука
   const [webhookStatus, setWebhookStatus] = useState<PaymentStatus>(PaymentStatus.Succeeded)
   const [providerIdInput, setProviderIdInput] = useState('')
 
@@ -30,7 +29,6 @@ export default function AdminPaymentDetailPage() {
         setLoading(true)
         setError('')
 
-        // 1. Проверяем права доступа (Admin, Manager, Moderator)
         const profile = await userApi.getCurrentUserProfile()
         setCurrentUser(profile)
 
@@ -41,7 +39,6 @@ export default function AdminPaymentDetailPage() {
           return
         }
 
-        // 2. Получаем данные конкретного платежа
         const paymentData = await paymentApi.getPaymentAdmin(id)
         setPayment(paymentData)
         setWebhookStatus(paymentData.status)
@@ -78,7 +75,6 @@ export default function AdminPaymentDetailPage() {
 
       const res = await paymentApi.processWebhook(webhookDto)
 
-      // Обновляем локальное состояние
       setPayment({
         ...payment,
         status: Number(webhookStatus) as PaymentStatus,
@@ -158,7 +154,6 @@ export default function AdminPaymentDetailPage() {
 
         {payment && (
           <div className="payment-detail-grid">
-            {/* Левая колонка: Детали платежа */}
             <div className="detail-card">
               <h2>Payment Specifications</h2>
               <div className="detail-info-list">
@@ -201,7 +196,6 @@ export default function AdminPaymentDetailPage() {
               </div>
             </div>
 
-            {/* Правая колонка: Симуляция / Обработка Webhook */}
             <div className="detail-card">
               <h2>Process Payment Webhook</h2>
               <p className="webhook-description">
