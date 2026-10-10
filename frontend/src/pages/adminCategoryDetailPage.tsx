@@ -19,7 +19,6 @@ export default function AdminCategoryDetailPage() {
   const [successMessage, setSuccessMessage] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
-  // Режим редактирования и поля формы
   const [isEditing, setIsEditing] = useState(false)
   const [title, setTitle] = useState('')
   const [slug, setSlug] = useState('')
@@ -31,7 +30,6 @@ export default function AdminCategoryDetailPage() {
         setLoading(true)
         setError('')
 
-        // 1. Проверяем права пользователя
         const profile = await userApi.getCurrentUserProfile()
         setCurrentUser(profile)
 
@@ -42,7 +40,6 @@ export default function AdminCategoryDetailPage() {
           return
         }
 
-        // 2. Получаем данные категории по ID
         const categoryData = await categoryApi.getCategoryById(id)
         setCategory(categoryData)
         setTitle(categoryData.title)
@@ -73,7 +70,6 @@ export default function AdminCategoryDetailPage() {
 
       await categoryApi.updateCategory(id, updateDto)
 
-      // Обновляем локальное состояние
       setCategory({
         ...category,
         title: title.trim(),

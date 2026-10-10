@@ -22,6 +22,7 @@ import AdminProductsPage from './pages/adminProductsPage'
 import AdminProductDetailPage from './pages/adminProductDetailPage'
 import AdminOrdersPage from './pages/adminOrdersPage'
 import AdminOrderDetailPage from './pages/adminOrderDetailPage'
+import AdminPaymentsPage from './pages/adminPaymentsPage'
 
 
 export default function App() {
@@ -51,6 +52,7 @@ export default function App() {
         <Route path="/admin/products/:id" element={<AdminProductDetailPage />} />
         <Route path="/admin/orders" element={<AdminOrdersPage />} />
         <Route path="/admin/orders/:id" element={<AdminOrderDetailPage />} />
+        <Route path="/admin/payments" element={<AdminPaymentsPage />} />
         
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

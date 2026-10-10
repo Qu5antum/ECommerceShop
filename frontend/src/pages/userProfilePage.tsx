@@ -218,6 +218,11 @@ export default function UserProfilePage() {
                             Manage orders (Admin Panel) →
                         </Link>
                     </div>
+                    <div className="admin-dashboard-link-box" style={{ marginTop: '12px' }}>
+                        <Link to="/admin/payments" className="button button--dark" style={{ background: '#7c3aed' }}>
+                            Manage payments (Admin Panel) →
+                        </Link>
+                    </div>
                 </>
             )}
               </div>
