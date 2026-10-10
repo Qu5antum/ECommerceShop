@@ -44,6 +44,11 @@ public class ReviewService : IReviewService
         return $"review:{reviewId}";
     }
 
+    private static string GetGeneralAnalyticsCacheKey()
+    {
+        return $"analytics:general:all";
+    }
+
     public ReviewService(IReviewRepository reviewRepository, ILogger<ReviewService> logger, IHelperService helper, IUnitOfWork unitOfWork, IRedisCacheService cache)
     {
         _reviewRepository = reviewRepository;
@@ -89,6 +94,7 @@ public class ReviewService : IReviewService
 
             await _cache.RemoveDataAsync(GetReviewsCacheKey(productId));
             await _cache.RemoveDataAsync(GetReviewsCacheKey());
+            await _cache.RemoveDataAsync(GetGeneralAnalyticsCacheKey());
 
             _logger.LogInformation("Reviews deleted from redis cache");
 
@@ -185,6 +191,7 @@ public class ReviewService : IReviewService
 
             await _cache.RemoveDataAsync(GetReviewsCacheKey());
             await _cache.RemoveDataAsync(GetReviewCacheKey(reviewId));
+            await _cache.RemoveDataAsync(GetGeneralAnalyticsCacheKey());
 
             _logger.LogInformation("Reviews delete from redis cache");
 
@@ -251,6 +258,7 @@ public class ReviewService : IReviewService
 
             await _cache.RemoveDataAsync(GetReviewsCacheKey());
             await _cache.RemoveDataAsync(GetReviewCacheKey(reviewId));
+            await _cache.RemoveDataAsync(GetGeneralAnalyticsCacheKey());
 
             _logger.LogInformation("Reviews delete from redis cache");
 

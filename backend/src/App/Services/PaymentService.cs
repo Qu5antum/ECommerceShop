@@ -50,6 +50,11 @@ public class PaymentService : IPaymentService
         return $"payments:total_statistic";
     }
 
+    private static string GetGeneralAnalyticsCacheKey()
+    {
+        return $"analytics:general:all";
+    }
+
     public PaymentService(
         IPaymentRepository paymentRepository, 
         INotificationRepository notificationRepository, 
@@ -115,6 +120,7 @@ public class PaymentService : IPaymentService
             await _cache.RemoveDataAsync(GetPaymentsWithStatusCacheKey(PaymentStatus.Pending));
             await _cache.RemoveDataAsync(GetPaymentsWithStatusCacheKey(PaymentStatus.Failed));
             await _cache.RemoveDataAsync(GetPaymentsWithStatusCacheKey(PaymentStatus.Refunded));
+            await _cache.RemoveDataAsync(GetGeneralAnalyticsCacheKey());
 
             _logger.LogInformation("Payments deleted from redis cache");
 

@@ -38,6 +38,11 @@ public class UserService : IUserService
         return $"user:all";
     }
 
+    private static string GetGeneralAnalyticsCacheKey()
+    {
+        return $"analytics:general:all";
+    }
+
     public UserService(IUserRepository repository, ILogger<UserService> logger, IHelperService helper, IUnitOfWork unitOfWork, IRedisCacheService cache)
     {
         _repository = repository;
@@ -177,6 +182,7 @@ public class UserService : IUserService
             
             await _cache.RemoveDataAsync(GetUsersCachedKey());
             await _cache.RemoveDataAsync(GetUserCacheKeyById(userId));
+            await _cache.RemoveDataAsync(GetGeneralAnalyticsCacheKey());
 
             _logger.LogInformation("User deleted from redis cache: {userId}", userId);
 

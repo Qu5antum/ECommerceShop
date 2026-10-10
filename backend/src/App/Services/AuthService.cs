@@ -9,6 +9,7 @@ using System.Text;
 using Microsoft.IdentityModel.Tokens;
 using App.Enum;
 using App.Transactions;
+using App.Services.Caching;
 
 namespace App.Services;
 
@@ -27,13 +28,20 @@ public class AuthService : IAuthService
     private readonly IConfiguration _configuration;
     private readonly ILogger<AuthService> _logger;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly IRedisCacheService _cache;
 
-    public AuthService(IUserRepository repository, IConfiguration configuration, ILogger<AuthService> logger, IUnitOfWork unitOfWork)
+    private static string GetGeneralAnalyticsCacheKey()
+    {
+        return $"analytics:general:all";
+    }
+
+    public AuthService(IUserRepository repository, IConfiguration configuration, ILogger<AuthService> logger, IUnitOfWork unitOfWork, IRedisCacheService cache)
     {
         _configuration = configuration;
         _repository = repository;
         _logger = logger;
         _unitOfWork = unitOfWork;
+        _cache = cache;
     }
 
     public async Task<bool> RegisterUser(RegisterRequest registerRequest)
@@ -68,15 +76,19 @@ public class AuthService : IAuthService
                 isActive = true
             };
 
+            await _repository.CreateAsync(newUser);
+            await _unitOfWork.SaveChangesAsync();
+            await _unitOfWork.CommitAsync();
+
+            await _cache.RemoveDataAsync(GetGeneralAnalyticsCacheKey());
+
+            _logger.LogInformation("General analytics deleted from redis cache");
+
             _logger.LogInformation(
                 "Creating user: {Email}, IsActive: {IsActive}",
                 newUser.Email,
                 newUser.isActive
             );
-
-            await _repository.CreateAsync(newUser);
-            await _unitOfWork.SaveChangesAsync();
-            await _unitOfWork.CommitAsync();
 
             return true;
         }
@@ -122,15 +134,19 @@ public class AuthService : IAuthService
 
             newUser.AddRole(UserRole.Admin);
 
+            await _repository.CreateAsync(newUser);
+            await _unitOfWork.SaveChangesAsync();
+            await _unitOfWork.CommitAsync();
+
+            await _cache.RemoveDataAsync(GetGeneralAnalyticsCacheKey());
+
+            _logger.LogInformation("General analytics deleted from redis cache");
+
             _logger.LogInformation(
                 "Creating user: {Email}, IsActive: {IsActive}",
                 newUser.Email,
                 newUser.isActive
             );
-
-            await _repository.CreateAsync(newUser);
-            await _unitOfWork.SaveChangesAsync();
-            await _unitOfWork.CommitAsync();
 
             return true;
         }

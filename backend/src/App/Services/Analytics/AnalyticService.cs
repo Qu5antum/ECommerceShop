@@ -1,5 +1,6 @@
 using App.DTOs;
 using App.Repositories;
+using App.Services.Caching;
 
 namespace App.Services.Analtytics;
 
@@ -19,6 +20,12 @@ public class AnalyticService : IAnalyticService
     private readonly IPaymentRepository _paymentRepository;
     private readonly IReviewRepository _reviewRepository;
     private readonly ILogger<AnalyticService> _logger;
+    private readonly IRedisCacheService _cache;
+
+    private static string GetGeneralAnalyticsCacheKey()
+    {
+        return $"analytics:general:all";
+    }
 
     public AnalyticService(
         IUserRepository userRepository,
@@ -27,7 +34,8 @@ public class AnalyticService : IAnalyticService
         IOrderRepository orderRepository,
         IPaymentRepository paymentRepository,
         IReviewRepository reviewRepository,
-        ILogger<AnalyticService> logger)
+        ILogger<AnalyticService> logger,
+        IRedisCacheService cache)
     {
         _userRepository = userRepository;
         _sellerRepository = sellerRepository;
@@ -36,11 +44,21 @@ public class AnalyticService : IAnalyticService
         _paymentRepository = paymentRepository;
         _reviewRepository = reviewRepository;
         _logger = logger;
+        _cache = cache;
     }
 
-    // TODO: add redis cache
     public async Task<GeneralAnalyticsResponseDto> GetGeneralAnalyticsAdminAsync()
     {
+        var cacheKey = GetGeneralAnalyticsCacheKey();
+
+        var cachedGeneralAnalytics = await _cache.GetDataAsync<GeneralAnalyticsResponseDto>(cacheKey);
+
+        if (cachedGeneralAnalytics is not null)
+        {
+            _logger.LogInformation("General analytics retrieved from redis cache");
+            return cachedGeneralAnalytics;
+        }
+
         var usersCount = await _userRepository.GetUsersCountAsync();
         var sellersCount = await _sellerRepository.GetEntitysCountAsync();
         var productsCount = await _productRepository.GetEntitysCountAsync();
@@ -61,6 +79,12 @@ public class AnalyticService : IAnalyticService
             Revenue = totalRevenue,
             Reviews = reviewsCount,
         };
+
+        await _cache.SetDataAsync(
+            cacheKey, 
+            result,
+            TimeSpan.FromMinutes(10)
+        );
 
         _logger.LogInformation("Successfull response of general analytics");
 

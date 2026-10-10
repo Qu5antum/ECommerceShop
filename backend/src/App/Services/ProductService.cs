@@ -64,6 +64,11 @@ public class ProductService : IProductService
         return $"products:{sellerId}";
     }
 
+    private static string GetGeneralAnalyticsCacheKey()
+    {
+        return $"analytics:general:all";
+    }
+
     public ProductService
     (
         IProductRepository productRepository,
@@ -133,13 +138,13 @@ public class ProductService : IProductService
             await _unitOfWork.SaveChangesAsync();
             await _unitOfWork.CommitAsync();
 
-            _logger.LogInformation("Product successfully create: {productId}", newProduct.Id);
-
             await _cache.RemoveDataAsync(GetProductsCacheKey());
             await _cache.RemoveDataAsync(GetProductsOutOfStockCacheyKey(sellerProfile.Id));
             await _cache.RemoveDataAsync(GetProductsOfSellerCacheKey(sellerProfile.Id));
+            await _cache.RemoveDataAsync(GetGeneralAnalyticsCacheKey());
 
             _logger.LogInformation("Products deleted from redis cache");
+            _logger.LogInformation("Product successfully create: {productId}", newProduct.Id);
 
             return new ProductResponseDto
             {
@@ -321,13 +326,13 @@ public class ProductService : IProductService
             await _unitOfWork.SaveChangesAsync();
             await _unitOfWork.CommitAsync();
 
-            _logger.LogInformation("Product successfully deleted");
-
             await _cache.RemoveDataAsync(GetProductsCacheKey());
             await _cache.RemoveDataAsync(GetProductCacheKeyById(productId));
             await _cache.RemoveDataAsync(GetProductsOutOfStockCacheyKey(sellerProfile.Id));
+            await _cache.RemoveDataAsync(GetGeneralAnalyticsCacheKey());
 
             _logger.LogInformation("Products deleted from redis cache");
+            _logger.LogInformation("Product successfully deleted");
 
             return true;
         }
@@ -567,12 +572,12 @@ public class ProductService : IProductService
             await _unitOfWork.SaveChangesAsync();
             await _unitOfWork.CommitAsync();
 
-            _logger.LogInformation("Product successfully deleted: {productId}", productId);
-
             await _cache.RemoveDataAsync(GetProductsCacheKey());
             await _cache.RemoveDataAsync(GetProductCacheKeyById(productId));
+            await _cache.RemoveDataAsync(GetGeneralAnalyticsCacheKey());
 
             _logger.LogInformation("Products deleted from redis cache");
+            _logger.LogInformation("Product successfully deleted: {productId}", productId);
 
             return true;
         }

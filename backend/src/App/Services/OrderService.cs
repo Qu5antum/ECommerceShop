@@ -88,6 +88,11 @@ public class OrderService : IOrderService
         return $"cartItems:{userId}";
     }
 
+    private static string GetGeneralAnalyticsCacheKey()
+    {
+        return $"analytics:general:all";
+    }
+
     public OrderService
     (
         IOrderRepository orderRepository, 
@@ -152,6 +157,14 @@ public class OrderService : IOrderService
             var firstProductId = cartWithItems.Items.First().ProductId;
             var sellerProfileId = productDict[firstProductId].SellerProfileId;
 
+            var sellerUserId = await _sellerRepository.GetUserIdBySellerProfileId(sellerProfileId);
+
+            if (sellerUserId == Guid.Empty)
+            {
+                _logger.LogInformation("User id of seller not found: {sellerId}", sellerProfileId);
+                throw new NotFoundException("User not found by seller");
+            }
+
             foreach (var item in cartWithItems.Items)
             {
                 if (!productDict.TryGetValue(item.ProductId, out var product))
@@ -179,8 +192,6 @@ public class OrderService : IOrderService
 
                 product.Stock -= item.Quantity;
             }
-
-            var sellerUserId = await _sellerRepository.GetUserIdBySellerProfileId(sellerProfileId);
 
             var newOrder = new Order
             {
@@ -239,6 +250,7 @@ public class OrderService : IOrderService
             await _cache.RemoveDataAsync(GetOrdersWithStatusCacheKey(OrderStatus.Delivered));
             await _cache.RemoveDataAsync(GetOrdersWithStatusCacheKey(OrderStatus.Cancelled));
             await _cache.RemoveDataAsync(GetOrdersCacheKey());
+            await _cache.RemoveDataAsync(GetGeneralAnalyticsCacheKey());
 
             _logger.LogInformation("Orders deleted from redis cache: {userId}", userId);
 
@@ -425,6 +437,14 @@ public class OrderService : IOrderService
             var firstProductId = order.orderItems.First().productId;
             var sellerProfileId = productDict[firstProductId].SellerProfileId;
 
+            var sellerUserId = await _sellerRepository.GetUserIdBySellerProfileId(sellerProfileId);
+
+            if (sellerUserId == Guid.Empty)
+            {
+                _logger.LogInformation("User id of seller not found: {sellerId}", sellerProfileId);
+                throw new NotFoundException("User not found by seller");
+            }
+
             foreach (var item in order.orderItems)
             {
                 var product = productDict[item.productId];
@@ -437,15 +457,13 @@ public class OrderService : IOrderService
                 _logger.LogInformation("Product deleted from redis cache: {productId}", product.Id);
             }
 
-            var sellerUserId = await _sellerRepository.GetUserIdBySellerProfileId(sellerProfileId);
-
             order.status = OrderStatus.Cancelled;
             order.UpdatedAt = DateTime.UtcNow;
 
             var notification = new Notification
             {
                 UserId = userId,
-                Title = "New order",
+                Title = "Order cancel",
                 Message = $"Order cancelled: {orderId}",
             };
 
@@ -583,24 +601,37 @@ public class OrderService : IOrderService
         
         try
         {
-            string notificationTitle = string.Empty;
-            string notificationMessage = string.Empty;
+            string notificationTitleForUser = string.Empty;
+            string notificationMessageForUser = string.Empty;
+            string notificationTitleForSeller = string.Empty;
+            string notificationMessageForSeller = string.Empty;
             NotificationType notificationType = NotificationType.General;
+
+            var productIds = order.orderItems.Select(p => p.productId).ToList();
+
+            var products = await _productRepository.GetObjectsByMultipleIdsAsync(productIds);
+
+            if (products.Count() != productIds.Count())
+            {
+                _logger.LogInformation("Some products are missing: {productsIds}", productIds);
+                throw new NotFoundException("Some products are missing");
+            }
+
+            var productDict = products.ToDictionary(p => p.Id);
+            
+            var firstProductId = order.orderItems.First().productId;
+            var sellerProfileId = productDict[firstProductId].SellerProfileId;
+
+            var sellerUserId = await _sellerRepository.GetUserIdBySellerProfileId(sellerProfileId);
+
+            if (sellerUserId == Guid.Empty)
+            {
+                _logger.LogInformation("User id of seller not found: {sellerId}", sellerProfileId);
+                throw new NotFoundException("User not found by seller");
+            }
 
             if (orderStatusDto.Status == OrderStatus.Cancelled)
             {
-                var productIds = order.orderItems.Select(p => p.productId).ToList();
-
-                var products = await _productRepository.GetObjectsByMultipleIdsAsync(productIds);
-
-                if (products.Count() != productIds.Count())
-                {
-                    _logger.LogInformation("Some products are missing: {productsIds}", productIds);
-                    throw new NotFoundException("Some products are missing");
-                }
-
-                var productDict = products.ToDictionary(p => p.Id);
-
                 foreach (var item in order.orderItems)
                 {
                     var product = productDict[item.productId];
@@ -616,8 +647,10 @@ public class OrderService : IOrderService
                 order.status = orderStatusDto.Status;
                 order.UpdatedAt = DateTime.UtcNow;
 
-                notificationTitle = "Order cancelled";
-                notificationMessage = $"You're order cancelled order ID: {orderId}";
+                notificationTitleForUser = "Order cancelled";
+                notificationMessageForUser = $"You're order cancelled order ID: {orderId}";
+                notificationTitleForSeller = "Order cancelled";
+                notificationMessageForSeller = $"Order was cancelled order ID: {orderId}";
                 notificationType = NotificationType.OrderCancelled;
 
                 await _unitOfWork.SaveChangesAsync();
@@ -646,26 +679,41 @@ public class OrderService : IOrderService
 
             else if (orderStatusDto.Status == OrderStatus.Shipped)
             {
-                notificationTitle = "Order shiped";
-                notificationMessage = $"You're order shiped order ID: {orderId}";
+                notificationTitleForUser = "Order shiped";
+                notificationMessageForUser = $"You're order shiped order ID: {orderId}";
+                notificationTitleForSeller = "Order shiped";
+                notificationMessageForSeller = $"Order shiped order ID: {orderId}";
                 notificationType = NotificationType.OrderShipped;
             }
 
             else if (orderStatusDto.Status == OrderStatus.Delivered)
             {
-                notificationTitle = "Order delivered";
-                notificationMessage = $"You're order delivered order ID: {orderId}";
+                notificationTitleForUser = "Order delivered";
+                notificationMessageForUser = $"You're order delivered order ID: {orderId}";
+                notificationTitleForSeller = "Order delivered";
+                notificationMessageForSeller = $"Order delivered order ID: {orderId}";
                 notificationType = NotificationType.OrderShipped;
             }
 
-            var newNotification = new Notification
+            var newNotificationForUser = new Notification
             {
                 UserId = order.userId, 
-                Title = notificationTitle,
-                Message = notificationMessage,
+                Title = notificationTitleForUser,
+                Message = notificationMessageForUser,
                 Type = notificationType,
-                IsRead = false
             };
+
+            await _notificationRepository.CreateAsync(newNotificationForUser);
+
+            var newNotificationForSeller = new Notification
+            {
+                UserId = sellerUserId,
+                Title = notificationTitleForSeller,
+                Message = notificationMessageForSeller,
+                Type = notificationType
+            };
+
+            await _notificationRepository.CreateAsync(newNotificationForSeller);
 
             order.status = orderStatusDto.Status;
             order.UpdatedAt = DateTime.UtcNow;

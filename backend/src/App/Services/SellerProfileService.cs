@@ -53,6 +53,11 @@ public class SellerProfileService : ISellerProfileService
         return $"seller:{sellerId}:preview";
     }
 
+    private static string GetGeneralAnalyticsCacheKey()
+    {
+        return $"analytics:general:all";
+    }
+
     public SellerProfileService(
         ISellerProfileRepository profileRepository, 
         INotificationRepository notificationRepository,
@@ -116,14 +121,15 @@ public class SellerProfileService : ISellerProfileService
             await _unitOfWork.SaveChangesAsync();
             await _unitOfWork.CommitAsync();
 
-            _logger.LogInformation("Seller Prorile created successfully: {profileId}", newSellerProfile.Id);
-
             await _cache.RemoveDataAsync(GetSellerProfileWithStatusCacheyKey(SellerStatus.Approved));
             await _cache.RemoveDataAsync(GetSellerProfileWithStatusCacheyKey(SellerStatus.Pending));
             await _cache.RemoveDataAsync(GetSellerProfileWithStatusCacheyKey(SellerStatus.Rejected));
             await _cache.RemoveDataAsync(GetSellerProfileWithStatusCacheyKey(SellerStatus.Suspended));
+            await _cache.RemoveDataAsync(GetGeneralAnalyticsCacheKey());
 
             _logger.LogInformation("Profile sellers with status delete from redis cache");
+
+            _logger.LogInformation("Seller Prorile created successfully: {profileId}", newSellerProfile.Id);
 
             return new SellerProfileResponseDto
             {
