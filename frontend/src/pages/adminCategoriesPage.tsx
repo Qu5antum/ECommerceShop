@@ -123,7 +123,7 @@ export default function AdminCategoriesPage() {
       <header className="site-header">
         <div className="site-header__inner">
           <Brand />
-          <Link to="/admin/users" className="button button--quiet">← Back to Admin Panel</Link>
+          <Link to="/user/profile" className="button button--quiet">← Back to Admin Panel</Link>
         </div>
       </header>
 

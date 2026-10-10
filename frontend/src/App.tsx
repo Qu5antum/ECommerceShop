@@ -17,6 +17,7 @@ import UserProfilePage from './pages/userProfilePage'
 import AdminUsersPage from './pages/adminUserPage'
 import AdminUserDetailPage from './pages/adminUserDetailPage'
 import AdminCategoriesPage from './pages/adminCategoriesPage'
+import AdminCategoryDetailPage from './pages/adminCategoryDetailPage'
 
 
 export default function App() {
@@ -41,6 +42,7 @@ export default function App() {
         <Route path="/admin/users" element={<AdminUsersPage />} />
         <Route path="/admin/users/:id" element={<AdminUserDetailPage />} />
         <Route path="/admin/categories" element={<AdminCategoriesPage />} />
+        <Route path="/admin/categories/:id" element={<AdminCategoryDetailPage />} />
         
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
