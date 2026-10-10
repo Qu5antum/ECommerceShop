@@ -127,6 +127,8 @@ export default function UserProfilePage() {
 
   if (loading) return <div className="loading">Loading profile...</div>
 
+  const hasManagementAccess = user ? (user.roles & (UserRole.Admin | UserRole.Manager | UserRole.Moderator)) !== 0 : false
+
   return (
     <main className="user-profile-page">
       <header className="site-header">
@@ -190,6 +192,14 @@ export default function UserProfilePage() {
                   <div className="seller-dashboard-link-box" style={{ marginTop: '20px' }}>
                     <Link to="/seller/profile" className="button button--dark">
                       Go to Seller Dashboard →
+                    </Link>
+                  </div>
+                )}
+
+                {hasManagementAccess && (
+                  <div className="admin-dashboard-link-box" style={{ marginTop: '12px' }}>
+                    <Link to="/admin/users" className="button button--dark" style={{ background: '#7c3aed' }}>
+                      Manage Users (Admin Panel) →
                     </Link>
                   </div>
                 )}

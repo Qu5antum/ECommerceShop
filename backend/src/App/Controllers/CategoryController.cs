@@ -18,7 +18,7 @@ public class CategoryController : ControllerBase
         _service = service;
     }
     
-    [Authorize(Roles = "Admin")]
+    [Authorize(Roles = "Admin, Manager")]
     [HttpPost]
     public async Task<IActionResult> CreateCategory(CategoryCreateDto categoryCreateDto)
     {
@@ -27,7 +27,7 @@ public class CategoryController : ControllerBase
         return Ok(category);
     }
 
-    [Authorize(Roles = "Admin")]
+    [Authorize(Roles = "Admin, Manager")]
     [HttpPut]
     public async Task<IActionResult> UpdateCategory(Guid categoryId, CategoryUpdateDto categoryUpdateDto)
     {
@@ -36,7 +36,7 @@ public class CategoryController : ControllerBase
         return Ok("Category successfully updated");
     }
     
-    [Authorize(Roles = "Admin")]
+    [Authorize(Roles = "Admin, Manager")]
     [HttpDelete]
     public async Task<IActionResult> DeleteCategory(Guid categoryId)
     {

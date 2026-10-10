@@ -24,8 +24,8 @@ public class UserController : ControllerBase{
         _validator = validator;
     }
     
-    [Authorize(Roles = "Admin, Moderator")]
-    [HttpGet("/Admin/Users")]
+    [Authorize(Roles = "Admin, Moderator, Manager")]
+    [HttpGet("Admin/Users")]
     public async Task<IActionResult> GetAllUsersNotAdmin()
     {
         var users = await _userService.GetAllUsersNotAdmin();
@@ -33,7 +33,7 @@ public class UserController : ControllerBase{
         return Ok(users);
     }
 
-    [Authorize(Roles = "Admin, Moderator")]
+    [Authorize(Roles = "Admin, Moderator, Manager")]
     [HttpGet("Admin/{userId:guid}")]
     public async Task<IActionResult> GetUserById(Guid userId)
     {
@@ -80,7 +80,7 @@ public class UserController : ControllerBase{
     }
 
 
-    [Authorize(Roles = "Admin, Moderator")]
+    [Authorize(Roles = "Admin, Moderator, Manager")]
     [HttpDelete("Admin/{userId:guid}")]
     public async Task<IActionResult> DeleteUser(Guid userId)
     {
@@ -89,7 +89,7 @@ public class UserController : ControllerBase{
         return Ok("User successfully deleted");
     }
 
-    [Authorize(Roles = "Admin, Moderator")]
+    [Authorize(Roles = "Admin, Moderator, Manager")]
     [HttpPut("Admin/{userId:guid}/ActiveStatus")]
     public async Task<IActionResult> ActivateOrDiactivateUser(Guid userId, bool isActive)
     {
@@ -98,7 +98,7 @@ public class UserController : ControllerBase{
         return Ok("User active status successfully updated");
     }
 
-    [Authorize(Roles = "Admin, Moderator")]
+    [Authorize(Roles = "Admin, Moderator, Manager")]
     [HttpPut("Admin/{userId:guid}/RoleAdd")]
     public async Task<IActionResult> AddRoleToUser(Guid userId, UserRole role)
     {
@@ -107,7 +107,7 @@ public class UserController : ControllerBase{
         return Ok("Successfully added role of user");
     }
 
-    [Authorize(Roles = "Admin, Moderator")]
+    [Authorize(Roles = "Admin, Moderator, Manager")]
     [HttpPut("Admin/{userId:guid}/RoleRemove")]
     public async Task<IActionResult> RemoveRoleToUser(Guid userId, UserRole role)
     {

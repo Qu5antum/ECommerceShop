@@ -122,7 +122,7 @@ public class ProductController : ControllerBase
         return Ok(products);
     }
 
-    [Authorize(Roles = "Admin, Moderator")]
+    [Authorize(Roles = "Admin, Moderator, Manager")]
     [HttpDelete("Admin/{productId:guid}")]
     public async Task<IActionResult> DeleteProductAdmin(Guid productId, CreateNotificationDto createNotificationDto)
     {
