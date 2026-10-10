@@ -18,11 +18,9 @@ export default function AdminUsersPage() {
         setLoading(true)
         setError('')
 
-        // 1. Получаем текущего пользователя для проверки прав
         const profile = await userApi.getCurrentUserProfile()
         setCurrentUser(profile)
 
-        // 2. Проверяем наличие роли Admin, Manager или Moderator (через побитовое И)
         const allowedRoles = UserRole.Admin | UserRole.Manager | UserRole.Moderator
         if (!profile || (profile.roles & allowedRoles) === 0) {
           setError('Access Denied: You do not have permission to view this page.')
@@ -30,7 +28,6 @@ export default function AdminUsersPage() {
           return
         }
 
-        // 3. Если права есть, запрашиваем список пользователей
         const usersData = await userApi.getAllUsersNotAdmin()
         setUsers(usersData)
       } catch (err: any) {
@@ -43,7 +40,6 @@ export default function AdminUsersPage() {
     initAdminPage()
   }, [])
 
-  // Функция для отрисовки ролей пользователя
   function renderRoles(rolesValue: UserRole) {
     const activeRoles: string[] = []
     if ((rolesValue & UserRole.DefaultUser) === UserRole.DefaultUser) activeRoles.push('User')
@@ -65,7 +61,6 @@ export default function AdminUsersPage() {
 
   if (loading) return <div className="loading">Checking permissions and loading users...</div>
 
-  // Если доступ запрещен
   if (error && error.includes('Access Denied')) {
     return (
       <main className="admin-users-page">
@@ -127,7 +122,11 @@ export default function AdminUsersPage() {
                 <tbody>
                   {users.map((u) => (
                     <tr key={u.id}>
-                      <td className="font-weight-bold">{u.userName}</td>
+                      <td className="font-weight-bold">
+                        <Link to={`/admin/users/${u.id}`} className="user-detail-link">
+                          {u.userName}
+                        </Link>
+                      </td>
                       <td>{u.email}</td>
                       <td>{renderRoles(u.roles)}</td>
                       <td>

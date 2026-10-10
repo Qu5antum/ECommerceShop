@@ -84,7 +84,9 @@ public class UserController : ControllerBase{
     [HttpDelete("Admin/{userId:guid}")]
     public async Task<IActionResult> DeleteUser(Guid userId)
     {
-        await _userService.DeleteUserAsync(userId);
+        Guid currentUserId = _helper.GetUserId();
+
+        await _userService.DeleteUserAsync(currentUserId, userId);
 
         return Ok("User successfully deleted");
     }
@@ -93,7 +95,9 @@ public class UserController : ControllerBase{
     [HttpPut("Admin/{userId:guid}/ActiveStatus")]
     public async Task<IActionResult> ActivateOrDiactivateUser(Guid userId, bool isActive)
     {
-        await _userService.ActivateOrDiactivateUserAsync(userId, isActive);
+        Guid currentUserId = _helper.GetUserId();
+
+        await _userService.ActivateOrDiactivateUserAsync(currentUserId, userId, isActive);
 
         return Ok("User active status successfully updated");
     }
@@ -102,7 +106,9 @@ public class UserController : ControllerBase{
     [HttpPut("Admin/{userId:guid}/RoleAdd")]
     public async Task<IActionResult> AddRoleToUser(Guid userId, UserRole role)
     {
-        await _userService.AddRoleToUserAsync(userId, role);
+        Guid currentUserId = _helper.GetUserId();
+
+        await _userService.AddRoleToUserAsync(currentUserId, userId, role);
 
         return Ok("Successfully added role of user");
     }
@@ -111,7 +117,9 @@ public class UserController : ControllerBase{
     [HttpPut("Admin/{userId:guid}/RoleRemove")]
     public async Task<IActionResult> RemoveRoleToUser(Guid userId, UserRole role)
     {
-        await _userService.RemoveRoleFromUserAsync(userId, role);
+        Guid currentUserId = _helper.GetUserId();
+
+        await _userService.RemoveRoleFromUserAsync(currentUserId, userId, role);
 
         return Ok("Successfully removed role of user");
     }

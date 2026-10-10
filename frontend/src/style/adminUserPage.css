@@ -115,6 +115,16 @@
   text-transform: uppercase;
 }
 
+.user-detail-link {
+  color: #2563eb;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.user-detail-link:hover {
+  text-decoration: underline;
+}
+
 .role-admin { background: #fee2e2; color: #991b1b; }
 .role-seller { background: #fef3c7; color: #b45309; }
 .role-manager { background: #e0e7ff; color: #3730a3; }

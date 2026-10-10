@@ -15,10 +15,10 @@ public interface IUserService
     Task<UserResponseDto> GetUserById(Guid userId);
     Task<List<UserResponseDto>> GetAllUsersNotAdmin();
     Task<bool> UpdateUserProfile(Guid userId, UserUpdateDto userUpdateDto);
-    Task<bool> DeleteUserAsync(Guid userId);
-    Task<bool> ActivateOrDiactivateUserAsync(Guid userId, bool isActive);
-    Task<bool> AddRoleToUserAsync(Guid userId, UserRole role);
-    Task<bool> RemoveRoleFromUserAsync(Guid userId, UserRole role);
+    Task<bool> DeleteUserAsync(Guid currentUserId, Guid userId);
+    Task<bool> ActivateOrDiactivateUserAsync(Guid currentUserId, Guid userId, bool isActive);
+    Task<bool> AddRoleToUserAsync(Guid currentUserId, Guid userId, UserRole role);
+    Task<bool> RemoveRoleFromUserAsync(Guid currentUserId, Guid userId, UserRole role);
     Task<bool> UpdateUserPasswordAsync(Guid userId, UserPasswordUpdateDto passwordUpdateDto);
 }
 
@@ -212,11 +212,19 @@ public class UserService : IUserService
         }
     }
 
-    public async Task<bool> DeleteUserAsync(Guid userId)
+    public async Task<bool> DeleteUserAsync(Guid currentUserId, Guid userId)
     {
-        await _unitOfWork.BeginTransactionAsync();
+        await _helper.GetUserOr404(currentUserId);
+
+        if (currentUserId == userId)
+        {
+            _logger.LogInformation("User can't delete themself: {userId}", currentUserId);
+            throw new BadRequestException("User can't delete themself");
+        }
 
         var user = await _helper.GetUserOr404(userId);
+
+        await _unitOfWork.BeginTransactionAsync();
 
         try
         {
@@ -242,11 +250,19 @@ public class UserService : IUserService
         }
     }
 
-    public async Task<bool> ActivateOrDiactivateUserAsync(Guid userId, bool isActive)
+    public async Task<bool> ActivateOrDiactivateUserAsync(Guid currentUserId, Guid userId, bool isActive)
     {
-        await _unitOfWork.BeginTransactionAsync();
+        await _helper.GetUserOr404(currentUserId);
+        
+        if (currentUserId == userId)
+        {
+            _logger.LogInformation("User can't activate or diactivate themself: {userId}", currentUserId);
+            throw new BadRequestException("User can't activate or diactivate for themself");
+        }
 
         var user = await _helper.GetUserOr404(userId);
+
+        await _unitOfWork.BeginTransactionAsync();
 
         try
         {
@@ -273,11 +289,19 @@ public class UserService : IUserService
         }
     }
 
-    public async Task<bool> AddRoleToUserAsync(Guid userId, UserRole role)
+    public async Task<bool> AddRoleToUserAsync(Guid currentUserId, Guid userId, UserRole role)
     {
-        await _unitOfWork.BeginTransactionAsync();
+        await _helper.GetUserOr404(currentUserId);
+        
+        if (currentUserId == userId)
+        {
+            _logger.LogInformation("User can't add role for themself: {userId}", currentUserId);
+            throw new BadRequestException("User can't add role for themself");
+        }
 
         var user = await _helper.GetUserOr404(userId);
+
+        await _unitOfWork.BeginTransactionAsync();
 
         try
         {
@@ -304,11 +328,19 @@ public class UserService : IUserService
         }
     }
 
-    public async Task<bool> RemoveRoleFromUserAsync(Guid userId, UserRole role)
+    public async Task<bool> RemoveRoleFromUserAsync(Guid currentUserId, Guid userId, UserRole role)
     {
-        await _unitOfWork.BeginTransactionAsync();
+        await _helper.GetUserOr404(currentUserId);
+        
+        if (currentUserId == userId)
+        {
+            _logger.LogInformation("User can't remove role from themself: {userId}", currentUserId);
+            throw new BadRequestException("User can't remove role from themself");
+        }
 
         var user = await _helper.GetUserOr404(userId);
+
+        await _unitOfWork.BeginTransactionAsync();
 
         try
         {

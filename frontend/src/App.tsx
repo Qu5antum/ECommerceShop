@@ -15,6 +15,7 @@ import SellerOrderItemsDetailPage from './pages/sellerOrderItemsPage'
 import SellerProductsPage from './pages/sellerProductPage'
 import UserProfilePage from './pages/userProfilePage'
 import AdminUsersPage from './pages/adminUserPage'
+import AdminUserDetailPage from './pages/adminUserDetailPage'
 
 
 export default function App() {
@@ -37,6 +38,7 @@ export default function App() {
         <Route path="/seller/products" element={<SellerProductsPage />} />
         <Route path="/user/profile" element={<UserProfilePage />} />
         <Route path="/admin/users" element={<AdminUsersPage />} />
+        <Route path="/admin/users/:id" element={<AdminUserDetailPage />} />
         
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
