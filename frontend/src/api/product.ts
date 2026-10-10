@@ -2,7 +2,8 @@ import api from './client';
 import type { 
   ProductResponseDto, 
   ProductCreateData, 
-  ProductUpdateData 
+  ProductUpdateData,
+  CreateNotificationDto
 } from '../types/product'
 
 export const productApi = {
@@ -101,8 +102,10 @@ export const productApi = {
     return response.data
   },
 
-  async deleteProductAdmin(productId: string): Promise<string> {
-    const response = await api.delete<string>(`/Product/Admin/${productId}`)
+  async deleteProductAdmin(productId: string, notificationDto: CreateNotificationDto): Promise<string> {
+    const response = await api.delete<string>(`/Product/Admin/${productId}`, {
+      data: notificationDto
+    })
     return response.data
   },
 

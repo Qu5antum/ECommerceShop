@@ -31,3 +31,8 @@ export interface ProductUpdateData {
   sku?: string | null
   stock?: number | null
 }
+
+export interface CreateNotificationDto {
+  title: string
+  message: string
+}
