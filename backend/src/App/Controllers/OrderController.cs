@@ -123,7 +123,10 @@ public class OrderController : ControllerBase
     [HttpGet("Admin/Date")]
     public async Task<IActionResult> GetOrdersFromDateToDate(DateTime fromDate, DateTime toDate)
     {
-        var products = await _service.GetOrdersFromDateToDateAsync(fromDate, toDate);
+        var utcFrom = DateTime.SpecifyKind(fromDate, DateTimeKind.Utc);
+        var utcTo = DateTime.SpecifyKind(toDate, DateTimeKind.Utc);
+
+        var products = await _service.GetOrdersFromDateToDateAsync(utcFrom, utcTo);
 
         return Ok(products);
     }
