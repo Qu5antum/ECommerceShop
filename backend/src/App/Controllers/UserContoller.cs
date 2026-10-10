@@ -1,6 +1,5 @@
 using App.DTOs;
 using App.Enum;
-using App.Repositories;
 using App.Services;
 using FluentValidation;
 using Microsoft.AspNetCore.Authorization;

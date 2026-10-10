@@ -197,12 +197,19 @@ export default function UserProfilePage() {
                 )}
 
                 {hasManagementAccess && (
-                  <div className="admin-dashboard-link-box" style={{ marginTop: '12px' }}>
-                    <Link to="/admin/users" className="button button--dark" style={{ background: '#7c3aed' }}>
-                      Manage Users (Admin Panel) →
-                    </Link>
-                  </div>
-                )}
+                <>
+                    <div className="admin-dashboard-link-box" style={{ marginTop: '12px' }}>
+                        <Link to="/admin/users" className="button button--dark" style={{ background: '#7c3aed' }}>
+                            Manage Users (Admin Panel) →
+                        </Link>
+                    </div>
+                    <div className="admin-dashboard-link-box" style={{ marginTop: '12px' }}>
+                        <Link to="/admin/categories" className="button button--dark" style={{ background: '#7c3aed' }}>
+                            Manage Categories (Admin Panel) →
+                        </Link>
+                    </div>
+                </>
+            )}
               </div>
             ) : (
               <form onSubmit={handleUpdate} className="profile-form">
