@@ -1,0 +1,109 @@
+.user-profile-page {
+  padding-bottom: 60px;
+}
+
+.user-profile-container {
+  max-width: 700px;
+  margin: 0 auto;
+  padding: 24px 20px;
+}
+
+.user-profile-container h1 {
+  font-size: 28px;
+  font-weight: 700;
+  margin-bottom: 24px;
+  color: #111;
+}
+
+.profile-card {
+  background: #ffffff;
+  border: 1px solid #e4e4e7;
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
+}
+
+.profile-header-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 20px;
+  border-bottom: 1px solid #f4f4f5;
+  padding-bottom: 16px;
+}
+
+.user-main-info {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.user-main-info h2 {
+  margin: 0;
+  font-size: 22px;
+  color: #09090b;
+}
+
+.profile-details {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.detail-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 14px;
+  padding: 8px 0;
+  border-bottom: 1px solid #fafafa;
+}
+
+.detail-label {
+  color: #71717a;
+  font-weight: 500;
+}
+
+.detail-value {
+  color: #18181b;
+  font-weight: 600;
+}
+
+.roles-badges {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.role-badge {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: #f4f4f5;
+  color: #3f3f46;
+  text-transform: uppercase;
+}
+
+.role-admin { background: #fee2e2; color: #991b1b; }
+.role-seller { background: #fef3c7; color: #b45309; }
+.role-manager { background: #e0e7ff; color: #3730a3; }
+.role-moderator { background: #e6fffa; color: #047481; }
+
+.profile-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 10px;
+}
+
+.form-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 6px;
+}
+
+.form-field small {
+  font-weight: normal;
+  color: #71717a;
+}

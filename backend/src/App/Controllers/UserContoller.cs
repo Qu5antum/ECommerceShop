@@ -1,6 +1,8 @@
 using App.DTOs;
 using App.Enum;
+using App.Repositories;
 using App.Services;
+using FluentValidation;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -13,11 +15,13 @@ namespace App.Controllers;
 public class UserController : ControllerBase{
     private readonly IUserService _userService;
     private readonly Helper _helper;
+    private readonly IValidator<UserPasswordUpdateDto> _validator;
 
-    public UserController(IUserService userService, Helper helper)
+    public UserController(IUserService userService, Helper helper, IValidator<UserPasswordUpdateDto> validator)
     {
         _userService = userService;
         _helper = helper;
+        _validator = validator;
     }
     
     [Authorize(Roles = "Admin, Moderator")]
@@ -38,7 +42,6 @@ public class UserController : ControllerBase{
         return Ok(user);
     }
 
-    [Authorize]
     [HttpPut]
     public async Task<IActionResult> UpdateUserProfile(UserUpdateDto userUpdateDto)
     {
@@ -49,7 +52,6 @@ public class UserController : ControllerBase{
         return Ok("User successfully updated");
     }
 
-    [Authorize]
     [HttpGet("Profile")]
     public async Task<IActionResult> GetCurrentUserProfile()
     {
@@ -59,6 +61,24 @@ public class UserController : ControllerBase{
 
         return Ok(user);
     }
+
+    [HttpPut("ChangePassword")]
+    public async Task<IActionResult> UpdateUserPassword(UserPasswordUpdateDto passwordUpdateDto)
+    {
+        Guid userId = _helper.GetUserId();
+
+        var validationResult = await _validator.ValidateAsync(passwordUpdateDto);
+        
+        if (!validationResult.IsValid)
+        {
+            return BadRequest(validationResult.ToDictionary());
+        }
+
+        await _userService.UpdateUserPasswordAsync(userId, passwordUpdateDto);
+
+        return Ok("Password successfully updated");
+    }
+
 
     [Authorize(Roles = "Admin, Moderator")]
     [HttpDelete("Admin/{userId:guid}")]

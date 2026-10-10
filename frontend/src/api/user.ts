@@ -1,5 +1,5 @@
 import api from './client';
-import type { UserResponseDto, UserUpdateDto } from '../types/user'
+import type { UserResponseDto, UserUpdateDto, UserPasswordUpdateDto } from '../types/user'
 
 export const userApi = {
   async getAllUsersNotAdmin(): Promise<UserResponseDto[]> {
@@ -19,6 +19,11 @@ export const userApi = {
 
   async getCurrentUserProfile(): Promise<UserResponseDto> {
     const response = await api.get<UserResponseDto>('/User/profile')
+    return response.data
+  },
+
+  async changePassword(data: UserPasswordUpdateDto): Promise<string> {
+    const response = await api.put<string>('/User/ChangePassword', data)
     return response.data
   },
 

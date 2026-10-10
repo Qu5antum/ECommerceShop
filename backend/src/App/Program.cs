@@ -137,6 +137,7 @@ builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
 
 // Validator
 builder.Services.AddValidatorsFromAssemblyContaining<UserRegisterDtoValidator>();
+builder.Services.AddValidatorsFromAssemblyContaining<UpdateUserPasswordDtoValidator>();
 
 builder.Services.AddHttpContextAccessor(); 
 builder.Services.AddScoped<Helper>();

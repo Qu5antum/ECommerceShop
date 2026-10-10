@@ -21,7 +21,11 @@ export interface UserResponseDto {
 export interface UserUpdateDto {
   userName?: string | null
   email?: string | null
-  password?: string | null
+}
+
+export interface UserPasswordUpdateDto {
+  password: string
+  confirmPassword?: string
 }
 
 export interface UserPreviewResponseDto {

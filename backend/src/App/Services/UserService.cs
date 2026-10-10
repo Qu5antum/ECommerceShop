@@ -1,6 +1,7 @@
 using App.DTOs;
 using App.Enum;
 using App.Exceptions;
+using App.Models;
 using App.Repositories;
 using App.Services.Caching;
 using App.Transactions;
@@ -18,11 +19,13 @@ public interface IUserService
     Task<bool> ActivateOrDiactivateUserAsync(Guid userId, bool isActive);
     Task<bool> AddRoleToUserAsync(Guid userId, UserRole role);
     Task<bool> RemoveRoleFromUserAsync(Guid userId, UserRole role);
+    Task<bool> UpdateUserPasswordAsync(Guid userId, UserPasswordUpdateDto passwordUpdateDto);
 }
 
 public class UserService : IUserService
 {
     private readonly IUserRepository _repository;
+    private readonly INotificationRepository _notificationRepository;
     private readonly ILogger<UserService> _logger;
     private readonly IHelperService _helper;
     private readonly IUnitOfWork _unitOfWork;
@@ -43,9 +46,16 @@ public class UserService : IUserService
         return $"analytics:general:all";
     }
 
-    public UserService(IUserRepository repository, ILogger<UserService> logger, IHelperService helper, IUnitOfWork unitOfWork, IRedisCacheService cache)
+    public UserService(
+        IUserRepository repository, 
+        ILogger<UserService> logger, 
+        IHelperService helper, 
+        IUnitOfWork unitOfWork, 
+        IRedisCacheService cache,
+        INotificationRepository notificationRepository)
     {
         _repository = repository;
+        _notificationRepository = notificationRepository;
         _logger = logger;
         _helper = helper;
         _unitOfWork = unitOfWork;
@@ -136,10 +146,6 @@ public class UserService : IUserService
         {
             user.Email = userUpdateDto.Email;
         }
-        if (userUpdateDto.Password != null)
-        {
-            user.Password = BCrypt.Net.BCrypt.HashPassword(userUpdateDto.Password);
-        }
 
         try
         {
@@ -163,6 +169,46 @@ public class UserService : IUserService
             await _unitOfWork.RollbackAsync();
             _logger.LogError(ex, "A database error occurred while updating the user: {Message}", ex.Message);
             throw new DatabaseException("Could not update the user profile to the database.");
+        }
+    }
+    
+    public async Task<bool> UpdateUserPasswordAsync(Guid userId, UserPasswordUpdateDto passwordUpdateDto)
+    {
+        var user = await _helper.GetUserOr404(userId);
+        await _unitOfWork.BeginTransactionAsync();
+
+        if (passwordUpdateDto.Password != null)
+        {
+            user.Password = BCrypt.Net.BCrypt.HashPassword(passwordUpdateDto.Password);
+        }
+
+        try
+        {
+            user.UpdatedAt = DateTime.UtcNow;
+
+            var newNotification = new Notification
+            {
+                UserId = userId,
+                Title = "Password update",
+                Message = "Your password successfully updated",
+                Type = NotificationType.System
+            };
+
+            await _notificationRepository.CreateAsync(newNotification);
+
+            await _repository.UpdateAsync(user);
+            await _unitOfWork.SaveChangesAsync();
+            await _unitOfWork.CommitAsync();
+
+            _logger.LogInformation("Password successfully updated: {userId}", userId);
+
+            return true;
+        }
+        catch (DbUpdateException ex)
+        {
+            await _unitOfWork.RollbackAsync();
+            _logger.LogError(ex, "A database error occurred while updating password of user: {Message}", ex.Message);
+            throw new DatabaseException("Could not update the user password to the database.");
         }
     }
 

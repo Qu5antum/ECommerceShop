@@ -164,6 +164,7 @@ export default function MainPage() {
             <Link className="button button--quiet" to="/seller/profile">Sell on Лавка</Link>
             <Link className="button button--quiet" to="/login">Log in</Link>
             <Link className="button button--dark" to="/register">Sign up</Link>
+            <Link className="button button--quiet" to="/user/profile">Profile</Link>
           </div>
         </div>
       </header>
