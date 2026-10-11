@@ -30,6 +30,7 @@ public class ReviewRepository(AppDbContext context) : BaseRepository<Review>(con
                 UpdatedAt = r.UpdatedAt,
                 User = r.User == null ? null : new UserReviewPreviewResponseDto
                 {
+                    Id = r.User.Id,
                     UserName = r.User.UserName
                 }
             })

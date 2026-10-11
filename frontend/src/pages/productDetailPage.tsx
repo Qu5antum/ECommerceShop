@@ -4,9 +4,12 @@ import { productApi } from '../api/product'
 import { reviewApi } from '../api/review'
 import { cartItemApi } from '../api/cart' 
 import { sellerProfileApi } from '../api/seller'
+import { userApi } from '../api/user'
 import type { ProductResponseDto } from '../types/product'
-import type { ReviewResponseDto } from '../types/review'
+import type { ProductReviewsResponseDto } from '../types/review'
 import type { SellerPreviewResponseDto } from '../types/seller'
+import type { UserResponseDto } from '../types/user'
+import { UserRole } from '../types/user'
 import Brand from '../components/Brand'
 
 export default function ProductDetailPage() {
@@ -14,7 +17,9 @@ export default function ProductDetailPage() {
   
   const [product, setProduct] = useState<ProductResponseDto | null>(null)
   const [imageUrl, setImageUrl] = useState<string | null>(null)
-  const [reviews, setReviews] = useState<ReviewResponseDto[]>([])
+  const [reviews, setReviews] = useState<ProductReviewsResponseDto[]>([])
+  const [currentUser, setCurrentUser] = useState<UserResponseDto | null>(null)
+  
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [successMessage, setSuccessMessage] = useState('')
@@ -35,12 +40,16 @@ export default function ProductDetailPage() {
     async function loadProductData() {
       try {
         setLoading(true)
-        const [prodData, reviewsData, imgUrl] = await Promise.all([
+        setError('')
+
+        const [profile, prodData, reviewsData, imgUrl] = await Promise.all([
+          userApi.getCurrentUserProfile().catch(() => null),
           productApi.getProductById(id!),
           reviewApi.getReviewsByProduct(id!),
           productApi.getProductImage(id!).catch(() => null)
         ])
         
+        setCurrentUser(profile)
         setProduct(prodData)
         setReviews(reviewsData)
         setImageUrl(imgUrl)
@@ -55,12 +64,13 @@ export default function ProductDetailPage() {
             ])
             setSellerPreview(previewData)
             setSellerImageUrl(avatarUrl)
-          } catch (err) {
+          } catch {
+            // Игнорируем ошибки превью продавца
           }
         }
 
       } catch (err: any) {
-        setError(err.message || 'Failed to load product details')
+        setError(err.response?.data?.message || err.message || 'Failed to load product details')
       } finally {
         setLoading(false)
       }
@@ -93,7 +103,24 @@ export default function ProductDetailPage() {
     try {
       setSubmittingReview(true)
       setError('')
-      const newReview = await reviewApi.createReview(id, { rating, comment })
+      const createdReview = await reviewApi.createReview(id, { rating, comment })
+      
+      const userIdVal = currentUser?.id || ''
+
+      const newReview: ProductReviewsResponseDto = {
+        id: createdReview.id,
+        user: {
+          id: userIdVal,
+          userName: currentUser?.userName || 'You'
+        },
+        rating: createdReview.rating,
+        comment: createdReview.comment,
+        createdAt: typeof createdReview.createdAt === 'string' 
+          ? createdReview.createdAt 
+          : new Date(createdReview.createdAt).toISOString(),
+        updatedAt: createdReview.updatedAt ? String(createdReview.updatedAt) : null
+      }
+
       setReviews([newReview, ...reviews])
       setComment('')
       setRating(5)
@@ -106,10 +133,24 @@ export default function ProductDetailPage() {
 
   async function handleDeleteReview(reviewId: string) {
     try {
-      await reviewApi.deleteReview(reviewId)
+      setError('')
+      const allowedRoles = UserRole.Admin | UserRole.Manager | UserRole.Moderator
+      const isAdminOrManager = currentUser && (currentUser.roles & allowedRoles) !== 0
+
+      // Проверяем, является ли отзыв нашим текущим в локальном стейте
+      const targetReview = reviews.find(r => r.id === reviewId)
+      const reviewUserId = targetReview?.user?.id || (targetReview?.user as any)?.id
+      const isOwner = currentUser && reviewUserId && currentUser.id === reviewUserId
+
+      if (isAdminOrManager && !isOwner) {
+        await reviewApi.deleteReviewByIdAdmin(reviewId)
+      } else {
+        await reviewApi.deleteReview(reviewId)
+      }
+
       setReviews(reviews.filter(r => r.id !== reviewId))
     } catch (err: any) {
-      setError(err.message || 'Failed to delete review')
+      setError(err.response?.data?.message || err.message || 'Failed to delete review')
     }
   }
 
@@ -118,6 +159,9 @@ export default function ProductDetailPage() {
   if (!product) return <div className="loading">Product not found</div>
 
   const sellerProfileId = (product as any).sellerProfileId
+
+  const allowedRoles = UserRole.Admin | UserRole.Manager | UserRole.Moderator
+  const isAdminOrManager = currentUser && (currentUser.roles & allowedRoles) !== 0
 
   return (
     <main className="product-detail-page">
@@ -228,22 +272,37 @@ export default function ProductDetailPage() {
             {reviews.length === 0 ? (
               <p>No reviews yet. Be the first to review!</p>
             ) : (
-              reviews.map((rev) => (
-                <div key={rev.id} className="review-card">
-                  <div className="review-header">
-                    <span className="review-rating">⭐ {rev.rating} / 5</span>
-                    <span className="review-date">{new Date(rev.createdAt).toLocaleDateString()}</span>
+              reviews.map((rev) => {
+                // Универсальная проверка владельца (учитываем как rev.user.Id, так и rev.user.id)
+                const reviewUserId = rev.user?.id || (rev.user as any)?.id
+                const isOwner = Boolean(currentUser && reviewUserId && currentUser.id === reviewUserId)
+                const canDelete = isOwner || isAdminOrManager
+
+                return (
+                  <div key={rev.id} className="review-card">
+                    <div className="review-header">
+                      <div className="review-user-info">
+                        <span className="review-author font-weight-bold">
+                          {rev.user?.userName || 'Anonymous User'}
+                        </span>
+                        <span className="review-rating">⭐ {rev.rating} / 5</span>
+                      </div>
+                      <span className="review-date">{new Date(rev.createdAt).toLocaleDateString()}</span>
+                    </div>
+                    <p className="review-comment">{rev.comment}</p>
+                    
+                    {canDelete && (
+                      <button 
+                        type="button"
+                        className="button button--quiet button--small text-danger" 
+                        onClick={() => handleDeleteReview(rev.id)}
+                      >
+                        {isAdminOrManager && !isOwner ? 'Delete (Admin)' : 'Delete'}
+                      </button>
+                    )}
                   </div>
-                  <p className="review-comment">{rev.comment}</p>
-                  <button 
-                    type="button"
-                    className="button button--quiet button--small text-danger" 
-                    onClick={() => handleDeleteReview(rev.id)}
-                  >
-                    Delete
-                  </button>
-                </div>
-              ))
+                )
+              })
             )}
           </div>
         </section>

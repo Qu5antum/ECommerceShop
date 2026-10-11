@@ -2,7 +2,8 @@ import api from './client'
 import type { 
   CreateReviewDto, 
   UpdateReviewDto, 
-  ReviewResponseDto 
+  ReviewResponseDto,
+  ProductReviewsResponseDto
 } from '../types/review' 
 
 
@@ -22,8 +23,8 @@ export const reviewApi = {
     return response.data
   },
 
-  async getReviewsByProduct(productId: string): Promise<ReviewResponseDto[]> {
-    const response = await api.get<ReviewResponseDto[]>(`/Review/${productId}`)
+  async getReviewsByProduct(productId: string): Promise<ProductReviewsResponseDto[]> {
+    const response = await api.get<ProductReviewsResponseDto[]>(`/Review/${productId}`)
     return response.data
   },
 

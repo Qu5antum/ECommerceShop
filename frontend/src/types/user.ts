@@ -33,3 +33,8 @@ export interface UserPreviewResponseDto {
   userName: string
   email: string
 }
+
+export interface UserReviewPreviewResponseDto {
+  id: string
+  userName: string
+}
