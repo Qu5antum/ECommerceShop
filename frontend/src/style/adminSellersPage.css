@@ -1,0 +1,161 @@
+.admin-sellers-page {
+  padding-bottom: 60px;
+}
+
+.admin-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 24px 20px;
+}
+
+.admin-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.admin-header-row h1 {
+  font-size: 26px;
+  font-weight: 700;
+  margin: 0;
+  color: #111;
+}
+
+.admin-role-indicator {
+  font-size: 13px;
+  color: #52525b;
+  background: #f4f4f5;
+  padding: 6px 12px;
+  border-radius: 8px;
+}
+
+.access-denied-card {
+  background: #fff;
+  border: 1px solid #fecaca;
+  background-color: #fef2f2;
+  border-radius: 12px;
+  padding: 40px;
+  text-align: center;
+  max-width: 500px;
+  margin: 40px auto;
+}
+
+.access-denied-card h2 {
+  color: #991b1b;
+  margin-top: 0;
+  margin-bottom: 10px;
+}
+
+.admin-return-btn {
+  margin-top: 16px;
+}
+
+.filters-card {
+  background: #fff;
+  border: 1px solid #e4e4e7;
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 20px;
+}
+
+.filter-field {
+  max-width: 300px;
+}
+
+.filter-field label {
+  display: block;
+  font-size: 12px;
+  font-weight: 500;
+  margin-bottom: 6px;
+  color: #71717a;
+}
+
+.filter-field select {
+  width: 100%;
+  padding: 9px 12px;
+  border-radius: 8px;
+  border: 1px solid #e4e4e7;
+  background: #fff;
+  font-size: 14px;
+  color: #18181b;
+}
+
+.sellers-table-card {
+  background: #fff;
+  border: 1px solid #e4e4e7;
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
+}
+
+.sellers-table-card h2 {
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0;
+  color: #09090b;
+}
+
+.no-sellers {
+  color: #71717a;
+  font-style: italic;
+  margin-top: 12px;
+}
+
+.table-responsive {
+  overflow-x: auto;
+  margin-top: 16px;
+}
+
+.admin-sellers-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 14px;
+}
+
+.admin-sellers-table th {
+  border-bottom: 1px solid #e4e4e7;
+  padding-bottom: 12px;
+  color: #71717a;
+  font-weight: 600;
+}
+
+.admin-sellers-table td {
+  padding: 14px 12px;
+  border-bottom: 1px solid #f4f4f5;
+  color: #18181b;
+}
+
+.seller-row-clickable {
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.seller-row-clickable:hover {
+  background-color: #fafafa;
+}
+
+.font-weight-bold {
+  font-weight: 600;
+}
+
+.seller-user-cell {
+  font-family: monospace;
+  font-size: 12px;
+  color: #71717a;
+}
+
+.seller-desc-cell {
+  max-width: 300px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: #52525b;
+}
+
+.seller-date-cell {
+  color: #52525b;
+}

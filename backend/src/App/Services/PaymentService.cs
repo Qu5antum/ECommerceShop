@@ -197,7 +197,7 @@ public class PaymentService : IPaymentService
 
         return result;
     }
-
+    
     public async Task<bool> ProcessWebhookAsync(PaymentWebhookDto webhookDto)
     {
         await _unitOfWork.BeginTransactionAsync();
@@ -210,10 +210,16 @@ public class PaymentService : IPaymentService
             throw new NotFoundException("Payment not found");
         }
 
+        if (webhookDto.Status == PaymentStatus.Pending)
+        {
+            _logger.LogInformation("Payment can't be marked as pending status for payment: {payemntId}, Provider ID: {provederId}", payment.Id, webhookDto.ProviderPaymentId);
+            throw new BadHttpRequestException("Payment can't be marked as pending status for payment");
+        }
+
         if (payment.Status == PaymentStatus.Succeeded)
         {
             _logger.LogInformation("Payment already marked as Succeeded. Provider ID: {providerId}", webhookDto.ProviderPaymentId);
-            return true; 
+            throw new BadRequestException("Payment already marked as Succeeded");
         }
 
         var order = await _helper.GetOrderOr404(payment.OrderId);
@@ -243,12 +249,24 @@ public class PaymentService : IPaymentService
                 order.status = OrderStatus.Pending; 
                 order.UpdatedAt = DateTime.UtcNow;
                 
-                _logger.LogWarning("Payment failed via webhook for order ID: {orderId}", order.Id);
+                _logger.LogInformation("Payment failed via webhook for order ID: {orderId}", order.Id);
 
                 notificationTitle = "Payment failed";
                 notificationMessage = $"Payment for order #{order.Id} has failed. Please try again.";
                 notificationType = NotificationType.PaymentFailed;
             }
+            else if (webhookDto.Status == PaymentStatus.Refunded)
+            {
+                order.status = OrderStatus.Cancelled;
+                order.UpdatedAt = DateTime.UtcNow;
+                
+                _logger.LogInformation("Payment has been refunded for order ID: {orderId}", order.Id);
+
+                notificationTitle = "Payment refunded";
+                notificationMessage = $"Payment for order #{order.Id} has been refunded.";
+                notificationType = NotificationType.System;
+            }
+            
 
             var notification = new Notification
             {
@@ -256,7 +274,6 @@ public class PaymentService : IPaymentService
                 Title = notificationTitle,
                 Message = notificationMessage,
                 Type = notificationType,
-                IsRead = false
             };
             
             await _notificationRepository.CreateAsync(notification);

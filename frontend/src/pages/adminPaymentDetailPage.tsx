@@ -41,7 +41,11 @@ export default function AdminPaymentDetailPage() {
 
         const paymentData = await paymentApi.getPaymentAdmin(id)
         setPayment(paymentData)
-        setWebhookStatus(paymentData.status)
+        
+        if (paymentData.status !== PaymentStatus.Pending) {
+          setWebhookStatus(paymentData.status)
+        }
+        
         setProviderIdInput(paymentData.providerPaymentId || '')
       } catch (err: any) {
         setError(err.response?.data?.message || err.message || 'Failed to load payment details')
@@ -221,7 +225,6 @@ export default function AdminPaymentDetailPage() {
                     onChange={(e) => setWebhookStatus(Number(e.target.value) as PaymentStatus)}
                     className="webhook-select"
                   >
-                    <option value={PaymentStatus.Pending}>Pending</option>
                     <option value={PaymentStatus.Succeeded}>Succeeded</option>
                     <option value={PaymentStatus.Failed}>Failed</option>
                     <option value={PaymentStatus.Refunded}>Refunded</option>
