@@ -56,6 +56,16 @@ public class PaymentService : IPaymentService
         return $"analytics:general:all";
     }
 
+    private static string GetOrderCacheKey(Guid orderId)
+    {
+        return $"orders:{orderId}";
+    }
+
+    private static string GetOrdersCacheKey()
+    {
+        return $"orders:all";
+    }
+
     public PaymentService(
         IPaymentRepository paymentRepository, 
         INotificationRepository notificationRepository, 
@@ -266,7 +276,6 @@ public class PaymentService : IPaymentService
                 notificationMessage = $"Payment for order #{order.Id} has been refunded.";
                 notificationType = NotificationType.System;
             }
-            
 
             var notification = new Notification
             {
@@ -285,8 +294,13 @@ public class PaymentService : IPaymentService
             await _cache.RemoveDataAsync(GetPaymentCacheKey(payment.Id));
             await _cache.RemoveDataAsync(GetPaymentsCacheKey());
             await _cache.RemoveDataAsync(GetPaymentTotalStatisticsCacheKey());
-
+            
             _logger.LogInformation("Payment deleted from redis cache: {paymentId}", payment.Id);
+
+            await _cache.RemoveDataAsync(GetOrdersCacheKey());
+            await _cache.RemoveDataAsync(GetOrderCacheKey(order.Id));
+
+            _logger.LogInformation("Order deleted from redis cache: {orderId}", order.Id);
 
             return true;
         }
