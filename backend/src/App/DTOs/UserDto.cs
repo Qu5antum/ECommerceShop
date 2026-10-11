@@ -23,6 +23,12 @@ public class UserPreviewResponseDto
 }
 
 
+public class UserReviewPreviewResponseDto
+{
+    public string UserName { get; set; } = string.Empty;
+}
+
+
 public class UserUpdateDto
 {
     public string? UserName { get; set; }

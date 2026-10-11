@@ -25,3 +25,14 @@ public class ReviewResponseDto
     public DateTime CreatedAt { get; set; }
     public DateTime? UpdatedAt { get; set; }
 }
+
+
+public class ProductReviewsResponseDto
+{
+    public Guid Id { get; set; }
+    public UserReviewPreviewResponseDto? User { get; set; }
+    public int Rating { get; set; }
+    public string Comment { get; set; } = string.Empty;
+    public DateTime CreatedAt { get; set; }
+    public DateTime? UpdatedAt { get; set; }
+}

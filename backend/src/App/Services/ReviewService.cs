@@ -14,7 +14,7 @@ public interface IReviewService
     Task<ReviewResponseDto> CreateReviewAsync(Guid userId, Guid productId, CreateReviewDto createReviewDto);
     Task<bool> UpdateReviewAsync(Guid userId, Guid reviewId, UpdateReviewDto updateReviewDto);
     Task<bool> DeleteReviewAsync(Guid userId, Guid reviewId);
-    Task<List<ReviewResponseDto>> GetReviewsByProductId(Guid productId);
+    Task<List<ProductReviewsResponseDto>> GetReviewsByProductId(Guid productId);
     Task<bool> DeleteReviewAdminAsync(Guid reviewId);
     Task<List<ReviewResponseDto>> GetAllReviewsAdminAsync();
     Task<ReviewResponseDto> GetReviewByIdAdminAsync(Guid reviewId);
@@ -207,13 +207,13 @@ public class ReviewService : IReviewService
         }
     }
 
-    public async Task<List<ReviewResponseDto>> GetReviewsByProductId(Guid productId)
+    public async Task<List<ProductReviewsResponseDto>> GetReviewsByProductId(Guid productId)
     {
         await _helper.GetProductOr404(productId);
 
         var cacheKey = GetReviewsCacheKey(productId);
 
-        var cachedReviews = await _cache.GetDataAsync<List<ReviewResponseDto>>(cacheKey);
+        var cachedReviews = await _cache.GetDataAsync<List<ProductReviewsResponseDto>>(cacheKey);
 
         if (cachedReviews is not null)
         {
@@ -223,26 +223,15 @@ public class ReviewService : IReviewService
 
         var reviews = await _reviewRepository.GetReviewsByProductId(productId);
 
-        var result = reviews.Select(review => new ReviewResponseDto
-        {
-            Id = review.Id,
-            UserId = review.UserId,
-            ProductId = review.ProductId,
-            Comment = review.Comment,
-            Rating = review.Rating,
-            CreatedAt = review.CreatedAt,
-            UpdatedAt = review.UpdatedAt
-        }).ToList();
-
         await _cache.SetDataAsync(
             cacheKey,
-            result,
+            reviews,
             TimeSpan.FromMinutes(5)
         );
 
         _logger.LogInformation("Successfull response of reviews by product: {productId}", productId);
         
-        return result;
+        return reviews;
     }
 
     public async Task<bool> DeleteReviewAdminAsync(Guid reviewId)
