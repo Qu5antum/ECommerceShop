@@ -64,8 +64,14 @@ public class CartItemService : ICartItemService
 
         if (cart is null)
         {
-            _logger.LogWarning("Cart not found by this user id: {userId}", userId);
-            throw new NotFoundException("Cart not found");
+            cart = new Cart
+            {
+                UserId = userId
+            };
+
+            await _cartRepository.CreateAsync(cart);
+
+            _logger.LogInformation("Cart created for user {UserId}", userId);
         }
 
         var isProductExistsInCart = await _itemRepository.GetCartItemByProductId(product.Id);
