@@ -65,7 +65,6 @@ export default function ProductDetailPage() {
             setSellerPreview(previewData)
             setSellerImageUrl(avatarUrl)
           } catch {
-            // Игнорируем ошибки превью продавца
           }
         }
 
@@ -137,7 +136,6 @@ export default function ProductDetailPage() {
       const allowedRoles = UserRole.Admin | UserRole.Manager | UserRole.Moderator
       const isAdminOrManager = currentUser && (currentUser.roles & allowedRoles) !== 0
 
-      // Проверяем, является ли отзыв нашим текущим в локальном стейте
       const targetReview = reviews.find(r => r.id === reviewId)
       const reviewUserId = targetReview?.user?.id || (targetReview?.user as any)?.id
       const isOwner = currentUser && reviewUserId && currentUser.id === reviewUserId
@@ -273,7 +271,6 @@ export default function ProductDetailPage() {
               <p>No reviews yet. Be the first to review!</p>
             ) : (
               reviews.map((rev) => {
-                // Универсальная проверка владельца (учитываем как rev.user.Id, так и rev.user.id)
                 const reviewUserId = rev.user?.id || (rev.user as any)?.id
                 const isOwner = Boolean(currentUser && reviewUserId && currentUser.id === reviewUserId)
                 const canDelete = isOwner || isAdminOrManager
