@@ -1,7 +1,17 @@
+using System.Net;
+
 namespace App.Exceptions;
 
 
 public class NotFoundException : Exception
 {
-    public NotFoundException(string message) : base(message) { }
+    public HttpStatusCode StatusCode { get; }
+    
+    public NotFoundException(
+        string message,
+        HttpStatusCode statusCode = HttpStatusCode.NotFound
+    ) : base(message)
+    {
+        StatusCode = statusCode;
+    }
 }

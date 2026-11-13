@@ -1,7 +1,17 @@
+using System.Net;
+
 namespace App.Exceptions;
 
 
 public class AlreadyExistsException : Exception
 {
-    public AlreadyExistsException(string message) : base(message) { }
+    public HttpStatusCode StatusCode { get; }
+
+    public AlreadyExistsException(
+        string message,
+        HttpStatusCode statusCode = HttpStatusCode.Conflict
+    ) : base(message)
+    {
+        StatusCode = statusCode;
+    }
 }

@@ -12,6 +12,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
+using App.Exceptions;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -144,9 +145,15 @@ builder.Services.AddScoped<Helper>();
 
 var app = builder.Build();
 
+app.UseMiddleware<ExceptionHandlingMiddleware>();
+
+if (app.Environment.IsDevelopment())
+{
+    app.UseSwagger();
+    app.UseSwaggerUI();
+}
+
 app.UseStaticFiles();
-app.UseSwagger();
-app.UseSwaggerUI();
 
 app.UseHttpsRedirection();
 app.UseStaticFiles();

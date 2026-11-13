@@ -1,7 +1,17 @@
+using System.Net;
+
 namespace App.Exceptions;
 
 
 public class AccessDeniedException : Exception
 {
-    public AccessDeniedException(string message) : base(message) { }
+    public HttpStatusCode StatusCode { get; }
+
+    public AccessDeniedException(
+        string message,
+        HttpStatusCode statusCode = HttpStatusCode.Forbidden
+    ) : base(message)
+    {
+        StatusCode = statusCode;
+    }
 }
