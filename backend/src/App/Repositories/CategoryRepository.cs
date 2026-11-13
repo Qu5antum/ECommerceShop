@@ -5,14 +5,14 @@ using Microsoft.EntityFrameworkCore;
 namespace App.Repositories;
 
 
-public interface ICategoryRepsitory : IBaseRepository<Category>
+public interface ICategoryRepository : IBaseRepository<Category>
 {
     Task<Category?> GetCategoryByTitle(string Title);
     Task<Category?> GetCategoryBySlug(string Slug);
 }
 
 
-public class CategoryRepository(AppDbContext context) : BaseRepository<Category>(context), ICategoryRepsitory
+public class CategoryRepository(AppDbContext context) : BaseRepository<Category>(context), ICategoryRepository
 {
     private readonly AppDbContext _context = context;
 

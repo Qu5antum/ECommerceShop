@@ -20,7 +20,7 @@ public interface IHelperService
 public class HelperService : IHelperService
 {
     private readonly IUserRepository _userRepository;
-    private readonly ICategoryRepsitory _categoryRepository;
+    private readonly ICategoryRepository _categoryRepository;
     private readonly ISellerProfileRepository _sellerProfileRepository;
     private readonly IProductRepository _productRepository;
     private readonly ICartItemRepository _itemRepository;
@@ -33,7 +33,7 @@ public class HelperService : IHelperService
     public HelperService
     (
         IUserRepository userRepository,
-        ICategoryRepsitory categoryRepsitory,
+        ICategoryRepository categoryRepsitory,
         ISellerProfileRepository sellerProfileRepository,
         IProductRepository productRepository,
         ICartItemRepository itemRepository,

@@ -21,7 +21,7 @@ public interface ICategoryService
 
 public class CategoryService : ICategoryService
 {
-    private readonly ICategoryRepsitory _repository;
+    private readonly ICategoryRepository _repository;
     private readonly ILogger<CategoryService> _logger;
     private readonly IHelperService _helper;
     private readonly IUnitOfWork _unitOfWork;
@@ -32,7 +32,7 @@ public class CategoryService : ICategoryService
         return $"category:{categoryId}";
     }
 
-    public CategoryService(ICategoryRepsitory repsitory, ILogger<CategoryService> logger, IHelperService helper, IUnitOfWork unitOfWork, IRedisCacheService cache)
+    public CategoryService(ICategoryRepository repsitory, ILogger<CategoryService> logger, IHelperService helper, IUnitOfWork unitOfWork, IRedisCacheService cache)
     {
         _repository = repsitory;
         _logger = logger;

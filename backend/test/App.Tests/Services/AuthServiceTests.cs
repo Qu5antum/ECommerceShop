@@ -12,7 +12,7 @@ using App.DTOs;
 
 public class AuthServiceTests
 {
-    private readonly Mock<IUserRepository> _repositoryMock;
+    private readonly Mock<IUserRepository> _authRepositoryMock;
     private readonly Mock<IUnitOfWork> _unitOfWorkMock;
     private readonly Mock<IRedisCacheService> _cacheMock; 
     private readonly Mock<IConfiguration> _configurationMock;
@@ -21,14 +21,14 @@ public class AuthServiceTests
 
     public AuthServiceTests()
     {
-        _repositoryMock = new Mock<IUserRepository>();
+        _authRepositoryMock = new Mock<IUserRepository>();
         _unitOfWorkMock = new Mock<IUnitOfWork>();
         _cacheMock = new Mock<IRedisCacheService>();
         _configurationMock = new Mock<IConfiguration>();
         _loggerMock = new Mock<ILogger<AuthService>>();
 
         _authService = new AuthService(
-            _repositoryMock.Object,
+            _authRepositoryMock.Object,
             _configurationMock.Object,
             _loggerMock.Object,
             _unitOfWorkMock.Object,
@@ -46,17 +46,17 @@ public class AuthServiceTests
             Password = "SecurePassword123"
         };
 
-        _repositoryMock.Setup(r => r.GetUserByEmail(request.Email))
+        _authRepositoryMock.Setup(r => r.GetUserByEmail(request.Email))
             .ReturnsAsync((User?)null);
 
-        _repositoryMock.Setup(r => r.GetUserByUserName(request.UserName))
+        _authRepositoryMock.Setup(r => r.GetUserByUserName(request.UserName))
             .ReturnsAsync((User?)null);
 
         var result = await _authService.RegisterUser(request);
 
         result.Should().BeTrue();
 
-        _repositoryMock.Verify(r => r.CreateAsync(It.IsAny<User>()), Times.Once);
+        _authRepositoryMock.Verify(r => r.CreateAsync(It.IsAny<User>()), Times.Once);
 
         _unitOfWorkMock.Verify(u => u.BeginTransactionAsync(), Times.Once);
         _unitOfWorkMock.Verify(u => u.SaveChangesAsync(), Times.Once);
@@ -75,14 +75,14 @@ public class AuthServiceTests
             Password = "SecurePassword123"
         };
 
-        _repositoryMock.Setup(r => r.GetUserByEmail(request.Email))
+        _authRepositoryMock.Setup(r => r.GetUserByEmail(request.Email))
             .ReturnsAsync(new User { Email = request.Email });
 
         Func<Task> action = async () => await _authService.RegisterUser(request);
 
         await action.Should().ThrowAsync<AlreadyExistsException>();
 
-        _repositoryMock.Verify(r => r.CreateAsync(It.IsAny<User>()), Times.Never);
+        _authRepositoryMock.Verify(r => r.CreateAsync(It.IsAny<User>()), Times.Never);
         
         _unitOfWorkMock.Verify(u => u.CommitAsync(), Times.Never);
     }
@@ -97,7 +97,7 @@ public class AuthServiceTests
             password: password
         );
 
-        _repositoryMock.Setup(r => r.GetUserByEmail(existingUser.Email))
+        _authRepositoryMock.Setup(r => r.GetUserByEmail(existingUser.Email))
             .ReturnsAsync(existingUser);
 
         _configurationMock.Setup(c => c["Jwt:Key"]).Returns("ThisIsAVeryLongSecretKeyForTestingPurposes12345!");
@@ -125,7 +125,7 @@ public class AuthServiceTests
             isActive: false
         );
 
-        _repositoryMock.Setup(r => r.GetUserByEmail(inactiveUser.Email))
+        _authRepositoryMock.Setup(r => r.GetUserByEmail(inactiveUser.Email))
             .ReturnsAsync(inactiveUser);
 
         var request = new LoginRequest
@@ -149,7 +149,7 @@ public class AuthServiceTests
             Password = "Password123"
         };
 
-        _repositoryMock.Setup(r => r.GetUserByEmail(request.Email))
+        _authRepositoryMock.Setup(r => r.GetUserByEmail(request.Email))
             .ReturnsAsync((User?)null);
 
         Func<Task> action = async () => await _authService.LoginUser(request);
@@ -166,8 +166,8 @@ public class AuthServiceTests
             password: "Password123"
         );
 
-        _repositoryMock.Setup(r => r.GetUserByEmail(wrongPasswordUser.Email))
-            .ReturnsAsync((User?)null);
+        _authRepositoryMock.Setup(r => r.GetUserByEmail(wrongPasswordUser.Email))
+            .ReturnsAsync(wrongPasswordUser);
 
         var request = new LoginRequest
         {
