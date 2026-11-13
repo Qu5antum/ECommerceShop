@@ -198,7 +198,6 @@ public class CategoryService : ICategoryService
             _logger.LogError(ex, "Database error while deleting category: {Message}", ex.Message);
             throw new DatabaseException("Database error while deleting category");
         }
-        
     }
 
     public async Task<CategoryResponseDto> GetCategoryByIdAsync(Guid categoryId)

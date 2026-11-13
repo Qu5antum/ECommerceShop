@@ -173,4 +173,90 @@ public class CategoryServiceTests
 
         _unitOfWorkMock.Verify(u => u.CommitAsync(), Times.Never);
     }
+
+    [Fact]
+    public async Task DeleteCategory_ReturnOk()
+    {
+        var CategoryToDelete = CategoryTestHelper.CreateTestCategory();
+
+        _helper.Setup(h => h.GetCategoryOr404(CategoryToDelete.Id))
+            .ReturnsAsync(CategoryToDelete);
+
+        var result = await _categoryService.DeleteCategoryByIdAsync(CategoryToDelete.Id);
+
+        result.Should().BeTrue();
+
+        _categoryRepositoryMock.Verify(r => r.DeleteAsync(It.IsAny<Category>()), Times.Once);
+
+        _unitOfWorkMock.Verify(u => u.BeginTransactionAsync(), Times.Once);
+        _unitOfWorkMock.Verify(u => u.SaveChangesAsync(), Times.Once);
+        _unitOfWorkMock.Verify(u => u.CommitAsync(), Times.Once);
+
+        _cacheMock.Verify(c => c.RemoveDataAsync("categories:all"), Times.Once);
+        _cacheMock.Verify(c => c.RemoveDataAsync($"category:{CategoryToDelete.Id}"), Times.Once);
+    }
+    
+    [Fact]
+    public async Task DeleteCategory_WhenCategoryDoesNotExists_ThrowsNotFoundException()
+    {
+        var categoryId = Guid.NewGuid();
+
+        _helper.Setup(h => h.GetCategoryOr404(categoryId))
+            .ThrowsAsync(new NotFoundException("Category not found"));
+    
+        Func<Task> action = async () => await _categoryService.DeleteCategoryByIdAsync(categoryId);
+
+        await action.Should().ThrowAsync<NotFoundException>()
+            .WithMessage("Category not found");
+
+        _unitOfWorkMock.Verify(u => u.CommitAsync(), Times.Never);
+    }
+
+    [Fact]
+    public async Task GetAllCategoriesAsync_WhenCacheIsEmpty_ReturnsCategoriesFromRepositoryAndCachesThem()
+    {
+        var categoriesFromRepo = new List<Category>
+        {
+            CategoryTestHelper.CreateTestCategory(Title: "Electronics", Slug: "electronics"),
+            CategoryTestHelper.CreateTestCategory(Title: "Clothing", Slug: "clothing")
+        };
+
+        _cacheMock.Setup(c => c.GetDataAsync<List<CategoryResponseDto>>("categories:all"))
+            .ReturnsAsync((List<CategoryResponseDto>?)null);
+
+        _categoryRepositoryMock.Setup(r => r.GetAllAsync())
+            .ReturnsAsync(categoriesFromRepo);
+
+        var result = await _categoryService.GetAllCategoriesAsync();
+
+        result.Should().NotBeNull();
+        result.Should().HaveCount(2);
+        result.Should().Contain(c => c.Title == "Electronics");
+        result.Should().Contain(c => c.Title == "Clothing");
+
+        _cacheMock.Verify(c => c.SetDataAsync(
+            "categories:all", 
+            It.Is<List<CategoryResponseDto>>(list => list.Count == 2), 
+            TimeSpan.FromMinutes(5)
+        ), Times.Once);
+    }
+
+    [Fact]
+    public async Task GetAllCategoriesAsync_WhenCacheExists_ReturnsCachedCategoriesWithoutCallingRepository()
+    {
+        var cachedCategories = new List<CategoryResponseDto>
+        {
+            new() { Id = Guid.NewGuid(), Title = "Cached Category", Slug = "cached-category" }
+        };
+
+        _cacheMock.Setup(c => c.GetDataAsync<List<CategoryResponseDto>>("categories:all"))
+            .ReturnsAsync(cachedCategories);
+
+        var result = await _categoryService.GetAllCategoriesAsync();
+
+        result.Should().NotBeNull();
+        result.Should().BeEquivalentTo(cachedCategories);
+
+        _categoryRepositoryMock.Verify(r => r.GetAllAsync(), Times.Never);
+    }
 }
