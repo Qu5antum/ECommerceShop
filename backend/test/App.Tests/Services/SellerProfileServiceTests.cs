@@ -311,4 +311,68 @@ public class SellerProfileServiceTests
 
         _helper.Verify(h => h.GetSellerProfileOr404(testSellerProfile.Id), Times.Never);
     }
+
+    [Fact]
+public async Task GetSellerProfileImageAsync_WhenImageExists_ReturnsFileStreamAndContentType()
+{
+    var sellerId = Guid.NewGuid();
+    var expectedImageUrl = "uploads/stores/logo.jpg";
+    var expectedContentType = "image/jpeg";
+    
+    Stream expectedStream = new MemoryStream(new byte[] { 1, 2, 3 });
+
+    var testSeller = SellerProfileTestHelper.CreateTestSellerProfile(
+        Id: sellerId,
+        imageUrl: expectedImageUrl
+    );
+
+    _helper.Setup(h => h.GetSellerProfileOr404(sellerId))
+        .ReturnsAsync(testSeller);
+
+    _fileServiceMock.Setup(f => f.GetFileAsync(expectedImageUrl))
+        .ReturnsAsync((expectedStream, expectedContentType));
+
+    var result = await _sellerProfileService.GetSellerProfileImageAsync(sellerId);
+
+    result.Should().NotBeNull();
+    result.Value.ContentType.Should().Be(expectedContentType);
+
+    _fileServiceMock.Verify(f => f.GetFileAsync(expectedImageUrl), Times.Once);
+}
+
+[Fact]
+public async Task GetSellerProfileImageAsync_WhenImageUrlIsNull_ReturnsNull()
+{
+    var sellerId = Guid.NewGuid();
+
+    var testSeller = SellerProfileTestHelper.CreateTestSellerProfile(
+        Id: sellerId,
+        imageUrl: null! 
+    );
+
+    _helper.Setup(h => h.GetSellerProfileOr404(sellerId))
+        .ReturnsAsync(testSeller);
+
+    var result = await _sellerProfileService.GetSellerProfileImageAsync(sellerId);
+
+    result.Should().BeNull();
+
+    _fileServiceMock.Verify(f => f.GetFileAsync(It.IsAny<string>()), Times.Never);
+}
+
+[Fact]
+public async Task GetSellerProfileImageAsync_WhenSellerNotFound_ThrowsNotFoundException()
+{
+    var nonExistentSellerId = Guid.NewGuid();
+
+    _helper.Setup(h => h.GetSellerProfileOr404(nonExistentSellerId))
+        .ThrowsAsync(new NotFoundException("Seller profile not found"));
+
+    Func<Task> action = async () => await _sellerProfileService.GetSellerProfileImageAsync(nonExistentSellerId);
+
+    await action.Should().ThrowAsync<NotFoundException>()
+        .WithMessage("Seller profile not found");
+
+    _fileServiceMock.Verify(f => f.GetFileAsync(It.IsAny<string>()), Times.Never);
+}
 }

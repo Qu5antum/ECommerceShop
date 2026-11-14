@@ -5,6 +5,7 @@ using App.Models;
 public static class SellerProfileTestHelper
 {
     public static SellerProfile CreateTestSellerProfile(
+        Guid? Id = null,
         Guid? userId = null,
         string storeName = "TestStoreName",
         string description = "TestDescription",
@@ -13,6 +14,7 @@ public static class SellerProfileTestHelper
     {
         return new SellerProfile
         {
+            Id = Id ?? Guid.NewGuid(),
             userId = userId ?? Guid.NewGuid(),
             StoreName = storeName,
             Description = description,
