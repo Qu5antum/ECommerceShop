@@ -92,7 +92,7 @@ public class AuthServiceTests
     {
         var password = "SecurePassword123";
         
-        var existingUser = AuthTestHelper.CreateTestAdminUser(
+        var existingUser = AuthTestHelper.CreateTestUser(
             email: "test@example.com", 
             password: password
         );
@@ -119,7 +119,7 @@ public class AuthServiceTests
     [Fact]
     public async Task LoginUser_WhenUserIsInactive_ThrowsUnauthorizedException()
     {
-        var inactiveUser = AuthTestHelper.CreateTestAdminUser(
+        var inactiveUser = AuthTestHelper.CreateTestUser(
             email: "inactive@example.com", 
             password: "Password123", 
             isActive: false
@@ -161,7 +161,7 @@ public class AuthServiceTests
     [Fact]
     public async Task LoginUser_WhenEmailExistsButWrongPassword_ThrowsUnauthorizedException()
     {
-        var wrongPasswordUser = AuthTestHelper.CreateTestAdminUser(
+        var wrongPasswordUser = AuthTestHelper.CreateTestUser(
             email: "test@example.com", 
             password: "Password123"
         );

@@ -138,6 +138,8 @@ public class UserService : IUserService
     {
         var user = await _helper.GetUserOr404(userId);
 
+        await _unitOfWork.BeginTransactionAsync();
+
         if (userUpdateDto.UserName != null)
         {
             user.UserName = userUpdateDto.UserName;

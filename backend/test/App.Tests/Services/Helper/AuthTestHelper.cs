@@ -3,11 +3,12 @@ using App.Enum;
 
 public static class AuthTestHelper
 {
-    public static User CreateTestAdminUser(
+    public static User CreateTestUser(
         string email = "test@example.com",
         string userName = "testuser",
         string password = "SecurePassword123",
-        bool isActive = true)
+        bool isActive = true,
+        UserRole roles = UserRole.DefaultUser)
     {
         return new User
         {
@@ -16,7 +17,7 @@ public static class AuthTestHelper
             Email = email,
             Password = BCrypt.Net.BCrypt.HashPassword(password),
             isActive = isActive,
-            Roles = UserRole.Admin
+            Roles = roles
         };
     }
 }
