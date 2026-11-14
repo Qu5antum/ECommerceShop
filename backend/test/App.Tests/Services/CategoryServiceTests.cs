@@ -16,7 +16,6 @@ public class CategoryServiceTests
     private readonly Mock<ICategoryRepository> _categoryRepositoryMock;
     private readonly Mock<IUnitOfWork> _unitOfWorkMock;
     private readonly Mock<IRedisCacheService> _cacheMock; 
-    private readonly Mock<IConfiguration> _configurationMock;
     private readonly Mock<ILogger<CategoryService>> _loggerMock;
     private readonly Mock<IHelperService> _helper;
     private readonly CategoryService _categoryService;
@@ -26,7 +25,6 @@ public class CategoryServiceTests
         _categoryRepositoryMock = new Mock<ICategoryRepository>();
         _unitOfWorkMock = new Mock<IUnitOfWork>();
         _cacheMock = new Mock<IRedisCacheService>();
-        _configurationMock = new Mock<IConfiguration>();
         _helper = new Mock<IHelperService>();
         _loggerMock = new Mock<ILogger<CategoryService>>();
 

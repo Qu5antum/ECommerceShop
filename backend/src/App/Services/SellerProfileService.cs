@@ -78,8 +78,6 @@ public class SellerProfileService : ISellerProfileService
 
     public async Task<SellerProfileResponseDto> CreateSellerProfileAsync(Guid currentUserId, SellerProfileCreateDto profileCreateDto)
     {
-        await _unitOfWork.BeginTransactionAsync();
-
         string? ImageUrl = null;
 
         var user = await _helper.GetUserOr404(currentUserId);
@@ -91,6 +89,8 @@ public class SellerProfileService : ISellerProfileService
             _logger.LogWarning("User already have seller profile: {userId}", currentUserId);
             throw new AlreadyExistsException("User already have seller profile");
         }
+
+        await _unitOfWork.BeginTransactionAsync();
 
         try
         {
@@ -153,7 +153,6 @@ public class SellerProfileService : ISellerProfileService
 
     public async Task<bool> UpdateSellerProfileAsync(Guid userId, Guid profileId, SellerProfileUpdateDto profileUpdateDto)
     {
-        await _unitOfWork.BeginTransactionAsync();
         await _helper.GetUserOr404(userId);
 
         string? newImageUrl = null;
@@ -170,12 +169,15 @@ public class SellerProfileService : ISellerProfileService
         {
             sellerProfile.StoreName = profileUpdateDto.StoreName;
         }
+
         if(profileUpdateDto.Description != null)
         {
             sellerProfile.Description = profileUpdateDto.Description;
         }
 
         string? oldImageUrl = sellerProfile.ImageUrl;
+
+        await _unitOfWork.BeginTransactionAsync();
 
         try
         {
@@ -227,14 +229,8 @@ public class SellerProfileService : ISellerProfileService
 
     public async Task<SellerProfileResponseDto> GetCurrentUserProfileAsync(Guid userId)
     {
-        var sellerProfile = await _profileRepository.GetSellerProfileByUserIdAsync(userId);
+        await _helper.GetUserOr404(userId);
         
-        if (sellerProfile is null)
-        {
-            _logger.LogWarning("Seller profile not found by user ID: {userId}", userId);
-            throw new NotFoundException("Seller profile not found");
-        }
-
         var cacheKey = GetSellerProfileByUserCacheKey(userId);
 
         var cachedSellerProfile = await _cache.GetDataAsync<SellerProfileResponseDto>(cacheKey);
@@ -243,6 +239,14 @@ public class SellerProfileService : ISellerProfileService
         {
             _logger.LogInformation("Seller profile retrieved from redis cache: {userId}", userId);
             return cachedSellerProfile;
+        }
+
+        var sellerProfile = await _profileRepository.GetSellerProfileByUserIdAsync(userId);
+        
+        if (sellerProfile is null)
+        {
+            _logger.LogWarning("Seller profile not found by user ID: {userId}", userId);
+            throw new NotFoundException("Seller profile not found");
         }
 
         var result = new SellerProfileResponseDto

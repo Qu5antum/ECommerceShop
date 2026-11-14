@@ -1,6 +1,5 @@
 using Moq;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Configuration; 
 
 using App.Repositories;
 using App.Services;
@@ -19,7 +18,6 @@ public class UserServiceTests
     private readonly Mock<INotificationRepository> _notificationRepositoryMock;
     private readonly Mock<IUnitOfWork> _unitOfWorkMock;
     private readonly Mock<IRedisCacheService> _cacheMock; 
-    private readonly Mock<IConfiguration> _configurationMock;
     private readonly Mock<ILogger<UserService>> _loggerMock;
     private readonly Mock<IHelperService> _helper;
     private readonly UserService _userService;
@@ -30,7 +28,6 @@ public class UserServiceTests
         _notificationRepositoryMock = new Mock<INotificationRepository>();
         _unitOfWorkMock = new Mock<IUnitOfWork>();
         _cacheMock = new Mock<IRedisCacheService>();
-        _configurationMock = new Mock<IConfiguration>();
         _loggerMock = new Mock<ILogger<UserService>>();
         _helper = new Mock<IHelperService>();
         
