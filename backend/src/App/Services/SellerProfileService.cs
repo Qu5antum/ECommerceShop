@@ -230,7 +230,7 @@ public class SellerProfileService : ISellerProfileService
     public async Task<SellerProfileResponseDto> GetCurrentUserProfileAsync(Guid userId)
     {
         await _helper.GetUserOr404(userId);
-        
+
         var cacheKey = GetSellerProfileByUserCacheKey(userId);
 
         var cachedSellerProfile = await _cache.GetDataAsync<SellerProfileResponseDto>(cacheKey);
@@ -273,8 +273,6 @@ public class SellerProfileService : ISellerProfileService
     
     public async Task<SellerProfileResponseDto> GetUserSellerProfileAsync(Guid sellerId)
     {
-        var sellerProfile = await _helper.GetSellerProfileOr404(sellerId);
-        
         var cacheKey = GetSellerProfileCacheKey(sellerId);
 
         var cachedSellerProfile = await _cache.GetDataAsync<SellerProfileResponseDto>(cacheKey);
@@ -284,6 +282,8 @@ public class SellerProfileService : ISellerProfileService
             _logger.LogInformation("Seller profile retrieved from redis cache");
             return cachedSellerProfile;
         }
+
+        var sellerProfile = await _helper.GetSellerProfileOr404(sellerId);
 
         var result = new SellerProfileResponseDto
         {
@@ -306,7 +306,8 @@ public class SellerProfileService : ISellerProfileService
 
         return result;
     }
-
+    
+    // TODO: add pagination
     public async Task<List<SellerProfileResponseDto>> GetSellersAsync(SellerStatus status)
     {
         var cacheyKey = GetSellerProfileWithStatusCacheyKey(status);

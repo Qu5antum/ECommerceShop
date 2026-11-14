@@ -261,4 +261,54 @@ public class SellerProfileServiceTests
 
         _sellerProfileRepositoryMock.Verify(r => r.GetSellerProfileByUserIdAsync(testUser.Id), Times.Never);
     }
+
+    [Fact]
+    public async Task GetUserSellerProfile_NotCachedData_Returns()
+    {
+        var testSellerProfile = SellerProfileTestHelper.CreateTestSellerProfile();
+
+        _cacheMock.Setup(c => c.GetDataAsync<SellerProfileResponseDto>($"seller:{testSellerProfile.Id}"))
+            .ReturnsAsync((SellerProfileResponseDto?)null);
+
+        _helper.Setup(h => h.GetSellerProfileOr404(testSellerProfile.Id))
+            .ReturnsAsync(testSellerProfile);
+
+        var result = await _sellerProfileService.GetUserSellerProfileAsync(testSellerProfile.Id);
+
+        result.Should().NotBeNull();
+        
+        _cacheMock.Verify(c => c.SetDataAsync(
+            $"seller:{testSellerProfile.Id}",
+            result,
+            TimeSpan.FromMinutes(5)
+        ), Times.Once);
+    }
+
+    [Fact]
+    public async Task GetUserSellerProfile_ReturnsCachedData()
+    {
+        var testSellerProfile = SellerProfileTestHelper.CreateTestSellerProfile();
+
+        var cachedTestSellerProfile = new SellerProfileResponseDto
+        {
+            Id = testSellerProfile.Id,
+            userId = testSellerProfile.userId,
+            StoreName = testSellerProfile.StoreName,
+            Description = testSellerProfile.Description,
+            ImageUrl = testSellerProfile.ImageUrl,
+            Status = testSellerProfile.Status,
+            CreatedAt = testSellerProfile.CreatedAt,
+            UpdatedAt = testSellerProfile.UpdatedAt
+        };
+        
+        _cacheMock.Setup(c => c.GetDataAsync<SellerProfileResponseDto>($"seller:{testSellerProfile.Id}"))
+            .ReturnsAsync(cachedTestSellerProfile);
+        
+        var result = await _sellerProfileService.GetUserSellerProfileAsync(testSellerProfile.Id);
+
+        result.Should().NotBeNull();
+        result.Should().BeEquivalentTo(cachedTestSellerProfile);
+
+        _helper.Verify(h => h.GetSellerProfileOr404(testSellerProfile.Id), Times.Never);
+    }
 }
