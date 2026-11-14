@@ -1,4 +1,5 @@
 using App.Enum;
+using System.Numerics;
 
 namespace App.Models;
 
@@ -14,4 +15,9 @@ public class User : BaseModel
     public void RemoveRole(UserRole role) => Roles &= ~role;
 
     public bool HasRole(UserRole role) => Roles.HasFlag(role);
+
+    public bool HasOnlyOneRole()
+    {
+        return BitOperations.PopCount((ulong)Roles) <= 1;
+    }
 }

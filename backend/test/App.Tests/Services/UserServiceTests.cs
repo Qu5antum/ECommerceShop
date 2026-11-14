@@ -181,4 +181,202 @@ public class UserServiceTests
         _unitOfWorkMock.Verify(u => u.RollbackAsync(), Times.Once);
         _unitOfWorkMock.Verify(u => u.CommitAsync(), Times.Never);
     }
+
+    [Fact]
+    public async Task DeleteUserByAdmin_ReturnOk()
+    {
+        var testAdminUser = AuthTestHelper.CreateTestUser(roles: UserRole.Admin);
+        var testDefaultUser = AuthTestHelper.CreateTestUser(roles: UserRole.DefaultUser);
+
+        _helper.Setup(h => h.GetUserOr404(testAdminUser.Id))
+            .ReturnsAsync(testAdminUser);
+
+        _helper.Setup(h => h.GetUserOr404(testDefaultUser.Id))
+            .ReturnsAsync(testDefaultUser);
+
+        var result = await _userService.DeleteUserAsync(testAdminUser.Id, testDefaultUser.Id);
+
+        result.Should().BeTrue();
+
+        _userRepositoryMock.Verify(r => r.DeleteAsync(It.IsAny<User>()), Times.Once);
+
+        _unitOfWorkMock.Verify(u => u.BeginTransactionAsync(), Times.Once);
+        _unitOfWorkMock.Verify(u => u.SaveChangesAsync(), Times.Once);
+        _unitOfWorkMock.Verify(u => u.CommitAsync(), Times.Once);
+
+        _cacheMock.Verify(c => c.RemoveDataAsync("user:all"), Times.Once);
+        _cacheMock.Verify(c => c.RemoveDataAsync($"user:{testDefaultUser.Id}"), Times.Once);
+        _cacheMock.Verify(c => c.RemoveDataAsync("analytics:general:all"), Times.Once);
+    }
+
+    [Fact]
+    public async Task DeleteUserAsync_WhenCurrentUserIdEqualsTargetUserId_ThrowsBadRequestException()
+    {
+        var adminId = Guid.NewGuid();
+        
+        var adminUser = new User
+        {
+            Id = adminId,
+            Email = "testadmin@example.com",
+            UserName = "testUserName",
+            Password = "NewSecurePassword123",
+        };
+
+        _helper.Setup(h => h.GetUserOr404(adminId))
+            .ReturnsAsync(adminUser);
+
+        Func<Task> action = async () => await _userService.DeleteUserAsync(adminId, adminId);
+
+        await action.Should().ThrowAsync<BadRequestException>()
+            .WithMessage("User can't delete themself");
+
+        _unitOfWorkMock.Verify(u => u.BeginTransactionAsync(), Times.Never);
+        _userRepositoryMock.Verify(r => r.DeleteAsync(It.IsAny<User>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task ActivateOrDiactivateUser_ReturnsOk()
+    {
+        var testAdminUser = AuthTestHelper.CreateTestUser(roles: UserRole.Admin);
+        var testDefaultUser = AuthTestHelper.CreateTestUser(roles: UserRole.DefaultUser);
+
+        _helper.Setup(h => h.GetUserOr404(testAdminUser.Id))
+            .ReturnsAsync(testAdminUser);
+
+        _helper.Setup(h => h.GetUserOr404(testDefaultUser.Id))
+            .ReturnsAsync(testDefaultUser);
+
+        var result = await _userService.ActivateOrDiactivateUserAsync(
+            testAdminUser.Id,
+            testDefaultUser.Id,
+            false
+        );
+
+        result.Should().BeTrue();
+
+        testDefaultUser.isActive.Should().BeFalse();
+
+        _userRepositoryMock.Verify(r => r.UpdateAsync(It.Is<User>(u => 
+            u.Id == testDefaultUser.Id && u.isActive == false
+        )), Times.Once);
+        
+        _unitOfWorkMock.Verify(u => u.BeginTransactionAsync(), Times.Once);
+        _unitOfWorkMock.Verify(u => u.SaveChangesAsync(), Times.Once);
+        _unitOfWorkMock.Verify(u => u.CommitAsync(), Times.Once);
+
+        _cacheMock.Verify(c => c.RemoveDataAsync("user:all"), Times.Once);
+        _cacheMock.Verify(c => c.RemoveDataAsync($"user:{testDefaultUser.Id}"), Times.Once);
+    }
+    
+    [Fact]
+    public async Task AddRoleToUser_ReturnOk()
+    {
+        var testAdminUser = AuthTestHelper.CreateTestUser(roles: UserRole.Admin);
+        var testDefaultUser = AuthTestHelper.CreateTestUser(roles: UserRole.DefaultUser);
+
+        _helper.Setup(h => h.GetUserOr404(testAdminUser.Id))
+            .ReturnsAsync(testAdminUser);
+
+        _helper.Setup(h => h.GetUserOr404(testDefaultUser.Id))
+            .ReturnsAsync(testDefaultUser);
+
+        var result = await _userService.AddRoleToUserAsync(
+            testAdminUser.Id,
+            testDefaultUser.Id,
+            UserRole.Moderator
+        );
+
+        testDefaultUser.Roles.Should().HaveFlag(UserRole.Moderator);
+
+        _userRepositoryMock.Verify(r => r.UpdateAsync(It.Is<User>(u => 
+            u.Id == testDefaultUser.Id && u.Roles.HasFlag(UserRole.Moderator)
+        )), Times.Once);
+
+        _unitOfWorkMock.Verify(u => u.BeginTransactionAsync(), Times.Once);
+        _unitOfWorkMock.Verify(u => u.SaveChangesAsync(), Times.Once);
+        _unitOfWorkMock.Verify(u => u.CommitAsync(), Times.Once);
+
+        _cacheMock.Verify(c => c.RemoveDataAsync("user:all"), Times.Once);
+        _cacheMock.Verify(c => c.RemoveDataAsync($"user:{testDefaultUser.Id}"), Times.Once);
+    }
+
+    [Fact]
+    public async Task AddRoleToUser_IfUserAlreadyHaveRole_ThrowsBadRequestException()
+    {
+        var testAdminUser = AuthTestHelper.CreateTestUser(roles: UserRole.Admin);
+        var testDefaultUser = AuthTestHelper.CreateTestUser(roles: UserRole.DefaultUser | UserRole.Moderator);
+
+        _helper.Setup(h => h.GetUserOr404(testAdminUser.Id))
+            .ReturnsAsync(testAdminUser);
+
+        _helper.Setup(h => h.GetUserOr404(testDefaultUser.Id))
+            .ReturnsAsync(testDefaultUser);
+
+        Func<Task> action = async () => await _userService.AddRoleToUserAsync(
+            testAdminUser.Id,
+            testDefaultUser.Id,
+            UserRole.Moderator
+        );
+
+        await action.Should().ThrowAsync<BadRequestException>()
+            .WithMessage("User already have this role");
+
+        _unitOfWorkMock.Verify(u => u.BeginTransactionAsync(), Times.Never);
+        _userRepositoryMock.Verify(r => r.UpdateAsync(It.IsAny<User>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task RemoveRoleFromUser_WhenRoleExists_RemovesRoleAndReturnsTrue()
+    {
+        var testAdminUser = AuthTestHelper.CreateTestUser(roles: UserRole.Admin);
+        var testDefaultUser = AuthTestHelper.CreateTestUser(roles: UserRole.DefaultUser | UserRole.Moderator);
+
+        _helper.Setup(h => h.GetUserOr404(testAdminUser.Id))
+            .ReturnsAsync(testAdminUser);
+
+        _helper.Setup(h => h.GetUserOr404(testDefaultUser.Id))
+            .ReturnsAsync(testDefaultUser);
+
+        var result = await _userService.RemoveRoleFromUserAsync(
+            testAdminUser.Id,
+            testDefaultUser.Id,
+            UserRole.Moderator
+        );
+
+        result.Should().BeTrue();
+
+        testDefaultUser.Roles.HasFlag(UserRole.Moderator).Should().BeFalse();
+        testDefaultUser.Roles.HasFlag(UserRole.DefaultUser).Should().BeTrue();
+
+        _userRepositoryMock.Verify(r => r.UpdateAsync(It.Is<User>(u => 
+            u.Id == testDefaultUser.Id && !u.Roles.HasFlag(UserRole.Moderator)
+        )), Times.Once);
+
+        _unitOfWorkMock.Verify(u => u.CommitAsync(), Times.Once);
+    }
+
+    [Fact]
+    public async Task RemoveRoleFromUser_IfHaveOneRoleNotPossibleToDelete_ThrowsBadRequestException()
+    {
+        var testAdminUser = AuthTestHelper.CreateTestUser(roles: UserRole.Admin);
+        var testDefaultUser = AuthTestHelper.CreateTestUser(roles: UserRole.DefaultUser);
+
+        _helper.Setup(h => h.GetUserOr404(testAdminUser.Id))
+            .ReturnsAsync(testAdminUser);
+
+        _helper.Setup(h => h.GetUserOr404(testDefaultUser.Id))
+            .ReturnsAsync(testDefaultUser);
+
+        Func<Task> action = async () => await _userService.RemoveRoleFromUserAsync(
+            testAdminUser.Id,
+            testDefaultUser.Id,
+            UserRole.DefaultUser
+        );
+
+        await action.Should().ThrowAsync<BadRequestException>()
+            .WithMessage("User must have at least one role");
+
+        _unitOfWorkMock.Verify(u => u.BeginTransactionAsync(), Times.Never);
+        _userRepositoryMock.Verify(r => r.UpdateAsync(It.IsAny<User>()), Times.Never);
+    }
 }

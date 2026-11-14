@@ -303,6 +303,12 @@ public class UserService : IUserService
 
         var user = await _helper.GetUserOr404(userId);
 
+        if (user.Roles.HasFlag(role))
+        {
+            _logger.LogWarning("User already have this role: {userId}", userId);
+            throw new BadRequestException("User already have this role");
+        }
+
         await _unitOfWork.BeginTransactionAsync();
 
         try
@@ -336,11 +342,23 @@ public class UserService : IUserService
         
         if (currentUserId == userId)
         {
-            _logger.LogInformation("User can't remove role from themself: {userId}", currentUserId);
+            _logger.LogWarning("User can't remove role from themself: {userId}", currentUserId);
             throw new BadRequestException("User can't remove role from themself");
         }
 
         var user = await _helper.GetUserOr404(userId);
+
+        if (!user.Roles.HasFlag(role))
+        {
+            _logger.LogWarning("User does not have this role: {userId}", userId);
+            throw new BadRequestException("User already does not have this role");
+        }
+
+        if (user.HasOnlyOneRole())
+        {
+           _logger.LogWarning("User can't remove their last remaining role: {userId}", userId);
+            throw new BadRequestException("User must have at least one role");
+        }
 
         await _unitOfWork.BeginTransactionAsync();
 
