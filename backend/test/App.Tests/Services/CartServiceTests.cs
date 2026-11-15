@@ -395,4 +395,120 @@ public class CartServiceTests
             TimeSpan.FromMinutes(5)
         ), Times.Once);
     }
+
+    [Fact]
+    public async Task GetItemInCartByIdAsync_WhenDataIsInCache_ReturnsCachedItemWithoutHittingDatabase()
+    {
+        var userId = Guid.NewGuid();
+        var itemId = Guid.NewGuid();
+
+        var cachedItem = new CartItemResponseDto
+        {
+            Id = itemId,
+            Quantity = 3,
+            ProductId = Guid.NewGuid()
+        };
+
+        _cacheMock.Setup(c => c.GetDataAsync<CartItemResponseDto>($"cartItem:{itemId}"))
+            .ReturnsAsync(cachedItem);
+
+        var result = await _cartItemService.GetItemInCartByIdAsync(userId, itemId);
+
+        result.Should().NotBeNull();
+        result.Should().BeEquivalentTo(cachedItem);
+
+        _helper.Verify(h => h.GetUserOr404(It.IsAny<Guid>()), Times.Never);
+        _cartRepositoryMock.Verify(r => r.GetCartIdByUserId(It.IsAny<Guid>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task GetItemInCartByIdAsync_WhenCartNotFound_ThrowsNotFoundException()
+    {
+        var userId = Guid.NewGuid();
+        var itemId = Guid.NewGuid();
+        var testUser = AuthTestHelper.CreateTestUser(Id: userId);
+
+        _cacheMock.Setup(c => c.GetDataAsync<CartItemResponseDto>($"cartItem:{itemId}"))
+            .ReturnsAsync((CartItemResponseDto?)null);
+
+        _helper.Setup(h => h.GetUserOr404(userId))
+            .ReturnsAsync(testUser);
+
+        _cartRepositoryMock.Setup(r => r.GetCartIdByUserId(userId))
+            .ReturnsAsync(Guid.Empty);
+
+        Func<Task> action = async () => await _cartItemService.GetItemInCartByIdAsync(userId, itemId);
+
+        await action.Should().ThrowAsync<NotFoundException>()
+            .WithMessage("Cart not found");
+
+        _helper.Verify(h => h.GetCartItemOr404(It.IsAny<Guid>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task GetItemInCartByIdAsync_WhenItemDoesNotBelongToUser_ThrowsBadRequestException()
+    {
+        var userId = Guid.NewGuid();
+        var itemId = Guid.NewGuid();
+        
+        var testUser = AuthTestHelper.CreateTestUser(Id: userId);
+        var testCart = CartTestHelper.CreateTestHelper(UserId: userId);
+        
+        var foreignCartItem = CartItemTestHelper.CreateTestCartItem(Id: itemId, CartId: Guid.NewGuid());
+
+        _cacheMock.Setup(c => c.GetDataAsync<CartItemResponseDto>($"cartItem:{itemId}"))
+            .ReturnsAsync((CartItemResponseDto?)null);
+
+        _helper.Setup(h => h.GetUserOr404(userId))
+            .ReturnsAsync(testUser);
+
+        _cartRepositoryMock.Setup(r => r.GetCartIdByUserId(userId))
+            .ReturnsAsync(testCart.Id);
+
+        _helper.Setup(h => h.GetCartItemOr404(itemId))
+            .ReturnsAsync(foreignCartItem);
+
+        Func<Task> action = async () => await _cartItemService.GetItemInCartByIdAsync(userId, itemId);
+
+        await action.Should().ThrowAsync<BadRequestException>()
+            .WithMessage("Cart item does not belong to user");
+
+        _cacheMock.Verify(c => c.SetDataAsync(It.IsAny<string>(), It.IsAny<CartItemResponseDto>(), It.IsAny<TimeSpan>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task GetItemInCartByIdAsync_WhenDataIsNotInCache_FetchesFromDbMapsAndCaches()
+    {
+        var userId = Guid.NewGuid();
+        var itemId = Guid.NewGuid();
+
+        var testUser = AuthTestHelper.CreateTestUser(Id: userId);
+        var testCart = CartTestHelper.CreateTestHelper(UserId: userId);
+        var testCartItem = CartItemTestHelper.CreateTestCartItem(Id: itemId, CartId: testCart.Id, Quantity: 4);
+
+        _cacheMock.Setup(c => c.GetDataAsync<CartItemResponseDto>($"cartItem:{itemId}"))
+            .ReturnsAsync((CartItemResponseDto?)null);
+
+        _helper.Setup(h => h.GetUserOr404(userId))
+            .ReturnsAsync(testUser);
+
+        _cartRepositoryMock.Setup(r => r.GetCartIdByUserId(userId))
+            .ReturnsAsync(testCart.Id);
+
+        _helper.Setup(h => h.GetCartItemOr404(itemId))
+            .ReturnsAsync(testCartItem);
+
+        var result = await _cartItemService.GetItemInCartByIdAsync(userId, itemId);
+
+        result.Should().NotBeNull();
+        result.Id.Should().Be(itemId);
+        result.Quantity.Should().Be(4);
+        result.CartId.Should().Be(testCart.Id);
+
+        _cacheMock.Verify(c => c.SetDataAsync(
+            $"cartItem:{itemId}",
+            It.Is<CartItemResponseDto>(dto => dto.Id == itemId && dto.Quantity == 4),
+            TimeSpan.FromMinutes(5)
+        ), Times.Once);
+    }
 }
