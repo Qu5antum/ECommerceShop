@@ -18,7 +18,7 @@ public interface IProductService
     Task<ProductResponseDto> GetProductByIdAsync(Guid productId);
     Task<List<ProductResponseDto>> GetProductsAsync(int limit = 50, int offset = 0);
     Task<(Stream FileStream, string ContentType)?> GetProductImageAsync(Guid productId);
-    Task<List<ProductResponseDto>> GetProductsByCategoryIdAsync(Guid categoryId);
+    Task<List<ProductResponseDto>> GetProductsByCategoryIdAsync(Guid categoryId, int limit = 50, int offset = 0);
     Task<List<ProductResponseDto>> SearchProductAsync(string productName);
     Task<List<ProductResponseDto>> SearchProductByPriceDesc(string productName);
     Task<List<ProductResponseDto>> SearchProductByPriceAsc(string productName);
@@ -437,7 +437,7 @@ public class ProductService : IProductService
         return await _fileService.GetFileAsync(product.ImageUrl);
     }
 
-    public async Task<List<ProductResponseDto>> GetProductsByCategoryIdAsync(Guid categoryId)
+    public async Task<List<ProductResponseDto>> GetProductsByCategoryIdAsync(Guid categoryId, int limit = 50, int offset = 0)
     {
         await _helper.GetCategoryOr404(categoryId);
 
@@ -451,7 +451,7 @@ public class ProductService : IProductService
             return cachedProducts;
         }
 
-        var products = await _productRepository.GetProductsByCategoryIdAsync(categoryId);
+        var products = await _productRepository.GetProductsByCategoryIdAsync(categoryId, limit, offset);
 
         var result = products.Select(product => new ProductResponseDto
         {

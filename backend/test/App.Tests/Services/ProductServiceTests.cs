@@ -503,4 +503,212 @@ public class ProductServiceTests
             TimeSpan.FromMinutes(5)
         ), Times.Once);
     }
+
+    [Fact]
+    public async Task GetProductImageAsync_WhenImageExists_ReturnsFileStreamAndContentType()
+    {
+        var productId = Guid.NewGuid();
+        var expectedImageUrl = "uploads/products/item.jpg";
+        var expectedContentType = "image/jpeg";
+        
+        Stream expectedStream = new MemoryStream(new byte[] { 10, 20, 30 });
+
+        var testProduct = ProductTestHelper.CreateTestProduct(
+            Id: productId,
+            ImageUrl: expectedImageUrl
+        );
+
+        _helperMock.Setup(h => h.GetProductOr404(productId))
+            .ReturnsAsync(testProduct);
+
+        _fileServiceMock.Setup(f => f.GetFileAsync(expectedImageUrl))
+            .ReturnsAsync((expectedStream, expectedContentType));
+
+        var result = await _productService.GetProductImageAsync(productId);
+
+        result.Should().NotBeNull();
+        result.Value.ContentType.Should().Be(expectedContentType);
+
+        _fileServiceMock.Verify(f => f.GetFileAsync(expectedImageUrl), Times.Once);
+    }
+
+    [Fact]
+    public async Task GetProductImageAsync_WhenImageUrlIsNull_ReturnsNull()
+    {
+        var productId = Guid.NewGuid();
+
+        var testProduct = ProductTestHelper.CreateTestProduct(
+            Id: productId,
+            ImageUrl: null!
+        );
+
+        _helperMock.Setup(h => h.GetProductOr404(productId))
+            .ReturnsAsync(testProduct);
+
+        var result = await _productService.GetProductImageAsync(productId);
+
+        result.Should().BeNull();
+
+        _fileServiceMock.Verify(f => f.GetFileAsync(It.IsAny<string>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task GetProductImageAsync_WhenProductNotFound_ThrowsNotFoundException()
+    {
+        var nonExistentProductId = Guid.NewGuid();
+
+        _helperMock.Setup(h => h.GetProductOr404(nonExistentProductId))
+            .ThrowsAsync(new NotFoundException("Product not found"));
+
+        Func<Task> action = async () => await _productService.GetProductImageAsync(nonExistentProductId);
+
+        await action.Should().ThrowAsync<NotFoundException>()
+            .WithMessage("Product not found");
+
+        _fileServiceMock.Verify(f => f.GetFileAsync(It.IsAny<string>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task GetProductsByCategoryIdAsync_WhenCategoryNotFound_ThrowsNotFoundException()
+    {
+        var categoryId = Guid.NewGuid();
+
+        _helperMock.Setup(h => h.GetCategoryOr404(categoryId))
+            .ThrowsAsync(new NotFoundException("Category not found"));
+
+        Func<Task> action = async () => await _productService.GetProductsByCategoryIdAsync(categoryId);
+
+        await action.Should().ThrowAsync<NotFoundException>()
+            .WithMessage("Category not found");
+
+        _cacheMock.Verify(c => c.GetDataAsync<List<ProductResponseDto>>(It.IsAny<string>()), Times.Never);
+        _productRepositoryMock.Verify(r => r.GetProductsByCategoryIdAsync(It.IsAny<Guid>(), It.IsAny<int>(), It.IsAny<int>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task GetProductsByCategoryIdAsync_WhenDataIsInCache_ReturnsCachedProductsWithoutHittingRepository()
+    {
+        var categoryId = Guid.NewGuid();
+
+        var cachedProducts = new List<ProductResponseDto>
+        {
+            new ProductResponseDto { Id = Guid.NewGuid(), CategoryId = categoryId, Name = "Cached Phone" }
+        };
+
+        _helperMock.Setup(h => h.GetCategoryOr404(categoryId)).ReturnsAsync(new Category());
+
+        _cacheMock.Setup(c => c.GetDataAsync<List<ProductResponseDto>>($"products:{categoryId}"))
+            .ReturnsAsync(cachedProducts);
+
+        var result = await _productService.GetProductsByCategoryIdAsync(categoryId);
+
+        result.Should().NotBeNull();
+        result.Should().BeEquivalentTo(cachedProducts);
+
+        _productRepositoryMock.Verify(r => r.GetProductsByCategoryIdAsync(It.IsAny<Guid>(), It.IsAny<int>(), It.IsAny<int>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task GetProductsByCategoryIdAsync_WhenDataIsNotInCache_FetchesFromRepositoryMapsAndCaches()
+    {
+        var categoryId = Guid.NewGuid();
+
+        var testProducts = new List<Product>
+        {
+            ProductTestHelper.CreateTestProduct(CategoryId: categoryId, Name: "DB Phone 1"),
+            ProductTestHelper.CreateTestProduct(CategoryId: categoryId, Name: "DB Phone 2")
+        };
+
+        _helperMock.Setup(h => h.GetCategoryOr404(categoryId)).ReturnsAsync(new Category());
+
+        _cacheMock.Setup(c => c.GetDataAsync<List<ProductResponseDto>>($"products:{categoryId}"))
+            .ReturnsAsync((List<ProductResponseDto>?)null);
+
+        _productRepositoryMock.Setup(r => r.GetProductsByCategoryIdAsync(categoryId, 50, 0))
+            .ReturnsAsync(testProducts);
+
+        var result = await _productService.GetProductsByCategoryIdAsync(categoryId);
+
+        result.Should().NotBeNull();
+        result.Should().HaveCount(2);
+        result[0].Name.Should().Be("DB Phone 1");
+        result[1].Name.Should().Be("DB Phone 2");
+
+        _productRepositoryMock.Verify(r => r.GetProductsByCategoryIdAsync(categoryId, 50, 0), Times.Once);
+
+        _cacheMock.Verify(c => c.SetDataAsync(
+            $"products:{categoryId}",
+            It.Is<List<ProductResponseDto>>(list => list.Count == 2),
+            TimeSpan.FromMinutes(5)
+        ), Times.Once);
+    }
+
+    [Fact]
+    public async Task SearchProductAsync_WhenProductsExist_ReturnsMappedProductDtos()
+    {
+        var searchTerm = "Gaming";
+        var testProducts = new List<Product>
+        {
+            ProductTestHelper.CreateTestProduct(Name: "Gaming Mouse", Price: 50.00m),
+            ProductTestHelper.CreateTestProduct(Name: "Gaming Keyboard", Price: 120.00m)
+        };
+
+        _productRepositoryMock.Setup(r => r.SearchProductByNameAsync(searchTerm))
+            .ReturnsAsync(testProducts);
+
+        var result = await _productService.SearchProductAsync(searchTerm);
+
+        result.Should().NotBeNull();
+        result.Should().HaveCount(2);
+        result[0].Name.Should().Be("Gaming Mouse");
+        result[1].Name.Should().Be("Gaming Keyboard");
+
+        _productRepositoryMock.Verify(r => r.SearchProductByNameAsync(searchTerm), Times.Once);
+    }
+
+    [Fact]
+    public async Task SearchProductByPriceDesc_WhenProductsExist_ReturnsSortedByPriceDesc()
+    {
+        var searchTerm = "Laptop";
+        var testProducts = new List<Product>
+        {
+            ProductTestHelper.CreateTestProduct(Name: "Pro Laptop", Price: 1500.00m),
+            ProductTestHelper.CreateTestProduct(Name: "Mini Laptop", Price: 800.00m)
+        };
+
+        _productRepositoryMock.Setup(r => r.SearchProductByPriceDesc(searchTerm))
+            .ReturnsAsync(testProducts);
+
+        var result = await _productService.SearchProductByPriceDesc(searchTerm);
+
+        result.Should().NotBeNull();
+        result.Should().HaveCount(2);
+        result[0].Price.Should().Be(1500.00m);
+        result[1].Price.Should().Be(800.00m);
+
+        _productRepositoryMock.Verify(r => r.SearchProductByPriceDesc(searchTerm), Times.Once);
+    }
+
+    [Fact]
+    public async Task SearchProductByPriceAsc_WhenProductsExist_ReturnsSortedByPriceAsc()
+    {
+        var searchTerm = "Headset";
+        var testProducts = new List<Product>
+        {
+            ProductTestHelper.CreateTestProduct(Name: "Basic Headset", Price: 30.00m),
+            ProductTestHelper.CreateTestProduct(Name: "Pro Headset", Price: 90.00m)
+        };
+
+        _productRepositoryMock.Setup(r => r.SearchProductByPriceAsc(searchTerm))
+            .ReturnsAsync(testProducts);
+
+        var result = await _productService.SearchProductByPriceAsc(searchTerm);
+
+        result.Should().NotBeNull();
+        result.Should().HaveCount(2);
+        result[0].Price.Should().Be(30.00m);
+        result[1].Price.Should().Be(90.00m);
+
+        _productRepositoryMock.Verify(r => r.SearchProductByPriceAsc(searchTerm), Times.Once);
+    }
 }

@@ -8,7 +8,7 @@ namespace App.Repositories;
 
 public interface IProductRepository : IBaseRepository<Product>
 {
-    Task<IEnumerable<Product>> GetProductsByCategoryIdAsync(Guid categoryId);
+    Task<IEnumerable<Product>> GetProductsByCategoryIdAsync(Guid categoryId, int limit = 50, int offset = 0);
     Task<IEnumerable<Product>> SearchProductByNameAsync(string Name);
     Task<List<Product>> SearchProductByPriceDesc(string ProductName);
     Task<List<Product>> SearchProductByPriceAsc(string ProductName);
@@ -23,11 +23,14 @@ public class ProductRepository(AppDbContext context) : BaseRepository<Product>(c
 {
     private readonly AppDbContext _context = context;
 
-    public async Task<IEnumerable<Product>> GetProductsByCategoryIdAsync(Guid categoryId)
+    public async Task<IEnumerable<Product>> GetProductsByCategoryIdAsync(Guid categoryId, int limit = 50, int offset = 0)
     {
         return await _context.Products
             .AsNoTracking()
+            .OrderBy(p => p.Id)
             .Where(p => p.CategoryId == categoryId)
+            .Skip(offset)
+            .Take(limit)
             .ToListAsync();
     }
 
