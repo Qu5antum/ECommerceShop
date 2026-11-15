@@ -711,4 +711,256 @@ public class ProductServiceTests
 
         _productRepositoryMock.Verify(r => r.SearchProductByPriceAsc(searchTerm), Times.Once);
     }
+
+    [Fact]
+    public async Task DeleteProductByIdAdminAsync_WhenRequestIsValid_DeletesProductCreatesNotificationAndReturnsTrue()
+    {
+        var productId = Guid.NewGuid();
+        var ownerUserId = Guid.NewGuid();
+        
+        var testProduct = ProductTestHelper.CreateTestProduct(Id: productId);
+        var notificationDto = new CreateNotificationDto
+        {
+            Title = "Product Deleted by Admin",
+            Message = "Your product violated marketplace policies."
+        };
+
+        _helperMock.Setup(h => h.GetProductOr404(productId))
+            .ReturnsAsync(testProduct);
+
+        _productRepositoryMock.Setup(r => r.GetUserIdByProductId(productId))
+            .ReturnsAsync(ownerUserId);
+
+        var result = await _productService.DeleteProductByIdAdminAsync(productId, notificationDto);
+
+        result.Should().BeTrue();
+
+        _notificationRepositoryMock.Verify(n => n.CreateAsync(It.Is<Notification>(notif =>
+            notif.Title == notificationDto.Title &&
+            notif.Message == notificationDto.Message &&
+            notif.UserId == ownerUserId &&
+            notif.Type == NotificationType.System
+        )), Times.Once);
+
+        _unitOfWorkMock.Verify(u => u.BeginTransactionAsync(), Times.Once);
+        _productRepositoryMock.Verify(r => r.DeleteAsync(testProduct), Times.Once);
+        _unitOfWorkMock.Verify(u => u.CommitAsync(), Times.Once);
+
+        _cacheMock.Verify(c => c.RemoveDataAsync(It.IsAny<string>()), Times.AtLeastOnce);
+    }
+
+    [Fact]
+    public async Task DeleteProductByIdAdminAsync_WhenUserIdNotFound_ThrowsNotFoundException()
+    {
+        var productId = Guid.NewGuid();
+        var testProduct = ProductTestHelper.CreateTestProduct(Id: productId);
+        var notificationDto = new CreateNotificationDto { Title = "Test", Message = "Test" };
+
+        _helperMock.Setup(h => h.GetProductOr404(productId))
+            .ReturnsAsync(testProduct);
+
+        _productRepositoryMock.Setup(r => r.GetUserIdByProductId(productId))
+            .ReturnsAsync(Guid.Empty);
+
+        Func<Task> action = async () => await _productService.DeleteProductByIdAdminAsync(productId, notificationDto);
+
+        await action.Should().ThrowAsync<NotFoundException>()
+            .WithMessage("User profile not found");
+
+        _unitOfWorkMock.Verify(u => u.BeginTransactionAsync(), Times.Never);
+        _productRepositoryMock.Verify(r => r.DeleteAsync(It.IsAny<Product>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task DeleteProductByIdAdminAsync_WhenDbUpdateExceptionOccurs_RollbacksTransaction()
+    {
+        var productId = Guid.NewGuid();
+        var ownerUserId = Guid.NewGuid();
+        var testProduct = ProductTestHelper.CreateTestProduct(Id: productId);
+        var notificationDto = new CreateNotificationDto { Title = "Test", Message = "Test" };
+
+        _helperMock.Setup(h => h.GetProductOr404(productId))
+            .ReturnsAsync(testProduct);
+
+        _productRepositoryMock.Setup(r => r.GetUserIdByProductId(productId))
+            .ReturnsAsync(ownerUserId);
+
+        _unitOfWorkMock.Setup(u => u.SaveChangesAsync())
+            .ThrowsAsync(new DbUpdateException("Database constraint violation"));
+
+        Func<Task> action = async () => await _productService.DeleteProductByIdAdminAsync(productId, notificationDto);
+
+        await action.Should().ThrowAsync<DatabaseException>()
+            .WithMessage("Database error while deleting product");
+
+        _unitOfWorkMock.Verify(u => u.RollbackAsync(), Times.Once);
+        _unitOfWorkMock.Verify(u => u.CommitAsync(), Times.Never);
+    }
+
+    [Fact]
+    public async Task GetProductThatOutOfStockAsync_WhenSellerProfileNotFound_ThrowsNotFoundException()
+    {
+        var userId = Guid.NewGuid();
+        var testUser = AuthTestHelper.CreateTestUser(Id: userId);
+
+        _helperMock.Setup(h => h.GetUserOr404(userId))
+            .ReturnsAsync(testUser);
+
+        _sellerProfileRepositoryMock.Setup(r => r.GetSellerProfileByUserIdAsync(userId))
+            .ReturnsAsync((SellerProfile?)null);
+
+        Func<Task> action = async () => await _productService.GetProductThatOutOfStockAsync(userId);
+
+        await action.Should().ThrowAsync<NotFoundException>()
+            .WithMessage("Seller profile not found");
+
+        _cacheMock.Verify(c => c.GetDataAsync<List<ProductResponseDto>>(It.IsAny<string>()), Times.Never);
+        _productRepositoryMock.Verify(r => r.GetProductsOutOfStockAsync(It.IsAny<Guid>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task GetProductThatOutOfStockAsync_WhenDataIsInCache_ReturnsCachedProductsWithoutHittingRepository()
+    {
+        var userId = Guid.NewGuid();
+        var testUser = AuthTestHelper.CreateTestUser(Id: userId);
+        var testSellerProfile = SellerProfileTestHelper.CreateTestSellerProfile(userId: userId);
+
+        var cachedProducts = new List<ProductResponseDto>
+        {
+            new ProductResponseDto { Id = Guid.NewGuid(), SellerProfileId = testSellerProfile.Id, Name = "Out of Stock Item", Stock = 0 }
+        };
+
+        _helperMock.Setup(h => h.GetUserOr404(userId))
+            .ReturnsAsync(testUser);
+
+        _sellerProfileRepositoryMock.Setup(r => r.GetSellerProfileByUserIdAsync(userId))
+            .ReturnsAsync(testSellerProfile);
+
+        _cacheMock.Setup(c => c.GetDataAsync<List<ProductResponseDto>>($"products:{testSellerProfile.Id}:outOfStock"))
+            .ReturnsAsync(cachedProducts);
+
+        var result = await _productService.GetProductThatOutOfStockAsync(userId);
+
+        result.Should().NotBeNull();
+        result.Should().BeEquivalentTo(cachedProducts);
+
+        _productRepositoryMock.Verify(r => r.GetProductsOutOfStockAsync(It.IsAny<Guid>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task GetProductThatOutOfStockAsync_WhenDataIsNotInCache_FetchesFromRepositoryMapsAndCaches()
+    {
+        var userId = Guid.NewGuid();
+        var testUser = AuthTestHelper.CreateTestUser(Id: userId);
+        var testSellerProfile = SellerProfileTestHelper.CreateTestSellerProfile(userId: userId);
+
+        var testProducts = new List<Product>
+        {
+            ProductTestHelper.CreateTestProduct(SellerProfileId: testSellerProfile.Id, Name: "Out of Stock 1", Stock: 0),
+            ProductTestHelper.CreateTestProduct(SellerProfileId: testSellerProfile.Id, Name: "Out of Stock 2", Stock: 0)
+        };
+
+        _helperMock.Setup(h => h.GetUserOr404(userId))
+            .ReturnsAsync(testUser);
+        _sellerProfileRepositoryMock.Setup(r => r.GetSellerProfileByUserIdAsync(userId))
+            .ReturnsAsync(testSellerProfile);
+
+        _cacheMock.Setup(c => c.GetDataAsync<List<ProductResponseDto>>($"products:{testSellerProfile.Id}:outOfStock"))
+            .ReturnsAsync((List<ProductResponseDto>?)null);
+
+        _productRepositoryMock.Setup(r => r.GetProductsOutOfStockAsync(testSellerProfile.Id))
+            .ReturnsAsync(testProducts);
+
+        var result = await _productService.GetProductThatOutOfStockAsync(userId);
+
+        result.Should().NotBeNull();
+        result.Should().HaveCount(2);
+        result[0].Name.Should().Be("Out of Stock 1");
+        result[1].Stock.Should().Be(0);
+
+        _productRepositoryMock.Verify(r => r.GetProductsOutOfStockAsync(testSellerProfile.Id), Times.Once);
+
+        _cacheMock.Verify(c => c.SetDataAsync(
+            $"products:{testSellerProfile.Id}:outOfStock",
+            It.Is<List<ProductResponseDto>>(list => list.Count == 2),
+            TimeSpan.FromMinutes(5)
+        ), Times.Once);
+    }
+
+    [Fact]
+    public async Task GetProductsOfSellerAsync_WhenSellerNotFound_ThrowsNotFoundException()
+    {
+        var sellerId = Guid.NewGuid();
+
+        _helperMock.Setup(h => h.GetSellerProfileOr404(sellerId))
+            .ThrowsAsync(new NotFoundException("Seller profile not found"));
+
+        Func<Task> action = async () => await _productService.GetProductsOfSellerAsync(sellerId);
+
+        await action.Should().ThrowAsync<NotFoundException>()
+            .WithMessage("Seller profile not found");
+
+        _cacheMock.Verify(c => c.GetDataAsync<List<ProductResponseDto>>(It.IsAny<string>()), Times.Never);
+        _productRepositoryMock.Verify(r => r.GetProductsOfSellerAsync(It.IsAny<Guid>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task GetProductsOfSellerAsync_WhenDataIsInCache_ReturnsCachedProductsWithoutHittingRepository()
+    {
+        var sellerId = Guid.NewGuid();
+
+        var cachedProducts = new List<ProductResponseDto>
+        {
+            new ProductResponseDto { Id = Guid.NewGuid(), SellerProfileId = sellerId, Name = "Cached Seller Product" }
+        };
+
+        _helperMock.Setup(h => h.GetSellerProfileOr404(sellerId))
+            .ReturnsAsync(SellerProfileTestHelper.CreateTestSellerProfile(Id: sellerId));
+
+        _cacheMock.Setup(c => c.GetDataAsync<List<ProductResponseDto>>($"products:{sellerId}"))
+            .ReturnsAsync(cachedProducts);
+
+        var result = await _productService.GetProductsOfSellerAsync(sellerId);
+
+        result.Should().NotBeNull();
+        result.Should().BeEquivalentTo(cachedProducts);
+
+        _productRepositoryMock.Verify(r => r.GetProductsOfSellerAsync(It.IsAny<Guid>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task GetProductsOfSellerAsync_WhenDataIsNotInCache_FetchesFromRepositoryMapsAndCaches()
+    {
+        var sellerId = Guid.NewGuid();
+
+        var testProducts = new List<Product>
+        {
+            ProductTestHelper.CreateTestProduct(SellerProfileId: sellerId, Name: "Seller Product 1"),
+            ProductTestHelper.CreateTestProduct(SellerProfileId: sellerId, Name: "Seller Product 2")
+        };
+
+        _helperMock.Setup(h => h.GetSellerProfileOr404(sellerId))
+            .ReturnsAsync(SellerProfileTestHelper.CreateTestSellerProfile(Id: sellerId));
+
+        _cacheMock.Setup(c => c.GetDataAsync<List<ProductResponseDto>>($"products:{sellerId}"))
+            .ReturnsAsync((List<ProductResponseDto>?)null);
+
+        _productRepositoryMock.Setup(r => r.GetProductsOfSellerAsync(sellerId))
+            .ReturnsAsync(testProducts);
+
+        var result = await _productService.GetProductsOfSellerAsync(sellerId);
+
+        result.Should().NotBeNull();
+        result.Should().HaveCount(2);
+        result[0].Name.Should().Be("Seller Product 1");
+        result[1].Name.Should().Be("Seller Product 2");
+
+        _productRepositoryMock.Verify(r => r.GetProductsOfSellerAsync(sellerId), Times.Once);
+
+        _cacheMock.Verify(c => c.SetDataAsync(
+            $"products:{sellerId}",
+            It.Is<List<ProductResponseDto>>(list => list.Count == 2),
+            TimeSpan.FromMinutes(5)
+        ), Times.Once);
+    }
 }

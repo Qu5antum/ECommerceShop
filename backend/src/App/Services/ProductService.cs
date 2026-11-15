@@ -547,7 +547,6 @@ public class ProductService : IProductService
     
     public async Task<bool> DeleteProductByIdAdminAsync(Guid productId, CreateNotificationDto createNotificationDto)
     {
-        await _unitOfWork.BeginTransactionAsync();
         var product = await _helper.GetProductOr404(productId);
 
         Guid userId = await _productRepository.GetUserIdByProductId(productId);
@@ -557,6 +556,8 @@ public class ProductService : IProductService
             _logger.LogInformation("User id not found by product: {productId}", productId);
             throw new NotFoundException("User profile not found");
         }
+
+        await _unitOfWork.BeginTransactionAsync();
 
         try
         {
