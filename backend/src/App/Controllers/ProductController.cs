@@ -62,9 +62,9 @@ public class ProductController : ControllerBase
     }
 
     [HttpGet("Products")]
-    public async Task<IActionResult> GetProducts()
+    public async Task<IActionResult> GetProducts(int limit = 50, int offset = 0)
     {
-        var products = await _service.GetProductsAsync();
+        var products = await _service.GetProductsAsync(limit, offset);
 
         return Ok(products);
     }

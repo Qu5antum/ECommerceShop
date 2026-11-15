@@ -15,6 +15,7 @@ public interface IProductRepository : IBaseRepository<Product>
     Task<List<Product>> GetProductsOutOfStockAsync(Guid sellerId);
     Task<List<Product>> GetProductsOfSellerAsync(Guid sellerId);
     Task<Guid> GetUserIdByProductId(Guid productId);
+    Task<List<ProductResponseDto>> GetProductsWithPagination(int limit = 50, int offset = 0);
 }
 
 
@@ -83,5 +84,29 @@ public class ProductRepository(AppDbContext context) : BaseRepository<Product>(c
             .Where(p => p.Id == productId)
             .Select(p => p.SellerProfile.userId)
             .FirstOrDefaultAsync();
+    }
+
+    public async Task<List<ProductResponseDto>> GetProductsWithPagination(int limit = 50, int offset = 0)
+    {
+        return await _context.Products
+            .AsNoTracking()
+            .OrderBy(p => p.Id) 
+            .Skip(offset)
+            .Take(limit)
+            .Select(p => new ProductResponseDto 
+            {
+                Id = p.Id,
+                SellerProfileId = p.SellerProfileId,
+                CategoryId = p.CategoryId,
+                Name = p.Name,
+                Description = p.Description,
+                Price = p.Price,
+                SKU = p.SKU,
+                Stock = p.Stock,
+                ImageUrl = p.ImageUrl,
+                CreatedAt = p.CreatedAt,
+                UpdatedAt = p.UpdatedAt
+            })
+            .ToListAsync();
     }
 }

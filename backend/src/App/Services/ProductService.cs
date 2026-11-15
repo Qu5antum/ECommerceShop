@@ -16,7 +16,7 @@ public interface IProductService
     Task<bool> UpdateProductAsync(Guid userId, Guid productId, ProductUpdateDto productUpdateDto);
     Task<bool> DeleteProductAsync(Guid userId, Guid productId);
     Task<ProductResponseDto> GetProductByIdAsync(Guid productId);
-    Task<List<ProductResponseDto>> GetProductsAsync();
+    Task<List<ProductResponseDto>> GetProductsAsync(int limit = 50, int offset = 0);
     Task<(Stream FileStream, string ContentType)?> GetProductImageAsync(Guid productId);
     Task<List<ProductResponseDto>> GetProductsByCategoryIdAsync(Guid categoryId);
     Task<List<ProductResponseDto>> SearchProductAsync(string productName);
@@ -41,7 +41,7 @@ public class ProductService : IProductService
 
     private static string GetProductsCacheKey()
     {
-        return $"products:all";
+        return "products:all";
     }
 
     private static string GetProductCacheKeyById(Guid productId)
@@ -66,7 +66,7 @@ public class ProductService : IProductService
 
     private static string GetGeneralAnalyticsCacheKey()
     {
-        return $"analytics:general:all";
+        return "analytics:general:all";
     }
 
     public ProductService
@@ -93,8 +93,6 @@ public class ProductService : IProductService
 
     public async Task<ProductResponseDto> CreateProductAsync(Guid userId, ProductCreateDto productCreateDto)
     {
-        await _unitOfWork.BeginTransactionAsync();
-
         string? ImageUrl = null;
 
         await _helper.GetUserOr404(userId);
@@ -114,6 +112,8 @@ public class ProductService : IProductService
             _logger.LogWarning("User seller profile status not approved, {sellerId}", sellerProfile.Id);
             throw new BadRequestException("User seller profile status not approved");
         }
+
+        await _unitOfWork.BeginTransactionAsync();
 
         try
         {
@@ -182,8 +182,6 @@ public class ProductService : IProductService
 
     public async Task<bool> UpdateProductAsync(Guid userId, Guid productId, ProductUpdateDto productUpdateDto)
     {
-        await _unitOfWork.BeginTransactionAsync();
-
         string? newImageUrl = null;
 
         await _helper.GetUserOr404(userId);
@@ -216,6 +214,8 @@ public class ProductService : IProductService
         }
 
         string? oldImageUrl = product.ImageUrl;
+
+        await _unitOfWork.BeginTransactionAsync();
 
         try
         {
@@ -290,7 +290,6 @@ public class ProductService : IProductService
 
     public async Task<bool> DeleteProductAsync(Guid userId, Guid productId)
     {
-        await _unitOfWork.BeginTransactionAsync();
         await _helper.GetUserOr404(userId);
 
         var sellerProfile = await _profileRepository.GetSellerProfileByUserIdAsync(userId);
@@ -320,6 +319,8 @@ public class ProductService : IProductService
             await _fileService.DeleteFileAsync(product.ImageUrl);
         }
 
+        await _unitOfWork.BeginTransactionAsync();
+
         try
         {
             await _productRepository.DeleteAsync(product);
@@ -346,8 +347,6 @@ public class ProductService : IProductService
 
     public async Task<ProductResponseDto> GetProductByIdAsync(Guid productId)
     {
-        var product = await _helper.GetProductOr404(productId);
-
         var cacheKey = GetProductCacheKeyById(productId);
 
         var cachedProduct = await _cache.GetDataAsync<ProductResponseDto>(cacheKey);
@@ -357,6 +356,8 @@ public class ProductService : IProductService
             _logger.LogInformation("Product retrieved from redis cache: {productId}", productId);
             return cachedProduct;
         }
+
+        var product = await _helper.GetProductOr404(productId);
 
         var result = new ProductResponseDto
         {
@@ -384,7 +385,7 @@ public class ProductService : IProductService
         return result;
     }
 
-    public async Task<List<ProductResponseDto>> GetProductsAsync()
+    public async Task<List<ProductResponseDto>> GetProductsAsync(int limit = 50, int offset = 0)
     {
         var cacheKey = GetProductsCacheKey();
 
@@ -396,7 +397,7 @@ public class ProductService : IProductService
             return cacheProducts;
         }
 
-        var products = await _productRepository.GetAllAsync();
+        var products = await _productRepository.GetProductsWithPagination(limit, offset);
 
         var result = products.Select(product => new ProductResponseDto
         {
