@@ -378,6 +378,60 @@ public class SellerProfileServiceTests
     }
 
     [Fact]
+    public async Task GetSellersAsync_WhenStatusIsProvidedAndNotInCache_FetchesFromRepositoryAndCaches()
+    {
+        var targetStatus = SellerStatus.Approved;
+        
+        var testSellers = new List<SellerProfile>
+        {
+            SellerProfileTestHelper.CreateTestSellerProfile(status: targetStatus),
+            SellerProfileTestHelper.CreateTestSellerProfile(status: targetStatus)
+        };
+
+        _cacheMock.Setup(c => c.GetDataAsync<List<SellerProfileResponseDto>>(It.IsAny<string>()))
+            .ReturnsAsync((List<SellerProfileResponseDto>?)null);
+
+        _sellerProfileRepositoryMock.Setup(r => r.GetSellersByStatusAsync(targetStatus, 50, 0))
+            .ReturnsAsync(testSellers);
+
+        var result = await _sellerProfileService.GetSellersAsync(targetStatus, limit: 50, offset: 0);
+
+        result.Should().NotBeNull();
+        result.Should().HaveCount(2);
+        result.Should().AllSatisfy(s => s.Status.Should().Be(targetStatus));
+
+        _sellerProfileRepositoryMock.Verify(r => r.GetSellersByStatusAsync(targetStatus, 50, 0), Times.Once);
+
+        _cacheMock.Verify(c => c.SetDataAsync(
+            It.IsAny<string>(),
+            It.Is<List<SellerProfileResponseDto>>(list => list.Count == 2),
+            TimeSpan.FromMinutes(5)
+        ), Times.Once);
+    }
+
+    [Fact]
+    public async Task GetSellersAsync_WhenStatusIsNullAndInCache_ReturnsCachedDataWithoutHittingRepository()
+    {
+        var cachedSellers = new List<SellerProfileResponseDto>
+        {
+            new SellerProfileResponseDto { StoreName = "Cached Store 1", Status = SellerStatus.Pending },
+            new SellerProfileResponseDto { StoreName = "Cached Store 2", Status = SellerStatus.Approved }
+        };
+
+        _cacheMock.Setup(c => c.GetDataAsync<List<SellerProfileResponseDto>>(It.IsAny<string>()))
+            .ReturnsAsync(cachedSellers);
+
+        var result = await _sellerProfileService.GetSellersAsync(status: null);
+
+        result.Should().NotBeNull();
+        result.Should().BeEquivalentTo(cachedSellers);
+
+        _sellerProfileRepositoryMock.Verify(r => r.GetSellersByStatusAsync(It.IsAny<SellerStatus?>(), It.IsAny<int>(), It.IsAny<int>()), Times.Never);
+        
+        _cacheMock.Verify(c => c.SetDataAsync(It.IsAny<string>(), It.IsAny<object>(), It.IsAny<TimeSpan>()), Times.Never);
+    }
+
+    [Fact]
     public async Task UpdateStatusOfSellerProfile_ReturnOk()
     {
         var testCurrentUser = AuthTestHelper.CreateTestUser();

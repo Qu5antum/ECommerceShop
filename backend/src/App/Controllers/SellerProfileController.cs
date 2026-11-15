@@ -79,9 +79,9 @@ public class SellerProfileController : ControllerBase
 
     [Authorize(Roles = "Admin, Moderator, Manager")]
     [HttpGet("Sellers")]
-    public async Task<IActionResult> GetSellers(SellerStatus status)
+    public async Task<IActionResult> GetSellers(SellerStatus? status, int limit = 50, int offset = 0)
     {
-        var sellers = await _service.GetSellersAsync(status);
+        var sellers = await _service.GetSellersAsync(status, limit, offset);
 
         return Ok(sellers);
     }

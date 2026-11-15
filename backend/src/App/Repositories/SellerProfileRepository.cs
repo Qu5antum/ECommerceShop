@@ -11,7 +11,7 @@ public interface ISellerProfileRepository : IBaseRepository<SellerProfile>
 {
     Task<SellerProfile?> GetSellerProfileByUserIdAsync(Guid userId);
     Task<bool> IsStoreNameTakenAsync(string storeName);
-    Task<List<SellerProfile>> GetSellersByStatusAsync(SellerStatus status);
+    Task<List<SellerProfile>> GetSellersByStatusAsync(SellerStatus? status = null, int limit = 50, int offset = 0);
     Task<SellerPreviewResponseDto?> GetSellerStoreNameDescriptionAsync(Guid sellerId);
     Task<Guid> GetUserIdBySellerProfileId(Guid sellerId);
 }
@@ -34,12 +34,19 @@ public class SellerProfileRepository(AppDbContext context) : BaseRepository<Sell
             .AnyAsync(s => s.StoreName == storeName);
     }
 
-    public async Task<List<SellerProfile>> GetSellersByStatusAsync(SellerStatus status)
+    public async Task<List<SellerProfile>> GetSellersByStatusAsync(SellerStatus? status = null, int limit = 50, int offset = 0)
     {
-        return await _context.SellerProfiles
-            .AsNoTracking()
-            .Where(s => s.Status == status)
-            .ToListAsync();
+        var query = _context.SellerProfiles
+            .AsNoTracking();
+
+        if (status is not null)
+        {
+            query = query.Where(s => s.Status == status);
+        }
+
+        var result = await query.Skip(offset).Take(limit).ToListAsync();
+
+        return result;
     }
 
     public async Task<SellerPreviewResponseDto?> GetSellerStoreNameDescriptionAsync(Guid sellerId)

@@ -16,7 +16,7 @@ public interface ISellerProfileService
     Task<SellerProfileResponseDto> GetUserSellerProfileAsync(Guid sellerId);
     Task<SellerProfileResponseDto> GetCurrentUserProfileAsync(Guid userId);
     Task<bool> UpdateSellerProfileAsync(Guid userId, Guid profileId, SellerProfileUpdateDto profileUpdateDto);
-    Task<List<SellerProfileResponseDto>> GetSellersAsync(SellerStatus status);
+    Task<List<SellerProfileResponseDto>> GetSellersAsync(SellerStatus? status = null, int limit = 50, int offset = 0);
     Task<bool> UpdateStatusOfSellerProfile(Guid userId, Guid sellerId, SellerStatus status);
     Task<(Stream FileStream, string ContentType)?> GetSellerProfileImageAsync(Guid sellerId);
     Task<SellerPreviewResponseDto> GetSellerProfilePreviewAsync(Guid sellerId);
@@ -48,7 +48,7 @@ public class SellerProfileService : ISellerProfileService
         return $"seller:status:{status}";
     }
 
-    public static string GetSellerProfilePreviewCacheKey(Guid sellerId)
+    private static string GetSellerProfilePreviewCacheKey(Guid sellerId)
     {
         return $"seller:{sellerId}:preview";
     }
@@ -56,6 +56,11 @@ public class SellerProfileService : ISellerProfileService
     private static string GetGeneralAnalyticsCacheKey()
     {
         return $"analytics:general:all";
+    }
+
+    private static string GetAllSellersCacheKey()
+    {
+        return "seller:all";
     }
 
     public SellerProfileService(
@@ -126,6 +131,7 @@ public class SellerProfileService : ISellerProfileService
             await _cache.RemoveDataAsync(GetSellerProfileWithStatusCacheyKey(SellerStatus.Rejected));
             await _cache.RemoveDataAsync(GetSellerProfileWithStatusCacheyKey(SellerStatus.Suspended));
             await _cache.RemoveDataAsync(GetGeneralAnalyticsCacheKey());
+            await _cache.RemoveDataAsync(GetAllSellersCacheKey());
 
             _logger.LogInformation("Profile sellers with status delete from redis cache");
 
@@ -208,6 +214,7 @@ public class SellerProfileService : ISellerProfileService
             await _cache.RemoveDataAsync(GetSellerProfileWithStatusCacheyKey(SellerStatus.Pending));
             await _cache.RemoveDataAsync(GetSellerProfileWithStatusCacheyKey(SellerStatus.Rejected));
             await _cache.RemoveDataAsync(GetSellerProfileWithStatusCacheyKey(SellerStatus.Suspended));
+            await _cache.RemoveDataAsync(GetAllSellersCacheKey());
 
             _logger.LogInformation("Profile sellers with status delete from redis cache");
             _logger.LogInformation("Seller profile deleted from redis cache: {userId}", userId);
@@ -307,20 +314,37 @@ public class SellerProfileService : ISellerProfileService
         return result;
     }
     
-    // TODO: add pagination
-    public async Task<List<SellerProfileResponseDto>> GetSellersAsync(SellerStatus status)
+    public async Task<List<SellerProfileResponseDto>> GetSellersAsync(SellerStatus? status, int limit = 50, int offset = 0)
     {
-        var cacheyKey = GetSellerProfileWithStatusCacheyKey(status);
+        var cacheKey = "";
 
-        var cachedSellers = await _cache.GetDataAsync<List<SellerProfileResponseDto>>(cacheyKey);
-
-        if (cachedSellers is not null)
+        if (status is not null)
         {
-            _logger.LogInformation("Seller profile retrieved from redis cache");
-            return cachedSellers;
+            cacheKey = GetSellerProfileWithStatusCacheyKey(status.Value);
+
+            var cachedSellers = await _cache.GetDataAsync<List<SellerProfileResponseDto>>(cacheKey);
+
+            if (cachedSellers is not null)
+            {
+                _logger.LogInformation("Seller profile retrieved from redis cache");
+                return cachedSellers;
+            }
         }
 
-        var sellers = await _profileRepository.GetSellersByStatusAsync(status);
+        else
+        {
+            cacheKey = GetAllSellersCacheKey();
+            
+            var cachedSellers = await _cache.GetDataAsync<List<SellerProfileResponseDto>>(cacheKey);
+
+            if (cachedSellers is not null)
+            {
+                _logger.LogInformation("Seller profile retrieved from redis cache");
+                return cachedSellers;
+            }
+        }
+
+        var sellers = await _profileRepository.GetSellersByStatusAsync(status, limit, offset);
 
         var result = sellers.Select(seller => new SellerProfileResponseDto
         {
@@ -334,7 +358,7 @@ public class SellerProfileService : ISellerProfileService
         }).ToList();
 
         await _cache.SetDataAsync(
-            cacheyKey,
+            cacheKey,
             result,
             TimeSpan.FromMinutes(5)
         );
@@ -402,6 +426,7 @@ public class SellerProfileService : ISellerProfileService
             await _cache.RemoveDataAsync(GetSellerProfileWithStatusCacheyKey(SellerStatus.Pending));
             await _cache.RemoveDataAsync(GetSellerProfileWithStatusCacheyKey(SellerStatus.Rejected));
             await _cache.RemoveDataAsync(GetSellerProfileWithStatusCacheyKey(SellerStatus.Suspended));
+            await _cache.RemoveDataAsync(GetAllSellersCacheKey());
 
             _logger.LogInformation("Profile sellers with status delete from redis cache");
 
