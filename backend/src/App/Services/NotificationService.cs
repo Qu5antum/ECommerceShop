@@ -43,7 +43,7 @@ public class NotificationService : INotificationService
 
     private static string GetNotificationsCacheKey()
     {
-        return $"notifications:all";
+        return "notifications:all";
     }
 
     private static string GetNotificationCacheKey(Guid notificationId)

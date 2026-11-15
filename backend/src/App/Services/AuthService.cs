@@ -32,7 +32,7 @@ public class AuthService : IAuthService
 
     private static string GetGeneralAnalyticsCacheKey()
     {
-        return $"analytics:general:all";
+        return "analytics:general:all";
     }
 
     public AuthService(IUserRepository repository, IConfiguration configuration, ILogger<AuthService> logger, IUnitOfWork unitOfWork, IRedisCacheService cache)

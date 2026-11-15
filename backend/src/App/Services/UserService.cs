@@ -38,12 +38,12 @@ public class UserService : IUserService
 
     private static string GetUsersCachedKey()
     {
-        return $"user:all";
+        return "user:all";
     }
 
     private static string GetGeneralAnalyticsCacheKey()
     {
-        return $"analytics:general:all";
+        return "analytics:general:all";
     }
 
     public UserService(

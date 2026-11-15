@@ -36,7 +36,7 @@ public class ReviewService : IReviewService
 
     private static string GetReviewsCacheKey()
     {
-        return $"review:all";
+        return "review:all";
     }
 
     private static string GetReviewCacheKey(Guid reviewId)
@@ -46,7 +46,7 @@ public class ReviewService : IReviewService
 
     private static string GetGeneralAnalyticsCacheKey()
     {
-        return $"analytics:general:all";
+        return "analytics:general:all";
     }
 
     public ReviewService(IReviewRepository reviewRepository, ILogger<ReviewService> logger, IHelperService helper, IUnitOfWork unitOfWork, IRedisCacheService cache)

@@ -70,7 +70,7 @@ public class OrderService : IOrderService
 
     private static string GetProductsCacheKey()
     {
-        return $"products:all";
+        return "products:all";
     }
 
     private static string GetProductCacheKeyById(Guid productId)
@@ -90,9 +90,9 @@ public class OrderService : IOrderService
 
     private static string GetGeneralAnalyticsCacheKey()
     {
-        return $"analytics:general:all";
+        return "analytics:general:all";
     }
-
+    
     public OrderService
     (
         IOrderRepository orderRepository, 

@@ -38,7 +38,7 @@ public class PaymentService : IPaymentService
 
     private static string GetPaymentsCacheKey()
     {
-        return $"payments:all";
+        return "payments:all";
     }
 
     private static string GetPaymentsWithStatusCacheKey(PaymentStatus status)
@@ -48,12 +48,12 @@ public class PaymentService : IPaymentService
 
     private static string GetPaymentTotalStatisticsCacheKey()
     {
-        return $"payments:total_statistic";
+        return "payments:total_statistic";
     }
 
     private static string GetGeneralAnalyticsCacheKey()
     {
-        return $"analytics:general:all";
+        return "analytics:general:all";
     }
 
     private static string GetOrderCacheKey(Guid orderId)
@@ -63,7 +63,7 @@ public class PaymentService : IPaymentService
 
     private static string GetOrdersCacheKey()
     {
-        return $"orders:all";
+        return "orders:all";
     }
 
     public PaymentService(

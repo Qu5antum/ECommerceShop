@@ -136,7 +136,6 @@ public class CartItemService : ICartItemService
 
     public async Task<bool> UpdateCartItemAsync(Guid userId, Guid itemId, CartItemUpdateDto itemUpdateDto)
     {
-        await _unitOfWork.BeginTransactionAsync();
         await _helper.GetUserOr404(userId);
 
         var cartId = await _cartRepository.GetCartIdByUserId(userId);
@@ -154,6 +153,8 @@ public class CartItemService : ICartItemService
             _logger.LogWarning("Cart item does not belong to user, user ID: {userId}, Cart item ID: {itemId}", userId, itemId);
             throw new BadRequestException("Cart item does not belong to user");
         }
+
+        await _unitOfWork.BeginTransactionAsync();
 
         try
         {

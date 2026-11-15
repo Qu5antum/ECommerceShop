@@ -55,7 +55,7 @@ public class SellerProfileService : ISellerProfileService
 
     private static string GetGeneralAnalyticsCacheKey()
     {
-        return $"analytics:general:all";
+        return "analytics:general:all";
     }
 
     private static string GetAllSellersCacheKey()
