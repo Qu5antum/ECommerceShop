@@ -233,6 +233,8 @@ public class CartItemService : ICartItemService
 
     public async Task<List<CartItemResponseDto>> GetAllItemsInCartAsync(Guid userId)
     {
+        await _helper.GetUserOr404(userId);
+
         var cacheKey = GetCartItemsCacheKeyByUser(userId);
 
         var cachedItems = await _cache.GetDataAsync<List<CartItemResponseDto>>(cacheKey);
@@ -242,8 +244,6 @@ public class CartItemService : ICartItemService
             _logger.LogInformation("Cart items retrieved from redis cache");
             return cachedItems;
         }
-
-        await _helper.GetUserOr404(userId);
 
         var cartId = await _cartRepository.GetCartIdByUserId(userId);
 

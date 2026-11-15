@@ -307,4 +307,92 @@ public class CartServiceTests
 
         _cacheMock.Verify(c => c.RemoveDataAsync($"cartItem:{testCartItem.Id}"), Times.Never);
     }
+
+    [Fact]
+    public async Task GetAllItemsInCartAsync_WhenDataIsInCache_ReturnsCachedItemsWithoutHittingRepository()
+    {
+        var testUser = AuthTestHelper.CreateTestUser();
+
+        var cachedItems = new List<CartItemResponseDto>
+        {
+            new CartItemResponseDto { Id = Guid.NewGuid(), ProductId = Guid.NewGuid(), Quantity = 2 }
+        };
+
+        _helper.Setup(h => h.GetUserOr404(testUser.Id))
+            .ReturnsAsync(testUser);
+
+        _cacheMock.Setup(c => c.GetDataAsync<List<CartItemResponseDto>>($"cartItems:{testUser.Id}"))
+            .ReturnsAsync(cachedItems);
+
+        var result = await _cartItemService.GetAllItemsInCartAsync(testUser.Id);
+
+        result.Should().NotBeNull();
+        result.Should().BeEquivalentTo(cachedItems);
+
+        _cartRepositoryMock.Verify(r => r.GetCartIdByUserId(It.IsAny<Guid>()), Times.Never);
+        _cartItemRepositoryMock.Verify(r => r.GetAllItemsInCartAsyncByCartId(It.IsAny<Guid>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task GetAllItemsInCartAsync_WhenCartNotFound_ThrowsNotFoundException()
+    {
+        var testUser = AuthTestHelper.CreateTestUser();
+
+        _helper.Setup(h => h.GetUserOr404(testUser.Id))
+            .ReturnsAsync(testUser);
+
+        _cacheMock.Setup(c => c.GetDataAsync<List<CartItemResponseDto>>($"cartItems:{testUser.Id}"))
+            .ReturnsAsync((List<CartItemResponseDto>?)null);
+
+        _cartRepositoryMock.Setup(r => r.GetCartIdByUserId(testUser.Id))
+            .ReturnsAsync(Guid.Empty);
+
+        Func<Task> action = async () => await _cartItemService.GetAllItemsInCartAsync(testUser.Id);
+
+        await action.Should().ThrowAsync<NotFoundException>()
+            .WithMessage("Cart not found");
+
+        _cartItemRepositoryMock.Verify(r => r.GetAllItemsInCartAsyncByCartId(It.IsAny<Guid>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task GetAllItemsInCartAsync_WhenDataIsNotInCache_FetchesFromRepositoryMapsAndCaches()
+    {
+        var testUser = AuthTestHelper.CreateTestUser();
+        var testCart = CartTestHelper.CreateTestHelper(UserId: testUser.Id);
+        var cacheKey = $"cart:items:{testUser.Id}";
+
+        var testCartItems = new List<CartItem>
+        {
+            CartItemTestHelper.CreateTestCartItem(CartId: testCart.Id, Quantity: 1),
+            CartItemTestHelper.CreateTestCartItem(CartId: testCart.Id, Quantity: 3)
+        };
+
+        _helper.Setup(h => h.GetUserOr404(testUser.Id))
+            .ReturnsAsync(testUser);
+
+        _cacheMock.Setup(c => c.GetDataAsync<List<CartItemResponseDto>>($"cartItems:{testUser.Id}"))
+            .ReturnsAsync((List<CartItemResponseDto>?)null);
+
+        _cartRepositoryMock.Setup(r => r.GetCartIdByUserId(testUser.Id))
+            .ReturnsAsync(testCart.Id);
+
+        _cartItemRepositoryMock.Setup(r => r.GetAllItemsInCartAsyncByCartId(testCart.Id))
+            .ReturnsAsync(testCartItems);
+
+        var result = await _cartItemService.GetAllItemsInCartAsync(testUser.Id);
+
+        result.Should().NotBeNull();
+        result.Should().HaveCount(2);
+        result[0].Quantity.Should().Be(1);
+        result[1].Quantity.Should().Be(3);
+
+        _cartItemRepositoryMock.Verify(r => r.GetAllItemsInCartAsyncByCartId(testCart.Id), Times.Once);
+
+        _cacheMock.Verify(c => c.SetDataAsync(
+            $"cartItems:{testUser.Id}",
+            It.Is<List<CartItemResponseDto>>(list => list.Count == 2),
+            TimeSpan.FromMinutes(5)
+        ), Times.Once);
+    }
 }
