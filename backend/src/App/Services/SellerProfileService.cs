@@ -359,7 +359,6 @@ public class SellerProfileService : ISellerProfileService
     public async Task<bool> UpdateStatusOfSellerProfile(Guid userId, Guid sellerId, SellerStatus status)
     {
         await _helper.GetUserOr404(userId);
-        await _unitOfWork.BeginTransactionAsync();
 
         var seller = await _helper.GetSellerProfileOr404(sellerId);
 
@@ -374,6 +373,8 @@ public class SellerProfileService : ISellerProfileService
             _logger.LogWarning("This status has already been set: {sellerId}", sellerId);
             throw new BadRequestException("This status has already been set");
         }
+
+        await _unitOfWork.BeginTransactionAsync();
 
         try
         {

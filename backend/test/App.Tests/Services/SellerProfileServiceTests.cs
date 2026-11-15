@@ -10,6 +10,7 @@ using App.Models;
 using App.Exceptions;
 using App.DTOs;
 using Microsoft.EntityFrameworkCore;
+using App.Enum;
 
 
 public class SellerProfileServiceTests
@@ -313,66 +314,202 @@ public class SellerProfileServiceTests
     }
 
     [Fact]
-public async Task GetSellerProfileImageAsync_WhenImageExists_ReturnsFileStreamAndContentType()
-{
-    var sellerId = Guid.NewGuid();
-    var expectedImageUrl = "uploads/stores/logo.jpg";
-    var expectedContentType = "image/jpeg";
-    
-    Stream expectedStream = new MemoryStream(new byte[] { 1, 2, 3 });
+    public async Task GetSellerProfileImageAsync_WhenImageExists_ReturnsFileStreamAndContentType()
+    {
+        var sellerId = Guid.NewGuid();
+        var expectedImageUrl = "uploads/stores/logo.jpg";
+        var expectedContentType = "image/jpeg";
+        
+        Stream expectedStream = new MemoryStream(new byte[] { 1, 2, 3 });
 
-    var testSeller = SellerProfileTestHelper.CreateTestSellerProfile(
-        Id: sellerId,
-        imageUrl: expectedImageUrl
-    );
+        var testSeller = SellerProfileTestHelper.CreateTestSellerProfile(
+            Id: sellerId,
+            imageUrl: expectedImageUrl
+        );
 
-    _helper.Setup(h => h.GetSellerProfileOr404(sellerId))
-        .ReturnsAsync(testSeller);
+        _helper.Setup(h => h.GetSellerProfileOr404(sellerId))
+            .ReturnsAsync(testSeller);
 
-    _fileServiceMock.Setup(f => f.GetFileAsync(expectedImageUrl))
-        .ReturnsAsync((expectedStream, expectedContentType));
+        _fileServiceMock.Setup(f => f.GetFileAsync(expectedImageUrl))
+            .ReturnsAsync((expectedStream, expectedContentType));
 
-    var result = await _sellerProfileService.GetSellerProfileImageAsync(sellerId);
+        var result = await _sellerProfileService.GetSellerProfileImageAsync(sellerId);
 
-    result.Should().NotBeNull();
-    result.Value.ContentType.Should().Be(expectedContentType);
+        result.Should().NotBeNull();
+        result.Value.ContentType.Should().Be(expectedContentType);
 
-    _fileServiceMock.Verify(f => f.GetFileAsync(expectedImageUrl), Times.Once);
-}
+        _fileServiceMock.Verify(f => f.GetFileAsync(expectedImageUrl), Times.Once);
+    }
 
-[Fact]
-public async Task GetSellerProfileImageAsync_WhenImageUrlIsNull_ReturnsNull()
-{
-    var sellerId = Guid.NewGuid();
+    [Fact]
+    public async Task GetSellerProfileImageAsync_WhenImageUrlIsNull_ReturnsNull()
+    {
+        var sellerId = Guid.NewGuid();
 
-    var testSeller = SellerProfileTestHelper.CreateTestSellerProfile(
-        Id: sellerId,
-        imageUrl: null! 
-    );
+        var testSeller = SellerProfileTestHelper.CreateTestSellerProfile(
+            Id: sellerId,
+            imageUrl: null! 
+        );
 
-    _helper.Setup(h => h.GetSellerProfileOr404(sellerId))
-        .ReturnsAsync(testSeller);
+        _helper.Setup(h => h.GetSellerProfileOr404(sellerId))
+            .ReturnsAsync(testSeller);
 
-    var result = await _sellerProfileService.GetSellerProfileImageAsync(sellerId);
+        var result = await _sellerProfileService.GetSellerProfileImageAsync(sellerId);
 
-    result.Should().BeNull();
+        result.Should().BeNull();
 
-    _fileServiceMock.Verify(f => f.GetFileAsync(It.IsAny<string>()), Times.Never);
-}
+        _fileServiceMock.Verify(f => f.GetFileAsync(It.IsAny<string>()), Times.Never);
+    }
 
-[Fact]
-public async Task GetSellerProfileImageAsync_WhenSellerNotFound_ThrowsNotFoundException()
-{
-    var nonExistentSellerId = Guid.NewGuid();
+    [Fact]
+    public async Task GetSellerProfileImageAsync_WhenSellerNotFound_ThrowsNotFoundException()
+    {
+        var nonExistentSellerId = Guid.NewGuid();
 
-    _helper.Setup(h => h.GetSellerProfileOr404(nonExistentSellerId))
-        .ThrowsAsync(new NotFoundException("Seller profile not found"));
+        _helper.Setup(h => h.GetSellerProfileOr404(nonExistentSellerId))
+            .ThrowsAsync(new NotFoundException("Seller profile not found"));
 
-    Func<Task> action = async () => await _sellerProfileService.GetSellerProfileImageAsync(nonExistentSellerId);
+        Func<Task> action = async () => await _sellerProfileService.GetSellerProfileImageAsync(nonExistentSellerId);
 
-    await action.Should().ThrowAsync<NotFoundException>()
-        .WithMessage("Seller profile not found");
+        await action.Should().ThrowAsync<NotFoundException>()
+            .WithMessage("Seller profile not found");
 
-    _fileServiceMock.Verify(f => f.GetFileAsync(It.IsAny<string>()), Times.Never);
-}
+        _fileServiceMock.Verify(f => f.GetFileAsync(It.IsAny<string>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task UpdateStatusOfSellerProfile_ReturnOk()
+    {
+        var testCurrentUser = AuthTestHelper.CreateTestUser();
+        var testSellerProfile = SellerProfileTestHelper.CreateTestSellerProfile();
+
+        _helper.Setup(h => h.GetUserOr404(testCurrentUser.Id))
+            .ReturnsAsync(testCurrentUser);
+
+        _helper.Setup(h => h.GetSellerProfileOr404(testSellerProfile.Id))
+            .ReturnsAsync(testSellerProfile);
+
+        var result = await _sellerProfileService.UpdateStatusOfSellerProfile(
+            testCurrentUser.Id,
+            testSellerProfile.Id,
+            status: SellerStatus.Approved
+        );
+
+        result.Should().BeTrue();
+
+        _sellerProfileRepositoryMock.Verify(r => r.UpdateAsync(It.IsAny<SellerProfile>()), Times.Once);
+
+        _notificationRepositoryMock.Verify(r => r.CreateAsync(It.IsAny<Notification>()), Times.Once);
+
+        _unitOfWorkMock.Verify(u => u.BeginTransactionAsync(), Times.Once);
+        _unitOfWorkMock.Verify(u => u.SaveChangesAsync(), Times.Once);
+        _unitOfWorkMock.Verify(u => u.CommitAsync(), Times.Once);
+
+        _cacheMock.Verify(c => c.RemoveDataAsync($"seller:{testSellerProfile.Id}"), Times.Once);
+    }
+
+    [Fact]
+    public async Task UpdateStatusOfSellerProfile_UserCannotSetStatusThemselves_ThrowsBadRequestException()
+    {
+        var testCurrentUser = AuthTestHelper.CreateTestUser();
+        var testSellerProfile = SellerProfileTestHelper.CreateTestSellerProfile(userId: testCurrentUser.Id);
+
+        _helper.Setup(h => h.GetUserOr404(testCurrentUser.Id))
+            .ReturnsAsync(testCurrentUser);
+
+        _helper.Setup(h => h.GetSellerProfileOr404(testSellerProfile.Id))
+            .ReturnsAsync(testSellerProfile);
+
+        Func<Task> action = async () => await _sellerProfileService.UpdateStatusOfSellerProfile(
+            testCurrentUser.Id,
+            testSellerProfile.Id,
+            status: SellerStatus.Approved
+        );
+
+        await action.Should().ThrowAsync<BadRequestException>()
+            .WithMessage("User cannot set a status for themselves");
+
+        _sellerProfileRepositoryMock.Verify(r => r.UpdateAsync(It.IsAny<SellerProfile>()), Times.Never);
+
+        _notificationRepositoryMock.Verify(r => r.CreateAsync(It.IsAny<Notification>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task UpdateStatusOfSellerProfile_StatusHasAlreadyBeenSet_ThrowsBadRequestException()
+    {
+        var testCurrentUser = AuthTestHelper.CreateTestUser();
+        var testSellerProfile = SellerProfileTestHelper.CreateTestSellerProfile(status: SellerStatus.Pending);
+
+        _helper.Setup(h => h.GetUserOr404(testCurrentUser.Id))
+            .ReturnsAsync(testCurrentUser);
+
+        _helper.Setup(h => h.GetSellerProfileOr404(testSellerProfile.Id))
+            .ReturnsAsync(testSellerProfile);
+
+        Func<Task> action = async () => await _sellerProfileService.UpdateStatusOfSellerProfile(
+            testCurrentUser.Id,
+            testSellerProfile.Id,
+            status: SellerStatus.Pending
+        );
+
+        await action.Should().ThrowAsync<BadRequestException>()
+            .WithMessage("This status has already been set");
+
+        _sellerProfileRepositoryMock.Verify(r => r.UpdateAsync(It.IsAny<SellerProfile>()), Times.Never);
+
+        _notificationRepositoryMock.Verify(r => r.CreateAsync(It.IsAny<Notification>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task GetSellerProfilePreview_ReturnsNotCachedData()
+    {
+        var testSellerProfile = SellerProfileTestHelper.CreateTestSellerProfile();
+
+        _cacheMock.Setup(c => c.GetDataAsync<SellerPreviewResponseDto>($"seller:{testSellerProfile.Id}:preview"))
+            .ReturnsAsync((SellerPreviewResponseDto?)null);
+
+        _sellerProfileRepositoryMock.Setup(r => r.GetSellerStoreNameDescriptionAsync(testSellerProfile.Id))
+            .ReturnsAsync(new SellerPreviewResponseDto
+            {
+                StoreName = testSellerProfile.StoreName,
+                Description = testSellerProfile.Description
+            });
+
+        var result = await _sellerProfileService.GetSellerProfilePreviewAsync(testSellerProfile.Id);
+
+        result.Should().NotBeNull();
+
+        _sellerProfileRepositoryMock.Verify(r => r.GetSellerStoreNameDescriptionAsync(testSellerProfile.Id), Times.Once);
+
+        _cacheMock.Verify(c => c.SetDataAsync(
+            $"seller:{testSellerProfile.Id}:preview",
+            It.IsAny<SellerPreviewResponseDto>(),
+            TimeSpan.FromMinutes(5)
+        ), Times.Once);
+    }
+
+    [Fact]
+    public async Task GetSellerProfilePreview_ReturnsCachedData()
+    {
+        var testSellerProfile = SellerProfileTestHelper.CreateTestSellerProfile();
+
+        _cacheMock.Setup(c => c.GetDataAsync<SellerPreviewResponseDto>($"seller:{testSellerProfile.Id}:preview"))
+            .ReturnsAsync(new SellerPreviewResponseDto
+            {
+                StoreName = testSellerProfile.StoreName,
+                Description = testSellerProfile.Description
+            });
+
+        var result = await _sellerProfileService.GetSellerProfilePreviewAsync(testSellerProfile.Id);
+
+        result.Should().NotBeNull();
+
+        _sellerProfileRepositoryMock.Verify(r => r.GetSellerStoreNameDescriptionAsync(testSellerProfile.Id), Times.Never);
+
+        _cacheMock.Verify(c => c.SetDataAsync(
+            $"seller:{testSellerProfile.Id}:preview",
+            It.IsAny<SellerPreviewResponseDto>(),
+            TimeSpan.FromMinutes(5)
+        ), Times.Never);
+    }
 }
