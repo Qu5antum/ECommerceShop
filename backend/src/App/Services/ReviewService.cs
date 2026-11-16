@@ -239,8 +239,8 @@ public class ReviewService : IReviewService
 
     public async Task<bool> DeleteReviewAdminAsync(Guid reviewId)
     {
-        await _unitOfWork.BeginTransactionAsync();
         var review = await _helper.GetReviewOr404(reviewId);
+        await _unitOfWork.BeginTransactionAsync();
 
         try
         {

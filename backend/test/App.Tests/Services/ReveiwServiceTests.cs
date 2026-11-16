@@ -436,4 +436,67 @@ public class ReviewServiceTests
             TimeSpan.FromMinutes(5)
         ), Times.Once);
     }
+
+    [Fact]
+    public async Task DeleteReviewAdminAsync_WhenReviewExists_DeletesReviewCommitsAndInvalidatesCache()
+    {
+        var reviewId = Guid.NewGuid();
+        var testReview = ReviewTestHelper.CreateTestReview(Id: reviewId);
+
+        _helper.Setup(h => h.GetReviewOr404(reviewId))
+            .ReturnsAsync(testReview);
+
+        var result = await _reviewService.DeleteReviewAdminAsync(reviewId);
+
+        result.Should().BeTrue();
+
+        _unitOfWorkMock.Verify(u => u.BeginTransactionAsync(), Times.Once);
+        _reviewRepositoryMock.Verify(r => r.DeleteAsync(testReview), Times.Once);
+        _unitOfWorkMock.Verify(u => u.SaveChangesAsync(), Times.Once);
+        _unitOfWorkMock.Verify(u => u.CommitAsync(), Times.Once);
+
+        _cacheMock.Verify(c => c.RemoveDataAsync(It.IsAny<string>()), Times.Exactly(3));
+    }
+
+    [Fact]
+    public async Task DeleteReviewAdminAsync_WhenReviewNotFound_ThrowsNotFoundException()
+    {
+        var reviewId = Guid.NewGuid();
+
+        _helper.Setup(h => h.GetReviewOr404(reviewId))
+            .ThrowsAsync(new NotFoundException("Review not found"));
+
+        Func<Task> action = async () => await _reviewService.DeleteReviewAdminAsync(reviewId);
+
+        await action.Should().ThrowAsync<NotFoundException>()
+            .WithMessage("Review not found");
+
+        _unitOfWorkMock.Verify(u => u.BeginTransactionAsync(), Times.Never);
+        _reviewRepositoryMock.Verify(r => r.DeleteAsync(It.IsAny<Review>()), Times.Never);
+        _unitOfWorkMock.Verify(u => u.SaveChangesAsync(), Times.Never);
+        _unitOfWorkMock.Verify(u => u.CommitAsync(), Times.Never);
+        _cacheMock.Verify(c => c.RemoveDataAsync(It.IsAny<string>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task DeleteReviewAdminAsync_WhenDbUpdateExceptionOccurs_RollsBackAndThrowsDatabaseException()
+    {
+        var reviewId = Guid.NewGuid();
+        var testReview = ReviewTestHelper.CreateTestReview(Id: reviewId);
+
+        _helper.Setup(h => h.GetReviewOr404(reviewId))
+            .ReturnsAsync(testReview);
+
+        _unitOfWorkMock.Setup(u => u.SaveChangesAsync())
+            .ThrowsAsync(new DbUpdateException("Database error", new Exception()));
+
+        Func<Task> action = async () => await _reviewService.DeleteReviewAdminAsync(reviewId);
+
+        await action.Should().ThrowAsync<DatabaseException>()
+            .WithMessage("Could not delete the review to the database.");
+
+        _unitOfWorkMock.Verify(u => u.RollbackAsync(), Times.Once);
+        _unitOfWorkMock.Verify(u => u.CommitAsync(), Times.Never);
+        _cacheMock.Verify(c => c.RemoveDataAsync(It.IsAny<string>()), Times.Never);
+    }
 }
