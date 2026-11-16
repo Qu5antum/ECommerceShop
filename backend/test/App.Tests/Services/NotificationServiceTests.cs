@@ -292,4 +292,34 @@ public class NotificationServiceTests
         _unitOfWorkMock.Verify(u => u.CommitAsync(), Times.Never);
         _cacheMock.Verify(c => c.RemoveDataAsync(It.IsAny<string>()), Times.Never);
     }
+
+    [Fact]
+    public async Task SendNotificationsAdmin_ReturnsOk()
+    {
+        var testUserIds = new List<Guid>
+        {
+            Guid.NewGuid(),
+            Guid.NewGuid()
+        };
+
+        var testCreateNotificationDto = new CreateNotificationDto
+        {
+            Title = "TestAdminTitle", Message = "TestAdminMessage"
+        };
+
+        _userRepositoryMock.Setup(r => r.GetUserIdsWithDefaultRolesAsync())
+            .ReturnsAsync(testUserIds);
+
+        var result = await _notificationService.SendNotificationsAdminAsync(testCreateNotificationDto);
+
+        result.Should().BeTrue();
+
+        _notificationRepositoryMock.Verify(r => r.AddRangeAsync(It.IsAny<List<Notification>>()), Times.Once);
+
+        _unitOfWorkMock.Verify(u => u.BeginTransactionAsync(), Times.Once);
+        _unitOfWorkMock.Verify(u => u.SaveChangesAsync(), Times.Once);
+        _unitOfWorkMock.Verify(u => u.CommitAsync(), Times.Once);
+
+        _cacheMock.Verify(c => c.RemoveDataAsync("notifications:all"), Times.Once);
+    }
 }
