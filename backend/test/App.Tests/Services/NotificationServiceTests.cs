@@ -109,4 +109,101 @@ public class NotificationServiceTests
             It.IsAny<TimeSpan>()
         ), Times.Never);
     }
+
+    [Fact]
+    public async Task GetUserNotificationAsync_WhenNotificationDoesNotBelongToUser_ThrowsBadRequestException()
+    {
+        var userId = Guid.NewGuid();
+        var otherUserId = Guid.NewGuid();
+        var notificationId = Guid.NewGuid();
+
+        var testNotification = new Notification
+        {
+            Id = notificationId,
+            UserId = otherUserId,
+            Title = "Secret",
+            Message = "Secret message"
+        };
+
+        _helper.Setup(h => h.GetNotificationOr404(notificationId))
+            .ReturnsAsync(testNotification);
+
+        Func<Task> action = async () => await _notificationService.GetUserNotificationAsync(userId, notificationId);
+
+        await action.Should().ThrowAsync<BadRequestException>()
+            .WithMessage("Notification not belong to user");
+
+        _cacheMock.Verify(c => c.GetDataAsync<NotificationResponseDto>(It.IsAny<string>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task GetUserNotificationAsync_WhenDataIsInCache_ReturnsCachedNotificationWithoutSettingCache()
+    {
+        var userId = Guid.NewGuid();
+        var notificationId = Guid.NewGuid();
+
+        var testNotification = new Notification
+        {
+            Id = notificationId,
+            UserId = userId,
+            Title = "Cached Title",
+            Message = "Cached Message"
+        };
+
+        var cachedDto = new NotificationResponseDto
+        {
+            Id = notificationId,
+            UserId = userId,
+            Title = "Cached Title",
+            Message = "Cached Message"
+        };
+
+        _helper.Setup(h => h.GetNotificationOr404(notificationId))
+            .ReturnsAsync(testNotification);
+
+        _cacheMock.Setup(c => c.GetDataAsync<NotificationResponseDto>($"notifications:{notificationId}"))
+            .ReturnsAsync(cachedDto);
+
+        var result = await _notificationService.GetUserNotificationAsync(userId, notificationId);
+
+        result.Should().NotBeNull();
+        result.Should().BeEquivalentTo(cachedDto);
+
+        _cacheMock.Verify(c => c.SetDataAsync(It.IsAny<string>(), It.IsAny<NotificationResponseDto>(), It.IsAny<TimeSpan>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task GetUserNotificationAsync_WhenDataIsNotInCache_MapsAndCachesNotification()
+    {
+        var userId = Guid.NewGuid();
+        var notificationId = Guid.NewGuid();
+
+        var testNotification = new Notification
+        {
+            Id = notificationId,
+            UserId = userId,
+            Title = "Db Title",
+            Message = "Db Message",
+            IsRead = false
+        };
+
+        _helper.Setup(h => h.GetNotificationOr404(notificationId))
+            .ReturnsAsync(testNotification);
+
+        _cacheMock.Setup(c => c.GetDataAsync<NotificationResponseDto>($"notifications:{notificationId}"))
+            .ReturnsAsync((NotificationResponseDto?)null);
+
+        var result = await _notificationService.GetUserNotificationAsync(userId, notificationId);
+
+        result.Should().NotBeNull();
+        result.Id.Should().Be(notificationId);
+        result.UserId.Should().Be(userId);
+        result.Title.Should().Be("Db Title");
+
+        _cacheMock.Verify(c => c.SetDataAsync(
+            $"notifications:{notificationId}",
+            It.Is<NotificationResponseDto>(dto => dto.Id == notificationId && dto.Title == "Db Title"),
+            TimeSpan.FromMinutes(5)
+        ), Times.Once);
+    }
 }
