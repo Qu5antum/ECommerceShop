@@ -206,4 +206,53 @@ public class NotificationServiceTests
             TimeSpan.FromMinutes(5)
         ), Times.Once);
     }
+
+    [Fact]
+    public async Task GetCountOfUnreadNotification_WhenNotCachedData_FetchedFromCache()
+    {
+        var testUser = AuthTestHelper.CreateTestUser();
+
+        _helper.Setup(h => h.GetUserOr404(testUser.Id))
+            .ReturnsAsync(testUser);
+
+        _cacheMock.Setup(c => c.GetDataAsync<int?>($"notifications:{testUser.Id}:unread-count"))
+            .ReturnsAsync((int?)null);
+        
+        _notificationRepositoryMock.Setup(r => r.GetCountOfUnReadNotifications(testUser.Id))
+            .ReturnsAsync(2);
+
+        var result = await _notificationService.GetCountOfUnreadNotificationsAsync(testUser.Id);
+        
+        result.Should().Be(2);
+
+        _cacheMock.Verify(c => c.SetDataAsync(
+            $"notifications:{testUser.Id}:unread-count",
+            2,
+            TimeSpan.FromMinutes(1)
+        ), Times.Once);
+    }
+
+    [Fact]
+    public async Task GetCountOfUnreadNotification_WhenCachedData_FetchesFromCache()
+    {
+        var testUser = AuthTestHelper.CreateTestUser();
+
+        _helper.Setup(h => h.GetUserOr404(testUser.Id))
+            .ReturnsAsync(testUser);
+
+        _cacheMock.Setup(c => c.GetDataAsync<int?>($"notifications:{testUser.Id}:unread-count"))
+            .ReturnsAsync(2);
+
+        var result = await _notificationService.GetCountOfUnreadNotificationsAsync(testUser.Id);
+        
+        result.Should().Be(2);
+
+        _notificationRepositoryMock.Verify(r => r.GetCountOfUnReadNotifications(testUser.Id), Times.Never);
+
+        _cacheMock.Verify(c => c.SetDataAsync(
+            It.IsAny<string>(),
+            It.IsAny<int>(),
+            It.IsAny<TimeSpan>()
+        ), Times.Never);
+    }
 }
