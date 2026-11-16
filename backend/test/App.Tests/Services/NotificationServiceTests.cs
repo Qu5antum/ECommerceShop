@@ -255,4 +255,41 @@ public class NotificationServiceTests
             It.IsAny<TimeSpan>()
         ), Times.Never);
     }
+
+    [Fact]
+    public async Task MarkAllAsReadAsync_WhenUserExists_MarksNotificationsAsReadAndInvalidatesCache()
+    {
+        var testUser = AuthTestHelper.CreateTestUser();
+
+        _helper.Setup(h => h.GetUserOr404(testUser.Id))
+            .ReturnsAsync(testUser);
+
+        await _notificationService.MarkAllAsReadAsync(testUser.Id);
+
+        _unitOfWorkMock.Verify(u => u.BeginTransactionAsync(), Times.Once);
+        _notificationRepositoryMock.Verify(r => r.MarkAllAsReadAsync(testUser.Id), Times.Once);
+        _unitOfWorkMock.Verify(u => u.SaveChangesAsync(), Times.Once);
+        _unitOfWorkMock.Verify(u => u.CommitAsync(), Times.Once);
+
+        _cacheMock.Verify(c => c.RemoveDataAsync(It.IsAny<string>()), Times.AtLeastOnce);
+    }
+
+    [Fact]
+    public async Task MarkAllAsReadAsync_WhenUserNotFound_ThrowsNotFoundExceptionAndDoesNotCommit()
+    {
+        var nonExistentUserId = Guid.NewGuid();
+
+        _helper.Setup(h => h.GetUserOr404(nonExistentUserId))
+            .ThrowsAsync(new NotFoundException("User not found"));
+
+        Func<Task> action = async () => await _notificationService.MarkAllAsReadAsync(nonExistentUserId);
+
+        await action.Should().ThrowAsync<NotFoundException>()
+            .WithMessage("User not found");
+
+        _notificationRepositoryMock.Verify(r => r.MarkAllAsReadAsync(It.IsAny<Guid>()), Times.Never);
+        _unitOfWorkMock.Verify(u => u.SaveChangesAsync(), Times.Never);
+        _unitOfWorkMock.Verify(u => u.CommitAsync(), Times.Never);
+        _cacheMock.Verify(c => c.RemoveDataAsync(It.IsAny<string>()), Times.Never);
+    }
 }
