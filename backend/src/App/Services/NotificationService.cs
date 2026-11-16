@@ -52,6 +52,11 @@ public class NotificationService : INotificationService
         return $"notifications:{notificationId}";
     }
 
+    private static string GetNotificationUserCacheKey(Guid userId, Guid notificationId)
+    {
+        return $"notification:user:{userId}:{notificationId}";
+    }
+
     public NotificationService(
         INotificationRepository notificationRepository, 
         IUserRepository userRepository,
@@ -108,15 +113,7 @@ public class NotificationService : INotificationService
 
     public async Task<NotificationResponseDto> GetUserNotificationAsync(Guid userId, Guid notificationId)
     {
-        var notification = await _helper.GetNotificationOr404(notificationId);
-
-        if (notification.UserId != userId)
-        {
-            _logger.LogInformation("Notification not belong to user, user ID: {userId}, notification ID: {notificationId}", userId, notificationId);
-            throw new BadRequestException("Notification not belong to user");
-        }
-
-        var cacheKey = GetNotificationCacheKey(notificationId);
+        var cacheKey = GetNotificationUserCacheKey(userId, notificationId);
 
         var cachedNotification = await _cache.GetDataAsync<NotificationResponseDto>(cacheKey);
 
@@ -124,6 +121,14 @@ public class NotificationService : INotificationService
         {
             _logger.LogInformation("Notification retrieved from redis cache: {notificationId}", notificationId);
             return cachedNotification;
+        }
+
+        var notification = await _helper.GetNotificationOr404(notificationId);
+
+        if (notification.UserId != userId)
+        {
+            _logger.LogInformation("Notification not belong to user, user ID: {userId}, notification ID: {notificationId}", userId, notificationId);
+            throw new BadRequestException("Notification not belong to user");
         }
 
         var result = new NotificationResponseDto
@@ -263,8 +268,6 @@ public class NotificationService : INotificationService
 
     public async Task<NotificationResponseDto> GetNotificationAdminAsync(Guid notificationId)
     {
-        var notification = await _helper.GetNotificationOr404(notificationId);
-
         var cacheKey = GetNotificationCacheKey(notificationId);
 
         var cachedNotification = await _cache.GetDataAsync<NotificationResponseDto>(cacheKey);
@@ -274,6 +277,8 @@ public class NotificationService : INotificationService
             _logger.LogInformation("Notification retrieved from redis cache: {notificationId}", notificationId);
             return cachedNotification;
         }
+
+        var notification = await _helper.GetNotificationOr404(notificationId);
 
         var result = new NotificationResponseDto
         {
