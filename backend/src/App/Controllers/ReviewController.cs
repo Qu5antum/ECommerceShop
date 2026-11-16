@@ -51,9 +51,9 @@ public class ReviewController : ControllerBase
     }
 
     [HttpGet("{productId:guid}")]
-    public async Task<IActionResult> GetReviewsByProduct(Guid productId)
+    public async Task<IActionResult> GetReviewsByProduct(Guid productId, int limit = 50, int offset = 0)
     {
-        var reviews = await _service.GetReviewsByProductId(productId);
+        var reviews = await _service.GetReviewsByProductId(productId, limit, offset);
 
         return Ok(reviews);
     }

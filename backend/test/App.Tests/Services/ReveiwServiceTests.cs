@@ -352,4 +352,88 @@ public class ReviewServiceTests
         _unitOfWorkMock.Verify(u => u.CommitAsync(), Times.Never);
         _cacheMock.Verify(c => c.RemoveDataAsync(It.IsAny<string>()), Times.Never);
     }
+
+    [Fact]
+    public async Task GetReviewsByProductId_WhenDataIsInCache_ReturnsCachedReviewsWithoutHittingRepository()
+    {
+        var productId = Guid.NewGuid();
+        var testProduct = ProductTestHelper.CreateTestProduct(Id: productId);
+
+        var cachedReviews = new List<ProductReviewsResponseDto>
+        {
+            new ProductReviewsResponseDto 
+            { 
+                Id = Guid.NewGuid(), 
+                User = new UserReviewPreviewResponseDto { Id = Guid.NewGuid(), UserName = "TestUser" },
+                Rating = 5, 
+                Comment = "Cached review",
+                CreatedAt = DateTime.UtcNow
+            }
+        };
+
+        _helper.Setup(h => h.GetProductOr404(productId))
+            .ReturnsAsync(testProduct);
+
+        _cacheMock.Setup(c => c.GetDataAsync<List<ProductReviewsResponseDto>>($"review:{productId}"))
+            .ReturnsAsync(cachedReviews);
+
+        var result = await _reviewService.GetReviewsByProductId(productId);
+
+        result.Should().NotBeNull();
+        result.Should().BeEquivalentTo(cachedReviews);
+
+        _reviewRepositoryMock.Verify(r => r.GetReviewsByProductId(It.IsAny<Guid>(), It.IsAny<int>(), It.IsAny<int>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task GetReviewsByProductId_WhenCacheMiss_FetchesFromRepositoryAndCaches()
+    {
+        var productId = Guid.NewGuid();
+
+        var testProduct = ProductTestHelper.CreateTestProduct(Id: productId);
+
+        var repoReviews = new List<ProductReviewsResponseDto>
+        {
+            new ProductReviewsResponseDto 
+            { 
+                Id = Guid.NewGuid(), 
+                User = new UserReviewPreviewResponseDto { Id = Guid.NewGuid(), UserName = "TestUser"  }, 
+                Rating = 4, 
+                Comment = "Good quality",
+                CreatedAt = DateTime.UtcNow
+            },
+            new ProductReviewsResponseDto 
+            { 
+                Id = Guid.NewGuid(), 
+                User = new UserReviewPreviewResponseDto { Id = Guid.NewGuid(), UserName = "TestUser" }, 
+                Rating = 5, 
+                Comment = "Awesome!",
+                CreatedAt = DateTime.UtcNow
+            }
+        };
+
+        _helper.Setup(h => h.GetProductOr404(productId))
+            .ReturnsAsync(testProduct);
+
+        _cacheMock.Setup(c => c.GetDataAsync<List<ProductReviewsResponseDto>>($"review:{productId}"))
+            .ReturnsAsync((List<ProductReviewsResponseDto>?)null);
+
+        _reviewRepositoryMock.Setup(r => r.GetReviewsByProductId(productId))
+            .ReturnsAsync(repoReviews);
+
+        var result = await _reviewService.GetReviewsByProductId(productId);
+
+        result.Should().NotBeNull();
+        result.Should().HaveCount(2);
+        result[0].Comment.Should().Be("Good quality");
+        result[0].User?.UserName.Should().Be("TestUser");
+
+        _reviewRepositoryMock.Verify(r => r.GetReviewsByProductId(productId), Times.Once);
+
+        _cacheMock.Verify(c => c.SetDataAsync(
+            $"review:{productId}",
+            It.Is<List<ProductReviewsResponseDto>>(list => list.Count == 2),
+            TimeSpan.FromMinutes(5)
+        ), Times.Once);
+    }
 }

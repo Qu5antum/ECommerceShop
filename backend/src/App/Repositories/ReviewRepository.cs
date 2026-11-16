@@ -8,7 +8,7 @@ namespace App.Repositories;
 
 public interface IReviewRepository : IBaseRepository<Review>
 {
-    Task<List<ProductReviewsResponseDto>> GetReviewsByProductId(Guid productId);
+    Task<List<ProductReviewsResponseDto>> GetReviewsByProductId(Guid productId, int limit = 50, int offset = 0);
     Task<Review?> GetReviewByUserAndProductId(Guid userId, Guid productId);
 }
 
@@ -17,7 +17,7 @@ public class ReviewRepository(AppDbContext context) : BaseRepository<Review>(con
 {
     private readonly AppDbContext _context = context;
 
-    public async Task<List<ProductReviewsResponseDto>> GetReviewsByProductId(Guid productId)
+    public async Task<List<ProductReviewsResponseDto>> GetReviewsByProductId(Guid productId, int limit = 50, int offset = 0)
     {
         return await _context.Reviews
             .Where(r => r.ProductId == productId)
@@ -34,6 +34,8 @@ public class ReviewRepository(AppDbContext context) : BaseRepository<Review>(con
                     UserName = r.User.UserName
                 }
             })
+            .Skip(offset)
+            .Take(limit)
             .ToListAsync();
     }
 
