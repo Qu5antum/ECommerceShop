@@ -11,7 +11,7 @@ namespace App.Services;
 
 public interface INotificationService
 {
-    Task<List<NotificationResponseDto>> GetNotificationsAsync(Guid userId, int? take = null, bool? isRead = null);
+    Task<List<NotificationResponseDto>> GetNotificationsAsync(Guid userId, bool? isRead = null, int limit = 50, int offset = 0);
     Task<NotificationResponseDto> GetUserNotificationAsync(Guid userId, Guid notificationId);
     Task<int> GetCountOfUnreadNotificationsAsync(Guid userId);
     Task MarkAllAsReadAsync(Guid userId);
@@ -31,9 +31,9 @@ public class NotificationService : INotificationService
     private readonly IUnitOfWork _unitOfWork;
     private readonly IRedisCacheService _cache;
 
-    private static string GetNotificationsCacheKey(Guid userId, int? take, bool? isRead)
+    private static string GetNotificationsCacheKey(Guid userId, bool? isRead)
     {
-        return $"notifications:{userId}:take:{take}:isRead:{isRead}";
+        return $"notifications:{userId}:isRead:{isRead}";
     }
 
     private static string GetUnreadCountCacheKey(Guid userId)
@@ -68,11 +68,11 @@ public class NotificationService : INotificationService
     }
     
 
-    public async Task<List<NotificationResponseDto>> GetNotificationsAsync(Guid userId, int? take = null, bool? isRead = null)
+    public async Task<List<NotificationResponseDto>> GetNotificationsAsync(Guid userId, bool? isRead = null, int limit = 50, int offset = 0)
     {
         await _helper.GetUserOr404(userId);
 
-        var cacheKey = GetNotificationsCacheKey(userId, take, isRead);
+        var cacheKey = GetNotificationsCacheKey(userId, isRead);
 
         var cached = await _cache.GetDataAsync<List<NotificationResponseDto>>(cacheKey);
 
@@ -82,7 +82,7 @@ public class NotificationService : INotificationService
             return cached;
         }
 
-        var notifications = await _notificationRepository.GetNotificationsAsync(userId, take, isRead);
+        var notifications = await _notificationRepository.GetNotificationsAsync(userId, isRead, limit, offset);
 
         var result = notifications.Select(notification => new NotificationResponseDto
         {

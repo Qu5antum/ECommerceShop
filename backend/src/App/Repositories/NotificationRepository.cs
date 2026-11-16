@@ -7,7 +7,7 @@ namespace App.Repositories;
 
 public interface INotificationRepository : IBaseRepository<Notification>
 {
-    Task<List<Notification>> GetNotificationsAsync(Guid userId, int? take = null, bool? isRead = null);
+    Task<List<Notification>> GetNotificationsAsync(Guid userId, bool? isRead = null, int limit = 50, int offset = 0);
     Task<int> GetCountOfUnReadNotifications(Guid userId);
     Task MarkAllAsReadAsync(Guid userId);
 }
@@ -17,7 +17,7 @@ public class NotificationRepository(AppDbContext context) : BaseRepository<Notif
 {
     private readonly AppDbContext _context = context;
 
-    public async Task<List<Notification>> GetNotificationsAsync(Guid userId, int? take = null, bool? isRead = null)
+    public async Task<List<Notification>> GetNotificationsAsync(Guid userId, bool? isRead = null, int limit = 50, int offset = 0)
     {
         var query = _context.Notifications
             .AsNoTracking()
@@ -30,12 +30,7 @@ public class NotificationRepository(AppDbContext context) : BaseRepository<Notif
 
         query = query.OrderByDescending(n => n.CreatedAt);
 
-        if (take.HasValue)
-        {
-            query = query.Take(take.Value);
-        }
-
-        return await query.ToListAsync();
+        return await query.Skip(offset).Take(limit).ToListAsync();
     }
 
     public async Task<int> GetCountOfUnReadNotifications(Guid userId)

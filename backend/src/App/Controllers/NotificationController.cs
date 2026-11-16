@@ -21,11 +21,11 @@ public class NotificationController : ControllerBase
     }
 
     [HttpGet("Notifications")]
-    public async Task<IActionResult> GetNotifications(int? take = null!, bool? isRead = null)
+    public async Task<IActionResult> GetNotifications(bool? isRead = null, int limit = 50, int offset = 0)
     {
         Guid UserId = _helper.GetUserId();
 
-        var notifications = await _service.GetNotificationsAsync(UserId, take, isRead);
+        var notifications = await _service.GetNotificationsAsync(UserId, isRead, limit, offset);
 
         return Ok(notifications);
     }
