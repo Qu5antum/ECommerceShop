@@ -175,7 +175,6 @@ public class ReviewService : IReviewService
 
     public async Task<bool> DeleteReviewAsync(Guid userId, Guid reviewId)
     {
-        await _unitOfWork.BeginTransactionAsync();
         await _helper.GetUserOr404(userId);
         var review = await _helper.GetReviewOr404(reviewId);
 
@@ -184,6 +183,8 @@ public class ReviewService : IReviewService
             _logger.LogWarning("Review does not belong to user, userId: {userId}, reviewId: {reviewId}", userId, reviewId);
             throw new BadRequestException("Review does not belong to user");
         }
+
+        await _unitOfWork.BeginTransactionAsync();
 
         try
         {

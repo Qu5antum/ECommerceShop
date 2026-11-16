@@ -272,4 +272,84 @@ public class ReviewServiceTests
         _unitOfWorkMock.Verify(u => u.CommitAsync(), Times.Never);
         _cacheMock.Verify(c => c.RemoveDataAsync(It.IsAny<string>()), Times.Never);
     }
+
+    [Fact]
+    public async Task DeleteReviewAsync_WhenReviewDoesNotBelongToUser_ThrowsBadRequestException()
+    {
+        var userId = Guid.NewGuid();
+        var otherUserId = Guid.NewGuid();
+        var reviewId = Guid.NewGuid();
+
+        var testUser = AuthTestHelper.CreateTestUser(Id: userId);
+        var foreignReview = ReviewTestHelper.CreateTestReview(Id: reviewId, UserId: otherUserId);
+
+        _helper.Setup(h => h.GetUserOr404(userId))
+            .ReturnsAsync(testUser);
+
+        _helper.Setup(h => h.GetReviewOr404(reviewId))
+            .ReturnsAsync(foreignReview);
+
+        Func<Task> action = async () => await _reviewService.DeleteReviewAsync(userId, reviewId);
+
+        await action.Should().ThrowAsync<BadRequestException>()
+            .WithMessage("Review does not belong to user");
+
+        _reviewRepositoryMock.Verify(r => r.DeleteAsync(It.IsAny<Review>()), Times.Never);
+        _unitOfWorkMock.Verify(u => u.SaveChangesAsync(), Times.Never);
+    }
+
+    [Fact]
+    public async Task DeleteReviewAsync_WhenValidRequest_DeletesReviewCommitsAndInvalidatesCache()
+    {
+        var userId = Guid.NewGuid();
+        var reviewId = Guid.NewGuid();
+
+        var testUser = AuthTestHelper.CreateTestUser(Id: userId);
+        var testReview = ReviewTestHelper.CreateTestReview(Id: reviewId, UserId: userId);
+
+        _helper.Setup(h => h.GetUserOr404(userId))
+            .ReturnsAsync(testUser);
+
+        _helper.Setup(h => h.GetReviewOr404(reviewId))
+            .ReturnsAsync(testReview);
+
+        var result = await _reviewService.DeleteReviewAsync(userId, reviewId);
+
+        result.Should().BeTrue();
+
+        _unitOfWorkMock.Verify(u => u.BeginTransactionAsync(), Times.Once);
+        _reviewRepositoryMock.Verify(r => r.DeleteAsync(testReview), Times.Once);
+        _unitOfWorkMock.Verify(u => u.SaveChangesAsync(), Times.Once);
+        _unitOfWorkMock.Verify(u => u.CommitAsync(), Times.Once);
+
+        _cacheMock.Verify(c => c.RemoveDataAsync(It.IsAny<string>()), Times.Exactly(3));
+    }
+
+    [Fact]
+    public async Task DeleteReviewAsync_WhenDbUpdateExceptionOccurs_RollsBackAndThrowsDatabaseException()
+    {
+        var userId = Guid.NewGuid();
+        var reviewId = Guid.NewGuid();
+
+        var testUser = AuthTestHelper.CreateTestUser(Id: userId);
+        var testReview = ReviewTestHelper.CreateTestReview(Id: reviewId, UserId: userId);
+
+        _helper.Setup(h => h.GetUserOr404(userId))
+            .ReturnsAsync(testUser);
+
+        _helper.Setup(h => h.GetReviewOr404(reviewId))
+            .ReturnsAsync(testReview);
+
+        _unitOfWorkMock.Setup(u => u.SaveChangesAsync())
+            .ThrowsAsync(new DbUpdateException("Database constraint error", new Exception()));
+
+        Func<Task> action = async () => await _reviewService.DeleteReviewAsync(userId, reviewId);
+
+        await action.Should().ThrowAsync<DatabaseException>()
+            .WithMessage("Could not delete the review to the database.");
+
+        _unitOfWorkMock.Verify(u => u.RollbackAsync(), Times.Once);
+        _unitOfWorkMock.Verify(u => u.CommitAsync(), Times.Never);
+        _cacheMock.Verify(c => c.RemoveDataAsync(It.IsAny<string>()), Times.Never);
+    }
 }
