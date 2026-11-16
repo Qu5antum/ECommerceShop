@@ -60,9 +60,9 @@ public class ReviewController : ControllerBase
 
     [Authorize(Roles = "Admin, Moderator, Manager")]
     [HttpGet("Admin/Reviews")]
-    public async Task<IActionResult> GetReviewsAdmin()
+    public async Task<IActionResult> GetReviewsAdmin(int limit = 50, int offset = 0)
     {
-        var reviews = await _service.GetAllReviewsAdminAsync();
+        var reviews = await _service.GetAllReviewsAdminAsync(limit, offset);
 
         return Ok(reviews);
     }

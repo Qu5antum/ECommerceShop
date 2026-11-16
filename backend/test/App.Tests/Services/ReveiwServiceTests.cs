@@ -499,4 +499,78 @@ public class ReviewServiceTests
         _unitOfWorkMock.Verify(u => u.CommitAsync(), Times.Never);
         _cacheMock.Verify(c => c.RemoveDataAsync(It.IsAny<string>()), Times.Never);
     }
+
+    [Fact]
+    public async Task GetAllReviewsAdminAsync_WhenDataIsInCache_ReturnsCachedReviewsWithoutHittingRepository()
+    {
+        var cachedReviews = new List<ReviewResponseDto>
+        {
+            new ReviewResponseDto 
+            { 
+                Id = Guid.NewGuid(), 
+                UserId = Guid.NewGuid(), 
+                ProductId = Guid.NewGuid(), 
+                Rating = 5, 
+                Comment = "Cached admin review",
+                CreatedAt = DateTime.UtcNow 
+            }
+        };
+
+        _cacheMock.Setup(c => c.GetDataAsync<List<ReviewResponseDto>>("review:all"))
+            .ReturnsAsync(cachedReviews);
+
+        var result = await _reviewService.GetAllReviewsAdminAsync();
+
+        result.Should().NotBeNull();
+        result.Should().BeEquivalentTo(cachedReviews);
+
+        _reviewRepositoryMock.Verify(r => r.GetReviewsWithPagination(It.IsAny<int>(), It.IsAny<int>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task GetAllReviewsAdminAsync_WhenCacheMiss_FetchesFromRepositoryMapsAndCaches()
+    {
+        var expectedReviews = new List<ReviewResponseDto>
+        { 
+            new ReviewResponseDto 
+                { 
+                    Id = Guid.NewGuid(), 
+                    UserId = Guid.NewGuid(), 
+                    ProductId = Guid.NewGuid(), 
+                    Rating = 4, 
+                    Comment = "Good product",
+                    CreatedAt = DateTime.UtcNow 
+                },
+            new ReviewResponseDto 
+                { 
+                    Id = Guid.NewGuid(), 
+                    UserId = Guid.NewGuid(), 
+                    ProductId = Guid.NewGuid(), 
+                    Rating = 5, 
+                    Comment = "Excellent!",
+                    CreatedAt = DateTime.UtcNow 
+                }
+    };
+
+    _cacheMock.Setup(c => c.GetDataAsync<List<ReviewResponseDto>>("review:all"))
+        .ReturnsAsync((List<ReviewResponseDto>?)null);
+
+    _reviewRepositoryMock.Setup(r => r.GetReviewsWithPagination())
+        .ReturnsAsync(expectedReviews);
+
+        var result = await _reviewService.GetAllReviewsAdminAsync();
+
+        result.Should().NotBeNull();
+        result.Should().HaveCount(2);
+        result[0].Comment.Should().Be("Good product");
+        result[1].Comment.Should().Be("Excellent!");
+
+        _reviewRepositoryMock.Verify(r => r.GetReviewsWithPagination(), Times.Once);
+
+        _cacheMock.Verify(c => c.SetDataAsync(
+            "review:all",
+            It.Is<List<ReviewResponseDto>>(list => list.Count == 2),
+            TimeSpan.FromMinutes(5)
+        ), Times.Once);
+    }
 }

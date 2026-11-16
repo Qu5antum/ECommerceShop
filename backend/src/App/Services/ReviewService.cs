@@ -16,7 +16,7 @@ public interface IReviewService
     Task<bool> DeleteReviewAsync(Guid userId, Guid reviewId);
     Task<List<ProductReviewsResponseDto>> GetReviewsByProductId(Guid productId, int limit = 50, int offset = 0);
     Task<bool> DeleteReviewAdminAsync(Guid reviewId);
-    Task<List<ReviewResponseDto>> GetAllReviewsAdminAsync();
+    Task<List<ReviewResponseDto>> GetAllReviewsAdminAsync(int limit = 50, int offset = 0);
     Task<ReviewResponseDto> GetReviewByIdAdminAsync(Guid reviewId);
 }
 
@@ -266,7 +266,7 @@ public class ReviewService : IReviewService
         }
     }
 
-    public async Task<List<ReviewResponseDto>> GetAllReviewsAdminAsync()
+    public async Task<List<ReviewResponseDto>> GetAllReviewsAdminAsync(int limit = 50, int offset = 0)
     {
         var cacheKey = GetReviewsCacheKey();
 
@@ -278,7 +278,7 @@ public class ReviewService : IReviewService
             return cachedReviews;
         }
 
-        var reviews = await _reviewRepository.GetAllAsync();
+        var reviews = await _reviewRepository.GetReviewsWithPagination(limit, offset);
 
         var result = reviews.Select(review => new ReviewResponseDto
         {
