@@ -316,7 +316,6 @@ public class NotificationService : INotificationService
             await _cache.RemoveDataAsync(GetNotificationsCacheKey());
 
             _logger.LogInformation("Notification deleted from redis cache: {notificationId}", notificationId);
-            
             _logger.LogInformation("Notification successfully deleted: {notificationId}", notificationId);
 
             return true;

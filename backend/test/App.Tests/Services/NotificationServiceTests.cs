@@ -490,4 +490,51 @@ public class NotificationServiceTests
 
         _cacheMock.Verify(c => c.SetDataAsync(It.IsAny<string>(), It.IsAny<NotificationResponseDto>(), It.IsAny<TimeSpan>()), Times.Never);
     }
+
+    [Fact]
+    public async Task DeleteNotificationAdminAsync_WhenNotificationExists_DeletesItemCommitsTransactionAndInvalidatesCache()
+    {
+        var notificationId = Guid.NewGuid();
+
+        var testNotification = new Notification
+        {
+            Id = notificationId,
+            UserId = Guid.NewGuid(),
+            Title = "Test Notification",
+            Message = "Test Content"
+        };
+
+        _helper.Setup(h => h.GetNotificationOr404(notificationId))
+            .ReturnsAsync(testNotification);
+
+        var result = await _notificationService.DeleteNotificationAdminAsync(notificationId);
+
+        result.Should().BeTrue();
+
+        _unitOfWorkMock.Verify(u => u.BeginTransactionAsync(), Times.Once);
+        _notificationRepositoryMock.Verify(r => r.DeleteAsync(testNotification), Times.Once);
+        _unitOfWorkMock.Verify(u => u.SaveChangesAsync(), Times.Once);
+        _unitOfWorkMock.Verify(u => u.CommitAsync(), Times.Once);
+
+        _cacheMock.Verify(c => c.RemoveDataAsync(It.IsAny<string>()), Times.AtLeast(2));
+    }
+
+    [Fact]
+    public async Task DeleteNotificationAdminAsync_WhenNotificationNotFound_ThrowsNotFoundException()
+    {
+        var notificationId = Guid.NewGuid();
+
+        _helper.Setup(h => h.GetNotificationOr404(notificationId))
+            .ThrowsAsync(new NotFoundException("Notification not found"));
+
+        Func<Task> action = async () => await _notificationService.DeleteNotificationAdminAsync(notificationId);
+
+        await action.Should().ThrowAsync<NotFoundException>()
+            .WithMessage("Notification not found");
+
+        _notificationRepositoryMock.Verify(r => r.DeleteAsync(It.IsAny<Notification>()), Times.Never);
+        _unitOfWorkMock.Verify(u => u.SaveChangesAsync(), Times.Never);
+        _unitOfWorkMock.Verify(u => u.CommitAsync(), Times.Never);
+        _cacheMock.Verify(c => c.RemoveDataAsync(It.IsAny<string>()), Times.Never);
+    }
 }
