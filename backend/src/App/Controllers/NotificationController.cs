@@ -1,4 +1,5 @@
 using App.DTOs;
+using App.Enum;
 using App.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -71,9 +72,9 @@ public class NotificationController : ControllerBase
 
     [Authorize(Roles = "Admin, Moderator, Manager")]
     [HttpGet("Admin/Notifications")]
-    public async Task<IActionResult> GetNotificationsAdmin()
+    public async Task<IActionResult> GetNotificationsAdmin(NotificationType? notificationType, int limit = 50, int offset = 0)
     {
-        var notifications = await _service.GetAllNotificationsAdminAsync();
+        var notifications = await _service.GetAllNotificationsAdminAsync(notificationType, limit, offset);
 
         return Ok(notifications);
     }

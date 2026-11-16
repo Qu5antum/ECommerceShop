@@ -5,6 +5,7 @@ using App.Repositories;
 using App.Services.Caching;
 using App.Transactions;
 using Microsoft.EntityFrameworkCore;
+using App.Enum;
 
 namespace App.Services;
 
@@ -16,7 +17,7 @@ public interface INotificationService
     Task<int> GetCountOfUnreadNotificationsAsync(Guid userId);
     Task MarkAllAsReadAsync(Guid userId);
     Task<bool> SendNotificationsAdminAsync(CreateNotificationDto notificationDto);
-    Task<List<NotificationResponseDto>> GetAllNotificationsAdminAsync();
+    Task<List<NotificationResponseDto>> GetAllNotificationsAdminAsync(NotificationType? notificationType, int limit = 50, int offset = 0);
     Task<NotificationResponseDto> GetNotificationAdminAsync(Guid notificationId);
     Task<bool> DeleteNotificationAdminAsync(Guid notificationId);
 }
@@ -225,7 +226,7 @@ public class NotificationService : INotificationService
         }
     }
 
-    public async Task<List<NotificationResponseDto>> GetAllNotificationsAdminAsync()
+    public async Task<List<NotificationResponseDto>> GetAllNotificationsAdminAsync(NotificationType? notificationType, int limit = 50, int offset = 0)
     {
         var cacheKey = GetNotificationsCacheKey();
 
@@ -237,7 +238,7 @@ public class NotificationService : INotificationService
             return cachedNotifications;
         }
 
-        var notifications = await _notificationRepository.GetAllAsync();
+        var notifications = await _notificationRepository.GetAllNotificationWithPagination(notificationType, limit, offset);
 
         var result = notifications.Select(notification => new NotificationResponseDto
         {

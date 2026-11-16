@@ -2,6 +2,7 @@ import api from './client'
 import type { 
   CreateNotificationDto, 
   NotificationResponseDto,
+  NotificationType
 } from '../types/notification'
 
 
@@ -35,8 +36,14 @@ export const notificationApi = {
     return response.data
   },
 
-  async getNotificationsAdmin(): Promise<NotificationResponseDto[]> {
-    const response = await api.get<NotificationResponseDto[]>('/Notification/Admin/Notifications')
+  async getNotificationsAdmin(notificationType?: NotificationType, limit?: number, offset?: number): Promise<NotificationResponseDto[]> {
+    const response = await api.get<NotificationResponseDto[]>('/Notification/Admin/Notifications', {
+      params: {
+        notificationType: notificationType,
+        limit: limit ?? 50,
+        offset: offset ?? 0,
+      },
+    })
     return response.data
   },
 

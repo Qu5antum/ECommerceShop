@@ -322,4 +322,88 @@ public class NotificationServiceTests
 
         _cacheMock.Verify(c => c.RemoveDataAsync("notifications:all"), Times.Once);
     }
+
+    [Fact]
+    public async Task GetAllNotificationsAdminAsync_WhenDataIsInCache_ReturnsCachedNotificationsWithoutHittingRepository()
+    {
+        var notificationType = NotificationType.System;
+
+        var cachedNotifications = new List<NotificationResponseDto>
+        {
+            new NotificationResponseDto 
+            { 
+                Id = Guid.NewGuid(), 
+                UserId = Guid.NewGuid(), 
+                Title = "Admin Alert Cached", 
+                Message = "Cached message",
+                Type = NotificationType.System,
+                IsRead = false 
+            }
+        };
+
+        _cacheMock.Setup(c => c.GetDataAsync<List<NotificationResponseDto>>("notifications:all"))
+            .ReturnsAsync(cachedNotifications);
+
+        var result = await _notificationService.GetAllNotificationsAdminAsync(notificationType);
+
+        result.Should().NotBeNull();
+        result.Should().BeEquivalentTo(cachedNotifications);
+
+        _notificationRepositoryMock.Verify(r => r.GetAllNotificationWithPagination(
+            It.IsAny<NotificationType?>(), 
+            It.IsAny<int>(), 
+            It.IsAny<int>()
+        ), Times.Never);
+    }
+
+    [Fact]
+    public async Task GetAllNotificationsAdminAsync_WhenDataIsNotInCache_FetchesFromRepositoryWithPaginationAndCaches()
+    {
+        var notificationType = NotificationType.System;
+
+        var dbNotifications = new List<Notification>
+        {
+            new Notification
+            {
+                Id = Guid.NewGuid(),
+                UserId = Guid.NewGuid(),
+                Title = "System Maintenance",
+                Message = "Scheduled maintenance tonight",
+                Type = NotificationType.System,
+                IsRead = false,
+                CreatedAt = DateTime.UtcNow
+            },
+            new Notification
+            {
+                Id = Guid.NewGuid(),
+                UserId = Guid.NewGuid(),
+                Title = "Security Update",
+                Message = "New policy applied",
+                Type = NotificationType.System,
+                IsRead = true,
+                CreatedAt = DateTime.UtcNow
+            }
+        };
+
+        _cacheMock.Setup(c => c.GetDataAsync<List<NotificationResponseDto>>("notifications:all"))
+            .ReturnsAsync((List<NotificationResponseDto>?)null);
+
+        _notificationRepositoryMock.Setup(r => r.GetAllNotificationWithPagination(notificationType))
+            .ReturnsAsync(dbNotifications);
+
+        var result = await _notificationService.GetAllNotificationsAdminAsync(notificationType);
+
+        result.Should().NotBeNull();
+        result.Should().HaveCount(2);
+        result[0].Title.Should().Be("System Maintenance");
+        result[1].Title.Should().Be("Security Update");
+
+        _notificationRepositoryMock.Verify(r => r.GetAllNotificationWithPagination(notificationType), Times.Once);
+
+        _cacheMock.Verify(c => c.SetDataAsync(
+            "notifications:all",
+            It.Is<List<NotificationResponseDto>>(list => list.Count == 2),
+            TimeSpan.FromMinutes(5)
+        ), Times.Once);
+    }
 }
