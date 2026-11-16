@@ -184,4 +184,92 @@ public class ReviewServiceTests
         _unitOfWorkMock.Verify(u => u.CommitAsync(), Times.Never);
         _cacheMock.Verify(c => c.RemoveDataAsync(It.IsAny<string>()), Times.Never);
     }
+
+    [Fact]
+    public async Task UpdateReviewAsync_WhenReviewDoesNotBelongToUser_ThrowsBadRequestException()
+    {
+        var userId = Guid.NewGuid();
+        var otherUserId = Guid.NewGuid();
+        var reviewId = Guid.NewGuid();
+
+        var testUser = AuthTestHelper.CreateTestUser(Id: userId);
+        var foreignReview = ReviewTestHelper.CreateTestReview(Id: reviewId, UserId: otherUserId);
+
+        var updateDto = new UpdateReviewDto { Rating = 4, Comment = "Updated comment" };
+
+        _helper.Setup(h => h.GetUserOr404(userId))
+            .ReturnsAsync(testUser);
+
+        _helper.Setup(h => h.GetReviewOr404(reviewId))
+            .ReturnsAsync(foreignReview);
+
+        Func<Task> action = async () => await _reviewService.UpdateReviewAsync(userId, reviewId, updateDto);
+
+        await action.Should().ThrowAsync<BadRequestException>()
+            .WithMessage("Review does not belong to user");
+
+        _reviewRepositoryMock.Verify(r => r.UpdateAsync(It.IsAny<Review>()), Times.Never);
+        _unitOfWorkMock.Verify(u => u.SaveChangesAsync(), Times.Never);
+    }
+
+    [Fact]
+    public async Task UpdateReviewAsync_WhenValidRequest_UpdatesReviewCommitsAndInvalidatesCache()
+    {
+        var userId = Guid.NewGuid();
+        var reviewId = Guid.NewGuid();
+
+        var testUser = AuthTestHelper.CreateTestUser(Id: userId);
+        var testReview = ReviewTestHelper.CreateTestReview(Id: reviewId, UserId: userId, Rating: 2, Comment: "Old comment");
+
+        var updateDto = new UpdateReviewDto { Rating = 5, Comment = "New amazing comment!" };
+
+        _helper.Setup(h => h.GetUserOr404(userId))
+            .ReturnsAsync(testUser);
+
+        _helper.Setup(h => h.GetReviewOr404(reviewId))
+            .ReturnsAsync(testReview);
+
+        var result = await _reviewService.UpdateReviewAsync(userId, reviewId, updateDto);
+
+        result.Should().BeTrue();
+        testReview.Rating.Should().Be(5);
+        testReview.Comment.Should().Be("New amazing comment!");
+
+        _unitOfWorkMock.Verify(u => u.BeginTransactionAsync(), Times.Once);
+        _reviewRepositoryMock.Verify(r => r.UpdateAsync(testReview), Times.Once);
+        _unitOfWorkMock.Verify(u => u.SaveChangesAsync(), Times.Once);
+        _unitOfWorkMock.Verify(u => u.CommitAsync(), Times.Once);
+
+        _cacheMock.Verify(c => c.RemoveDataAsync(It.IsAny<string>()), Times.Exactly(2));
+    }
+
+    [Fact]
+    public async Task UpdateReviewAsync_WhenDbUpdateExceptionOccurs_RollsBackAndThrowsDatabaseException()
+    {
+        var userId = Guid.NewGuid();
+        var reviewId = Guid.NewGuid();
+
+        var testUser = AuthTestHelper.CreateTestUser(Id: userId);
+        var testReview = ReviewTestHelper.CreateTestReview(Id: reviewId, UserId: userId);
+
+        var updateDto = new UpdateReviewDto { Rating = 4 };
+
+        _helper.Setup(h => h.GetUserOr404(userId))
+            .ReturnsAsync(testUser);
+
+        _helper.Setup(h => h.GetReviewOr404(reviewId))
+            .ReturnsAsync(testReview);
+
+        _unitOfWorkMock.Setup(u => u.SaveChangesAsync())
+            .ThrowsAsync(new DbUpdateException("Database error", new Exception()));
+
+        Func<Task> action = async () => await _reviewService.UpdateReviewAsync(userId, reviewId, updateDto);
+
+        await action.Should().ThrowAsync<DatabaseException>()
+            .WithMessage("Could not update the review to the database.");
+
+        _unitOfWorkMock.Verify(u => u.RollbackAsync(), Times.Once);
+        _unitOfWorkMock.Verify(u => u.CommitAsync(), Times.Never);
+        _cacheMock.Verify(c => c.RemoveDataAsync(It.IsAny<string>()), Times.Never);
+    }
 }

@@ -3,7 +3,7 @@ using App.Models;
 
 public class ReviewTestHelper
 {
-    private static Review CreateTestReview(
+    public  static Review CreateTestReview(
         Guid? Id = null,
         Guid? UserId = null,
         Guid? ProductId = null,

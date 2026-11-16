@@ -122,7 +122,6 @@ public class ReviewService : IReviewService
 
     public async Task<bool> UpdateReviewAsync(Guid userId, Guid reviewId, UpdateReviewDto updateReviewDto)
     {
-        await _unitOfWork.BeginTransactionAsync();
         await _helper.GetUserOr404(userId);
         
         var review = await _helper.GetReviewOr404(reviewId);
@@ -138,6 +137,8 @@ public class ReviewService : IReviewService
             _logger.LogWarning("Rating can be only from 1 to 5 user ID: {userId}, reviewId: {reviewId}", userId, reviewId);
             throw new BadRequestException("Rating can be only from 1 to 5 rate");
         }
+
+        await _unitOfWork.BeginTransactionAsync();
 
         try
         {
