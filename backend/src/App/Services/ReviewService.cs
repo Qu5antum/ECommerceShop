@@ -60,7 +60,6 @@ public class ReviewService : IReviewService
 
     public async Task<ReviewResponseDto> CreateReviewAsync(Guid userId, Guid productId, CreateReviewDto createReviewDto)
     {
-        await _unitOfWork.BeginTransactionAsync();
         await _helper.GetUserOr404(userId);
         await _helper.GetProductOr404(productId);
 
@@ -77,6 +76,8 @@ public class ReviewService : IReviewService
             _logger.LogWarning("User already have review for this product, user ID: {userId}, product ID: {productId}", userId, productId);
             throw new BadRequestException("User already have revies for this product");
         }
+
+        await _unitOfWork.BeginTransactionAsync();
 
         try
         {
