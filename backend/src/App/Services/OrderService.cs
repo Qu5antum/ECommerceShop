@@ -390,8 +390,6 @@ public class OrderService : IOrderService
 
     public async Task<bool> CancelOrderAsync(Guid userId, Guid orderId)
     {
-        await _unitOfWork.BeginTransactionAsync();
-
         await _helper.GetUserOr404(userId);
         
         var order = await _orderRepository.GetOrderWithItemsById(orderId);
@@ -413,6 +411,8 @@ public class OrderService : IOrderService
             _logger.LogWarning("Cannot cancel order before Paid stage, order ID: {orderId}, status: {status}", orderId, order.status);
             throw new BadRequestException("Orders cannot be cancelled before the Paid stage.");
         }
+
+        await _unitOfWork.BeginTransactionAsync();
         
         try
         {

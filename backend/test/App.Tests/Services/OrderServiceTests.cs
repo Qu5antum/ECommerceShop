@@ -12,6 +12,7 @@ using App.Enum;
 using System.Data.Common;
 using FluentAssertions.Specialized;
 using Microsoft.AspNetCore.Http.HttpResults;
+using Microsoft.EntityFrameworkCore;
 
 
 public class OrderServiceTests
@@ -463,5 +464,225 @@ public class OrderServiceTests
             .WithMessage("Order does not belong to user");
 
         _cacheMock.Verify(c => c.SetDataAsync(It.IsAny<string>(), It.IsAny<OrderResponseDto>(), It.IsAny<TimeSpan>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task CancelOrder_SuccessfullResponse_ReturnsTrue()
+    {
+        var sellerProfileId = Guid.NewGuid();
+        var sellerUserId = Guid.NewGuid();
+        var testUser = AuthTestHelper.CreateTestUser();
+
+        var testProduct = ProductTestHelper.CreateTestProduct(
+            SellerProfileId: sellerProfileId,
+            Stock: 10
+        );
+        var testProducts = new List<Product> { testProduct };
+
+        var testOrder = OrderTestHelper.CreateTestOrder(userId: testUser.Id);
+
+        var testOrderItem = OrderItemTestHelper.CreateTestOrderItem(
+            orderId: testOrder.Id,
+            productId: testProduct.Id,
+            ProductName: testProduct.Name,
+            Price: testProduct.Price,
+            Quantity: 2
+        );
+
+        testOrder.orderItems = new List<OrderItem> { testOrderItem };
+
+        _helper.Setup(h => h.GetUserOr404(testUser.Id))
+            .ReturnsAsync(testUser);
+
+        _orderRepositoryMock.Setup(r => r.GetOrderWithItemsById(testOrder.Id))
+            .ReturnsAsync(testOrder);
+
+        _productRepositoryMock.Setup(r => r.GetObjectsByMultipleIdsAsync(It.IsAny<List<Guid>>()))
+            .ReturnsAsync(testProducts);
+
+        _sellerProfileRepositoryMock.Setup(r => r.GetUserIdBySellerProfileId(sellerProfileId))
+            .ReturnsAsync(sellerUserId);
+
+        var result = await _orderService.CancelOrderAsync(testUser.Id, testOrder.Id);
+
+        result.Should().BeTrue();
+        testOrder.status.Should().Be(OrderStatus.Cancelled);
+        testProduct.Stock.Should().Be(12); 
+
+        _notificationRepositoryMock.Verify(r => r.CreateAsync(It.IsAny<Notification>()), Times.Exactly(2));
+
+        _unitOfWorkMock.Verify(u => u.BeginTransactionAsync(), Times.Once);
+        _unitOfWorkMock.Verify(u => u.SaveChangesAsync(), Times.Once);
+        _unitOfWorkMock.Verify(u => u.CommitAsync(), Times.Once);
+
+        _cacheMock.Verify(c => c.RemoveDataAsync(It.IsAny<string>()), Times.Exactly(5));
+    }
+
+    [Fact]
+    public async Task CancelOrder_WhenOrderNotFound_ThrowsNotFoundException()
+    {
+        var userId = Guid.NewGuid();
+        var orderId = Guid.NewGuid();
+        var testUser = AuthTestHelper.CreateTestUser(Id: userId);
+
+        _helper.Setup(h => h.GetUserOr404(userId))
+            .ReturnsAsync(testUser);
+
+        _orderRepositoryMock.Setup(r => r.GetOrderWithItemsById(orderId))
+            .ReturnsAsync((Order?)null);
+
+        Func<Task> action = async () => await _orderService.CancelOrderAsync(userId, orderId);
+
+        await action.Should().ThrowAsync<NotFoundException>()
+            .WithMessage("Order not found");
+
+        _unitOfWorkMock.Verify(u => u.BeginTransactionAsync(), Times.Never);
+        _cacheMock.Verify(c => c.RemoveDataAsync(It.IsAny<string>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task CancelOrder_WhenOrderDoesNotBelongToUser_ThrowsBadRequestException()
+    {
+        var userId = Guid.NewGuid();
+        var otherUserId = Guid.NewGuid();
+        var orderId = Guid.NewGuid();
+        var testUser = AuthTestHelper.CreateTestUser(Id: userId);
+        var foreignOrder = OrderTestHelper.CreateTestOrder(Id: orderId, userId: otherUserId);
+
+        _helper.Setup(h => h.GetUserOr404(userId))
+            .ReturnsAsync(testUser);
+
+        _orderRepositoryMock.Setup(r => r.GetOrderWithItemsById(orderId))
+            .ReturnsAsync(foreignOrder);
+
+        Func<Task> action = async () => await _orderService.CancelOrderAsync(userId, orderId);
+
+        await action.Should().ThrowAsync<BadRequestException>()
+            .WithMessage("Order does not belong to user");
+
+        _unitOfWorkMock.Verify(u => u.BeginTransactionAsync(), Times.Never);
+    }
+
+    [Fact]
+    public async Task CancelOrder_WhenStatusIsGreaterThanPaid_ThrowsBadRequestException()
+    {
+        var userId = Guid.NewGuid();
+        var testUser = AuthTestHelper.CreateTestUser(Id: userId);
+        
+        var testOrder = OrderTestHelper.CreateTestOrder(userId: userId, status: OrderStatus.Shipped);
+
+        _helper.Setup(h => h.GetUserOr404(userId))
+            .ReturnsAsync(testUser);
+
+        _orderRepositoryMock.Setup(r => r.GetOrderWithItemsById(testOrder.Id))
+            .ReturnsAsync(testOrder);
+
+        Func<Task> action = async () => await _orderService.CancelOrderAsync(userId, testOrder.Id);
+
+        await action.Should().ThrowAsync<BadRequestException>()
+            .WithMessage("Orders cannot be cancelled before the Paid stage.");
+
+        _unitOfWorkMock.Verify(u => u.BeginTransactionAsync(), Times.Never);
+    }
+
+    [Fact]
+    public async Task CancelOrder_WhenSomeProductsAreMissing_ThrowsNotFoundException()
+    {
+        var userId = Guid.NewGuid();
+        var testUser = AuthTestHelper.CreateTestUser(Id: userId);
+        var testOrder = OrderTestHelper.CreateTestOrder(userId: userId, status: OrderStatus.Paid);
+
+        var item1 = OrderItemTestHelper.CreateTestOrderItem(orderId: testOrder.Id);
+        var item2 = OrderItemTestHelper.CreateTestOrderItem(orderId: testOrder.Id);
+        testOrder.orderItems = new List<OrderItem> { item1, item2 };
+
+        var dbProducts = new List<Product> { ProductTestHelper.CreateTestProduct(Id: item1.productId) };
+
+        _helper.Setup(h => h.GetUserOr404(userId))
+            .ReturnsAsync(testUser);
+
+        _orderRepositoryMock.Setup(r => r.GetOrderWithItemsById(testOrder.Id))
+            .ReturnsAsync(testOrder);
+
+        _productRepositoryMock.Setup(r => r.GetObjectsByMultipleIdsAsync(It.IsAny<List<Guid>>()))
+            .ReturnsAsync(dbProducts);
+
+        Func<Task> action = async () => await _orderService.CancelOrderAsync(userId, testOrder.Id);
+
+        await action.Should().ThrowAsync<NotFoundException>()
+            .WithMessage("Some products are missing");
+
+        _unitOfWorkMock.Verify(u => u.BeginTransactionAsync(), Times.Once);
+        _unitOfWorkMock.Verify(u => u.SaveChangesAsync(), Times.Never);
+    }
+
+    [Fact]
+    public async Task CancelOrder_WhenSellerUserIdNotFound_ThrowsNotFoundException()
+    {
+        var userId = Guid.NewGuid();
+        var sellerProfileId = Guid.NewGuid();
+        var testUser = AuthTestHelper.CreateTestUser(Id: userId);
+        var testProduct = ProductTestHelper.CreateTestProduct(SellerProfileId: sellerProfileId);
+        var testOrder = OrderTestHelper.CreateTestOrder(userId: userId, status: OrderStatus.Pending);
+        var item = OrderItemTestHelper.CreateTestOrderItem(orderId: testOrder.Id, productId: testProduct.Id);
+        
+        testOrder.orderItems = new List<OrderItem> { item };
+
+        _helper.Setup(h => h.GetUserOr404(userId))
+            .ReturnsAsync(testUser);
+
+        _orderRepositoryMock.Setup(r => r.GetOrderWithItemsById(testOrder.Id))
+            .ReturnsAsync(testOrder);
+
+        _productRepositoryMock.Setup(r => r.GetObjectsByMultipleIdsAsync(It.IsAny<List<Guid>>()))
+            .ReturnsAsync(new List<Product> { testProduct });
+
+        _sellerProfileRepositoryMock.Setup(r => r.GetUserIdBySellerProfileId(sellerProfileId))
+            .ReturnsAsync(Guid.Empty);
+
+        Func<Task> action = async () => await _orderService.CancelOrderAsync(userId, testOrder.Id);
+
+        await action.Should().ThrowAsync<NotFoundException>()
+            .WithMessage("User not found by seller");
+
+        _unitOfWorkMock.Verify(u => u.BeginTransactionAsync(), Times.Once);
+        _unitOfWorkMock.Verify(u => u.SaveChangesAsync(), Times.Never);
+    }
+
+    [Fact]
+    public async Task CancelOrder_WhenDbUpdateExceptionOccurs_RollsBackAndThrowsDatabaseException()
+    {
+        var userId = Guid.NewGuid();
+        var sellerProfileId = Guid.NewGuid();
+        var sellerUserId = Guid.NewGuid();
+        var testUser = AuthTestHelper.CreateTestUser(Id: userId);
+        var testProduct = ProductTestHelper.CreateTestProduct(SellerProfileId: sellerProfileId);
+        var testOrder = OrderTestHelper.CreateTestOrder(userId: userId, status: OrderStatus.Paid);
+        var item = OrderItemTestHelper.CreateTestOrderItem(orderId: testOrder.Id, productId: testProduct.Id);
+
+        testOrder.orderItems = new List<OrderItem> { item };
+
+        _helper.Setup(h => h.GetUserOr404(userId))
+            .ReturnsAsync(testUser);
+
+        _orderRepositoryMock.Setup(r => r.GetOrderWithItemsById(testOrder.Id))
+            .ReturnsAsync(testOrder);
+
+        _productRepositoryMock.Setup(r => r.GetObjectsByMultipleIdsAsync(It.IsAny<List<Guid>>()))
+            .ReturnsAsync(new List<Product> { testProduct });
+
+        _sellerProfileRepositoryMock.Setup(r => r.GetUserIdBySellerProfileId(sellerProfileId))
+            .ReturnsAsync(sellerUserId);
+
+        _unitOfWorkMock.Setup(u => u.SaveChangesAsync())
+            .ThrowsAsync(new DbUpdateException("Database error", new Exception()));
+
+        Func<Task> action = async () => await _orderService.CancelOrderAsync(userId, testOrder.Id);
+
+        await action.Should().ThrowAsync<DatabaseException>()
+            .WithMessage("Could not cancel the order to the database.");
+
+        _unitOfWorkMock.Verify(u => u.RollbackAsync(), Times.Once);
+        _unitOfWorkMock.Verify(u => u.CommitAsync(), Times.Never);
     }
 }
