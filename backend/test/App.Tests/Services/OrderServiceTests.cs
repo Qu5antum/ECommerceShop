@@ -1123,4 +1123,92 @@ public class OrderServiceTests
 
         _cacheMock.Verify(c => c.RemoveDataAsync(It.IsAny<string>()), Times.Exactly(15));
     }
+
+    [Fact]
+    public async Task GetOrdersForAdminAsync_WhenDataIsInCache_ReturnsCachedOrdersWithoutHittingRepository()
+    {
+        var status = OrderStatus.Paid;
+
+        var cachedOrders = new List<OrderResponseDto>
+        {
+            new OrderResponseDto
+            {
+                Id = Guid.NewGuid(),
+                userId = Guid.NewGuid(),
+                TotalAmount = 1500,
+                status = OrderStatus.Paid,
+                CreatedAt = DateTime.UtcNow,
+                orderItems = new List<OrderItemResponseDto>
+                {
+                    new OrderItemResponseDto
+                    {
+                        Id = Guid.NewGuid(),
+                        productId = Guid.NewGuid(),
+                        ProductName = "Test Product",
+                        Price = 1500,
+                        Quantity = 1
+                    }
+                }
+            }
+        };
+
+        _cacheMock.Setup(c => c.GetDataAsync<List<OrderResponseDto>>($"orders:{status}"))
+            .ReturnsAsync(cachedOrders);
+
+        var result = await _orderService.GetOrdersForAdminAsync(status);
+
+        result.Should().NotBeNull();
+        result.Should().BeEquivalentTo(cachedOrders);
+
+        _orderRepositoryMock.Verify(r => r.GetOrdersWithStatus(It.IsAny<OrderStatus?>(), It.IsAny<int>(), It.IsAny<int>()), Times.Never);
+        _cacheMock.Verify(c => c.SetDataAsync(It.IsAny<string>(), It.IsAny<List<OrderResponseDto>>(), It.IsAny<TimeSpan>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task GetOrdersForAdminAsync_WhenCacheMiss_FetchesFromRepositoryAndCaches()
+    {
+        var cachedOrders = new List<OrderResponseDto>
+        {
+            new OrderResponseDto
+            {
+                Id = Guid.NewGuid(),
+                userId = Guid.NewGuid(),
+                TotalAmount = 1500,
+                status = OrderStatus.Paid,
+                CreatedAt = DateTime.UtcNow,
+                orderItems = new List<OrderItemResponseDto>
+                {
+                    new OrderItemResponseDto
+                    {
+                        Id = Guid.NewGuid(),
+                        productId = Guid.NewGuid(),
+                        ProductName = "Test Product",
+                        Price = 1500,
+                        Quantity = 1
+                    }
+                }
+            }
+        };
+
+        _cacheMock.Setup(c => c.GetDataAsync<List<OrderResponseDto>>("orders:all"))
+            .ReturnsAsync((List<OrderResponseDto>?)null);
+
+        _orderRepositoryMock.Setup(r => r.GetOrdersWithStatus())
+            .ReturnsAsync(cachedOrders);
+
+        var result = await _orderService.GetOrdersForAdminAsync();
+
+        result.Should().NotBeNull();
+        result.Should().HaveCount(1);
+        result.First().TotalAmount.Should().Be(1500);
+        result.First().orderItems.First().ProductName.Should().Be("Test Product");
+
+        _orderRepositoryMock.Verify(r => r.GetOrdersWithStatus(), Times.Once);
+
+        _cacheMock.Verify(c => c.SetDataAsync(
+            "orders:all",
+            It.Is<List<OrderResponseDto>>(list => list.Count == 1),
+            TimeSpan.FromMinutes(5)
+        ), Times.Once);
+    }
 }

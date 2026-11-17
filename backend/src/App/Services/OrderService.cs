@@ -19,7 +19,7 @@ public interface IOrderService
     Task<bool> CancelOrderAsync(Guid userId, Guid orderId);
     Task<List<OrderResponseWithOutItemsDto>> GetOrdersOfSellerAsync(Guid userId, int limit = 50, int offset = 0);
     Task<bool> UpdateOrderStatusAsync(Guid orderId, UpdateOrderStatusDto orderStatusDto);
-    Task<List<OrderResponseDto>> GetOrdersForAdminAsync(OrderStatus? status = null);
+    Task<List<OrderResponseDto>> GetOrdersForAdminAsync(OrderStatus? status = null, int limit = 50, int offset = 0);
     Task<OrderResponseDto> GetOrderAdminAsync(Guid orderId);
     Task<List<OrderResponseDto>> GetOrdersFromDateToDateAsync(DateTime fromDate, DateTime toDate);
     Task<OrderResponseWithItemsAndUser> GetOrderOfSellerWithItemAndUserAsync(Guid userId, Guid orderId);
@@ -732,7 +732,7 @@ public class OrderService : IOrderService
         }
     }
 
-    public async Task<List<OrderResponseDto>> GetOrdersForAdminAsync(OrderStatus? status = null)
+    public async Task<List<OrderResponseDto>> GetOrdersForAdminAsync(OrderStatus? status = null, int limit = 50, int offset = 0)
     {
         var cacheKey = status.HasValue 
             ? GetOrdersWithStatusCacheKey(status.Value) 
@@ -746,7 +746,7 @@ public class OrderService : IOrderService
             return cachedOrders;
         }
 
-        var orders = await _orderRepository.GetOrdersWithStatus(status);
+        var orders = await _orderRepository.GetOrdersWithStatus(status, limit, offset);
 
         var result = orders.Select(order => new OrderResponseDto
         {

@@ -11,7 +11,7 @@ public interface IOrderRepository : IBaseRepository<Order>
 {
     Task<IEnumerable<OrderResponseDto>> GetOrdersByUserIdAsync(Guid userId, int limit = 50, int offset = 0);
     Task<Order?> GetOrderWithItemsById(Guid orderId);
-    Task<List<Order>> GetOrdersWithStatus(OrderStatus? status = null);
+    Task<List<OrderResponseDto>> GetOrdersWithStatus(OrderStatus? status = null, int limit = 50, int offset = 0);
     Task<List<Order>> GetOrderWithDate(DateTime fromDate, DateTime toDate);
     Task<int> GetPendingOrdersCountAsync();
     Task<List<OrderResponseWithOutItemsDto>> GetOrdersOfSellerAsync(Guid sellerId, int limit = 50, int offset = 0);
@@ -61,17 +61,44 @@ public class OrderRepository(AppDbContext context) : BaseRepository<Order>(conte
             .FirstOrDefaultAsync(o => o.Id == orderId);
     }
 
-    public async Task<List<Order>> GetOrdersWithStatus(OrderStatus? status = null)
+    public async Task<List<OrderResponseDto>> GetOrdersWithStatus(OrderStatus? status = null, int limit = 50, int offset = 0)
     {
-        var query = _context.Orders
+        IQueryable<Order> query = _context.Orders
             .AsNoTracking();
-        
+
         if (status.HasValue)
         {
-            query = query.Where(p => p.status == status.Value);
+            query = query.Where(o => o.status == status.Value); 
         }
 
-        var result = await query.ToListAsync();
+        query = query
+            .OrderByDescending(o => o.CreatedAt)
+            .ThenBy(o => o.Id)
+            .Skip(offset)
+            .Take(limit);
+
+        var result = await query.Select(o => new OrderResponseDto
+            {
+                Id = o.Id,
+                userId = o.userId,
+                TotalAmount = o.TotalAmount,
+                status = o.status,
+                orderItems = o.orderItems
+                    .Select(i => new OrderItemResponseDto
+                    {
+                        Id = i.Id,
+                        orderId = i.orderId,
+                        productId = i.productId,
+                        ProductName = i.ProductName,
+                        Price = i.Price,
+                        Quantity = i.Quantity,
+                        CreatedAt = i.CreatedAt,
+                        UpdatedAt = i.UpdatedAt
+                    }).ToList(),
+                CreatedAt = o.CreatedAt,
+                UpdatedAt = o.UpdatedAt
+            })
+            .ToListAsync();
 
         return result;
     }
