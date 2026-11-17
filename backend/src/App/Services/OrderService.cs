@@ -55,7 +55,7 @@ public class OrderService : IOrderService
 
     private static string GetOrdersCacheKey()
     {
-        return $"orders:all";
+        return "orders:all";
     }
 
     private static string GetOrdersWithStatusCacheKey(OrderStatus status)
@@ -80,7 +80,7 @@ public class OrderService : IOrderService
 
     private static string GetProductsOutOfStockCacheyKey()
     {
-        return $"products:outOfStock";
+        return "products:outOfStock";
     }
 
     private static string GetCartItemsCacheKeyByUser(Guid userId)
@@ -121,8 +121,6 @@ public class OrderService : IOrderService
     
     public async Task<OrderResponseDto> CreateOrderAsync(Guid userId)
     {
-        await _unitOfWork.BeginTransactionAsync();
-
         await _helper.GetUserOr404(userId);
 
         var cartWithItems = await _cartRepository.GetCartWithItemsByUserIdAsync(userId);
@@ -138,6 +136,8 @@ public class OrderService : IOrderService
             _logger.LogWarning("Cart can't be empty: {cartId}", cartWithItems.Id);
             throw new BadRequestException("Cart can't be empty");
         }
+
+        await _unitOfWork.BeginTransactionAsync();
         
         try
         {
@@ -198,22 +198,16 @@ public class OrderService : IOrderService
                 userId = userId,
                 TotalAmount = totalAmount,
                 status = OrderStatus.Pending,
+                orderItems = orderItems 
             };
 
-            await _orderRepository.CreateAsync(newOrder);
-            _logger.LogInformation("New order created: {orderId}", newOrder.Id);
+            await _orderRepository.CreateAsync(newOrder); 
+            _logger.LogInformation("New order prepared with {count} items: {orderId}", orderItems.Count, newOrder.Id);
 
-            foreach (var item in orderItems)
-            {
-                item.orderId = newOrder.Id;
-                await _orderItemRepository.CreateAsync(item);
+            var cacheTasks = orderItems.Select(item => _cache.RemoveDataAsync(GetProductCacheKeyById(item.productId)));
+            await Task.WhenAll(cacheTasks);
 
-                await _cache.RemoveDataAsync(GetProductCacheKeyById(item.productId));
-
-                _logger.LogInformation("Product deleted from redis cache: {productId}", item.productId);
-                
-                newOrder.orderItems.Add(item);
-            }
+            _logger.LogInformation("Products cache cleared for order: {orderId}", newOrder.Id);
 
             await _cartRepository.ClearCartAsync(cartWithItems.Id);
 

@@ -85,7 +85,6 @@ public class PaymentService : IPaymentService
 
     public async Task<PaymentResponseDto> CreatePaymentAsync(Guid userId, Guid orderId)
     {
-        await _unitOfWork.BeginTransactionAsync();
         await _helper.GetUserOr404(userId);
 
         var order = await _helper.GetOrderOr404(orderId);
@@ -110,6 +109,8 @@ public class PaymentService : IPaymentService
 
         string ProviderPaymentId = $"mock_{Guid.NewGuid()}";
 
+        await _unitOfWork.BeginTransactionAsync();
+
         try
         {
             var newPayment = new Payment
@@ -123,7 +124,6 @@ public class PaymentService : IPaymentService
             await _paymentRepository.CreateAsync(newPayment);
             await _unitOfWork.SaveChangesAsync();
             await _unitOfWork.CommitAsync();
-
             
             await _cache.RemoveDataAsync(GetPaymentsCacheKey());
             await _cache.RemoveDataAsync(GetPaymentTotalStatisticsCacheKey());
@@ -134,7 +134,6 @@ public class PaymentService : IPaymentService
             await _cache.RemoveDataAsync(GetGeneralAnalyticsCacheKey());
 
             _logger.LogInformation("Payments deleted from redis cache");
-
             _logger.LogInformation("Successfull response of payment, user ID: {userId}, order ID: {orderId}", userId, orderId);
 
             return new PaymentResponseDto
