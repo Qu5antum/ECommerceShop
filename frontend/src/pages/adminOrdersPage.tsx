@@ -15,10 +15,7 @@ export default function AdminOrdersPage() {
   const [orders, setOrders] = useState<OrderResponseDto[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-
   const [selectedStatus, setSelectedStatus] = useState<string>('all')
-  const [fromDate, setFromDate] = useState<string>('')
-  const [toDate, setToDate] = useState<string>('')
 
   useEffect(() => {
     async function initAdminOrders() {
@@ -46,22 +43,12 @@ export default function AdminOrdersPage() {
     initAdminOrders()
   }, [])
 
-  async function fetchOrders(statusFilter?: OrderStatus, start?: string, end?: string) {
+  async function fetchOrders(statusFilter?: OrderStatus) {
     try {
       setLoading(true)
       setError('')
 
-      let data: OrderResponseDto[] = []
-
-      if (start && end) {
-        data = await orderApi.getOrdersFromDateToDateAdmin(start, end)
-        if (statusFilter !== undefined && !isNaN(statusFilter)) {
-          data = data.filter((o) => o.status === statusFilter)
-        }
-      } else {
-        data = await orderApi.getOrdersAdmin(statusFilter)
-      }
-
+      const data = await orderApi.getOrdersAdmin(statusFilter)
       setOrders(data)
     } catch (err: any) {
       setError(err.response?.data?.message || err.message || 'Failed to load orders')
@@ -74,19 +61,11 @@ export default function AdminOrdersPage() {
     const val = e.target.value
     setSelectedStatus(val)
     const statusNum = val === 'all' ? undefined : (Number(val) as OrderStatus)
-    fetchOrders(statusNum, fromDate, toDate)
-  }
-
-  function handleDateFilterSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    const statusNum = selectedStatus === 'all' ? undefined : (Number(selectedStatus) as OrderStatus)
-    fetchOrders(statusNum, fromDate, toDate)
+    fetchOrders(statusNum)
   }
 
   function handleResetFilters() {
     setSelectedStatus('all')
-    setFromDate('')
-    setToDate('')
     fetchOrders()
   }
 
@@ -153,7 +132,7 @@ export default function AdminOrdersPage() {
         </div>
 
         <div className="filters-card">
-          <form onSubmit={handleDateFilterSubmit} className="filters-grid">
+          <div className="filters-grid">
             <div className="filter-field">
               <label>Filter by Status</label>
               <select value={selectedStatus} onChange={handleStatusChange}>
@@ -168,35 +147,14 @@ export default function AdminOrdersPage() {
               </select>
             </div>
 
-            <div className="filter-field">
-              <label>From Date</label>
-              <input 
-                type="date" 
-                value={fromDate}
-                onChange={(e) => setFromDate(e.target.value)}
-              />
-            </div>
-
-            <div className="filter-field">
-              <label>To Date</label>
-              <input 
-                type="date" 
-                value={toDate}
-                onChange={(e) => setToDate(e.target.value)}
-              />
-            </div>
-
             <div className="filter-actions">
-              <button type="submit" className="button button--dark">
-                Apply Dates
-              </button>
-              {(fromDate || toDate || selectedStatus !== 'all') && (
+              {selectedStatus !== 'all' && (
                 <button type="button" className="button button--quiet" onClick={handleResetFilters}>
-                  Reset
+                  Reset Filter
                 </button>
               )}
             </div>
-          </form>
+          </div>
         </div>
 
         {error && <p className="form-message form-message--error">{error}</p>}

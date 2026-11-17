@@ -63,12 +63,5 @@ export const orderApi = {
   async getOrdersByUserIdAdmin(userId: string): Promise<OrderResponseDto[]> {
     const response = await api.get<OrderResponseDto[]>(`/Order/User/${userId}/Admin`)
     return response.data
-  },
-
-  async getOrdersFromDateToDateAdmin(fromDate: string, toDate: string): Promise<OrderResponseDto[]> {
-    const response = await api.get<OrderResponseDto[]>('/Order/Admin/Date', {
-      params: { fromDate, toDate }
-    })
-    return response.data
-  },
+  }
 }
