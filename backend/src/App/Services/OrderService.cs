@@ -13,7 +13,7 @@ namespace App.Services;
 public interface IOrderService
 {
     Task<OrderResponseDto> CreateOrderAsync(Guid userId);
-    Task<List<OrderResponseDto>> GetOrdersByUserIdAsync(Guid userId);
+    Task<List<OrderResponseDto>> GetOrdersByUserIdAsync(Guid userId, int limit = 50, int offset = 0);
     Task<OrderResponseDto> GetOrderByUserIdAsync(Guid userId, Guid orderId);
     Task<bool> CancelOrderAsync(Guid userId, Guid orderId);
     Task<List<OrderResponseWithOutItemsDto>> GetOrdersOfSellerAsync(Guid userId);
@@ -284,7 +284,7 @@ public class OrderService : IOrderService
         }
     }
 
-    public async Task<List<OrderResponseDto>> GetOrdersByUserIdAsync(Guid userId)
+    public async Task<List<OrderResponseDto>> GetOrdersByUserIdAsync(Guid userId, int limit = 50, int offset = 0)
     {
         await _helper.GetUserOr404(userId);
 
@@ -298,7 +298,7 @@ public class OrderService : IOrderService
             return cachedOrder;
         } 
 
-        var orders = await _orderRepository.GetOrdersByUserIdAsync(userId);
+        var orders = await _orderRepository.GetOrdersByUserIdAsync(userId, limit, offset);
 
         var result =  orders.Select(order => new OrderResponseDto
         {

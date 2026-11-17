@@ -32,11 +32,11 @@ public class OrderController : ControllerBase
     }
 
     [HttpGet("Orders")]
-    public async Task<IActionResult> GetOrdersOfUser()
+    public async Task<IActionResult> GetOrdersOfUser(int limit = 50, int offset = 0)
     {
         Guid userId = _helper.GetUserId();
 
-        var orders = await _service.GetOrdersByUserIdAsync(userId);
+        var orders = await _service.GetOrdersByUserIdAsync(userId, limit, offset);
 
         return Ok(orders);
     }

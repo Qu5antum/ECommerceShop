@@ -1,6 +1,5 @@
 using System.ComponentModel.DataAnnotations;
 using App.Enum;
-using App.Models;
 
 namespace App.DTOs;
 
