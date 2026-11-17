@@ -343,4 +343,125 @@ public class OrderServiceTests
             TimeSpan.FromMinutes(5)
         ), Times.Once);
     }
+
+    [Fact]
+    public async Task GetOrderByUserIdAsync_WhenDataIsInCache_ReturnsCachedOrderWithoutHittingRepository()
+    {
+        var userId = Guid.NewGuid();
+        var orderId = Guid.NewGuid();
+        var testUser = AuthTestHelper.CreateTestUser(Id: userId);
+
+        var cachedOrder = new OrderResponseDto
+        {
+            Id = orderId,
+            userId = userId,
+            TotalAmount = 500,
+            status = OrderStatus.Pending,
+            CreatedAt = DateTime.UtcNow,
+            orderItems = new List<OrderItemResponseDto>()
+        };
+
+        _helper.Setup(h => h.GetUserOr404(userId))
+            .ReturnsAsync(testUser);
+
+        _cacheMock.Setup(c => c.GetDataAsync<OrderResponseDto>($"order:{userId}:{orderId}"))
+            .ReturnsAsync(cachedOrder);
+
+        var result = await _orderService.GetOrderByUserIdAsync(userId, orderId);
+
+        result.Should().NotBeNull();
+        result.Should().BeEquivalentTo(cachedOrder);
+
+        _helper.Verify(h => h.GetUserOr404(userId), Times.Once);
+        _orderRepositoryMock.Verify(r => r.GetOrderWithItemsById(It.IsAny<Guid>()), Times.Never);
+        _cacheMock.Verify(c => c.SetDataAsync(It.IsAny<string>(), It.IsAny<OrderResponseDto>(), It.IsAny<TimeSpan>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task GetOrderByUserIdAsync_WhenCacheMissAndValidUser_FetchesFromRepositoryMapsAndCaches()
+    {
+        var userId = Guid.NewGuid();
+        var orderId = Guid.NewGuid();
+        var testUser = AuthTestHelper.CreateTestUser(Id: userId);
+
+        var testOrder = OrderTestHelper.CreateTestOrder(Id: orderId, userId: userId, TotalAmount: 1000, status: OrderStatus.Paid);
+        var testOrderItem = OrderItemTestHelper.CreateTestOrderItem(orderId: orderId, ProductName: "Phone", Price: 500, Quantity: 2);
+        testOrder.orderItems = new List<OrderItem> { testOrderItem };
+
+        _helper.Setup(h => h.GetUserOr404(userId))
+            .ReturnsAsync(testUser);
+
+        _cacheMock.Setup(c => c.GetDataAsync<OrderResponseDto>($"order:{userId}:{orderId}"))
+            .ReturnsAsync((OrderResponseDto?)null);
+
+        _orderRepositoryMock.Setup(r => r.GetOrderWithItemsById(orderId))
+            .ReturnsAsync(testOrder);
+
+        var result = await _orderService.GetOrderByUserIdAsync(userId, orderId);
+
+        result.Should().NotBeNull();
+        result.Id.Should().Be(orderId);
+        result.userId.Should().Be(userId);
+        result.TotalAmount.Should().Be(1000);
+        result.orderItems.Should().HaveCount(1);
+        result.orderItems.First().ProductName.Should().Be("Phone");
+
+        _orderRepositoryMock.Verify(r => r.GetOrderWithItemsById(orderId), Times.Once);
+        _cacheMock.Verify(c => c.SetDataAsync(
+            $"order:{userId}:{orderId}",
+            It.Is<OrderResponseDto>(dto => dto.Id == orderId),
+            TimeSpan.FromMinutes(5)
+        ), Times.Once);
+    }
+
+    [Fact]
+    public async Task GetOrderByUserIdAsync_WhenOrderNotFound_ThrowsNotFoundException()
+    {
+        var userId = Guid.NewGuid();
+        var orderId = Guid.NewGuid();
+        var testUser = AuthTestHelper.CreateTestUser(Id: userId);
+
+        _helper.Setup(h => h.GetUserOr404(userId))
+            .ReturnsAsync(testUser);
+
+        _cacheMock.Setup(c => c.GetDataAsync<OrderResponseDto>($"order:{userId}:{orderId}"))
+            .ReturnsAsync((OrderResponseDto?)null);
+
+        _orderRepositoryMock.Setup(r => r.GetOrderWithItemsById(orderId))
+            .ReturnsAsync((Order?)null);
+
+        Func<Task> action = async () => await _orderService.GetOrderByUserIdAsync(userId, orderId);
+
+        await action.Should().ThrowAsync<NotFoundException>()
+            .WithMessage("Order not found");
+
+        _cacheMock.Verify(c => c.SetDataAsync(It.IsAny<string>(), It.IsAny<OrderResponseDto>(), It.IsAny<TimeSpan>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task GetOrderByUserIdAsync_WhenOrderDoesNotBelongToUser_ThrowsBadRequestException()
+    {
+        var userId = Guid.NewGuid();
+        var otherUserId = Guid.NewGuid();
+        var orderId = Guid.NewGuid();
+        var testUser = AuthTestHelper.CreateTestUser(Id: userId);
+
+        var foreignOrder = OrderTestHelper.CreateTestOrder(Id: orderId, userId: otherUserId);
+
+        _helper.Setup(h => h.GetUserOr404(userId))
+            .ReturnsAsync(testUser);
+
+        _cacheMock.Setup(c => c.GetDataAsync<OrderResponseDto>($"order:{userId}:{orderId}"))
+            .ReturnsAsync((OrderResponseDto?)null);
+
+        _orderRepositoryMock.Setup(r => r.GetOrderWithItemsById(orderId))
+            .ReturnsAsync(foreignOrder);
+
+        Func<Task> action = async () => await _orderService.GetOrderByUserIdAsync(userId, orderId);
+
+        await action.Should().ThrowAsync<BadRequestException>()
+            .WithMessage("Order does not belong to user");
+
+        _cacheMock.Verify(c => c.SetDataAsync(It.IsAny<string>(), It.IsAny<OrderResponseDto>(), It.IsAny<TimeSpan>()), Times.Never);
+    }
 }
