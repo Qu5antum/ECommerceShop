@@ -92,6 +92,11 @@ public class OrderService : IOrderService
     {
         return "analytics:general:all";
     }
+
+    private static string GetOrderWithItemsByIdAndUserIdCachKey(Guid userId, Guid orderId)
+    {
+        return $"orderSeller:{orderId}:user:{userId}";
+    }
     
     public OrderService
     (
@@ -484,6 +489,8 @@ public class OrderService : IOrderService
             await _cache.RemoveDataAsync(GetProductsCacheKey());
             await _cache.RemoveDataAsync(GetProductsOutOfStockCacheyKey());
             await _cache.RemoveDataAsync(GetOrdersCacheKeyOfSeller(sellerUserId));
+            await _cache.RemoveDataAsync(GetOrderCacheKeyByOrderIdAndUser(userId, orderId));
+            await _cache.RemoveDataAsync(GetOrderWithItemsByIdAndUserIdCachKey(sellerProfileId, orderId));
 
             _logger.LogInformation("Products deleted from redis cache");
 
@@ -544,6 +551,16 @@ public class OrderService : IOrderService
     {
         await _helper.GetUserOr404(userId);
 
+        var cacheKey = GetOrderWithItemsByIdAndUserIdCachKey(userId, orderId);
+
+        var cachedOrder = await _cache.GetDataAsync<OrderResponseWithItemsAndUser>(cacheKey);
+
+        if (cachedOrder is not null)
+        {
+            _logger.LogInformation("Order fetched from redis cache, order ID: {orderId}, user ID: {userId}", orderId, userId);
+            return cachedOrder;
+        }
+
         var seller = await _sellerRepository.GetSellerProfileByUserIdAsync(userId);
 
         if (seller is null)
@@ -559,6 +576,12 @@ public class OrderService : IOrderService
             _logger.LogInformation("Order not found: {orderId}", orderId);
             throw new NotFoundException("Order not found");
         }
+
+        await _cache.SetDataAsync(
+            cacheKey, 
+            order,
+            TimeSpan.FromMinutes(5)
+        );
 
         return order;
     }
@@ -659,6 +682,8 @@ public class OrderService : IOrderService
                 await _cache.RemoveDataAsync(GetOrdersWithStatusCacheKey(OrderStatus.Delivered));
                 await _cache.RemoveDataAsync(GetOrdersWithStatusCacheKey(OrderStatus.Cancelled));
                 await _cache.RemoveDataAsync(GetOrdersCacheKey());
+                await _cache.RemoveDataAsync(GetOrderCacheKeyByOrderIdAndUser(order.userId, orderId));
+                await _cache.RemoveDataAsync(GetOrderWithItemsByIdAndUserIdCachKey(sellerProfileId, orderId));
 
                 _logger.LogInformation("Orders deleted from redis cache");
                 _logger.LogInformation("Order was cancelled by Moderator order ID: {orderId}", orderId);
