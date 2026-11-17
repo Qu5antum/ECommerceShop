@@ -958,4 +958,169 @@ public class OrderServiceTests
 
         _cacheMock.Verify(c => c.SetDataAsync(It.IsAny<string>(), It.IsAny<OrderResponseWithItemsAndUser>(), It.IsAny<TimeSpan>()), Times.Never);
     }
+
+    [Fact]
+    public async Task UpdateOrderStatus_SuccessfullResponse_ReturnsOk()
+    {
+        var sellerUserId = Guid.NewGuid();
+        var sellerProfileId = Guid.NewGuid();
+        var testUser = AuthTestHelper.CreateTestUser();
+
+        var testProducts = new List<Product>
+        {
+            ProductTestHelper.CreateTestProduct(SellerProfileId: sellerProfileId),
+            ProductTestHelper.CreateTestProduct(SellerProfileId: sellerProfileId)
+        };
+
+        var testOrder = OrderTestHelper.CreateTestOrder(userId: testUser.Id, status: OrderStatus.Paid);
+
+        var testOrderItems = new List<OrderItem>
+        {
+            OrderItemTestHelper.CreateTestOrderItem(orderId: testOrder.Id, productId: testProducts[0].Id),
+            OrderItemTestHelper.CreateTestOrderItem(orderId: testOrder.Id, productId: testProducts[1].Id)
+        };
+
+        testOrder.orderItems = testOrderItems;
+
+        var updateOrderStatusDto = new UpdateOrderStatusDto
+        {
+            Status = OrderStatus.Processing
+        };
+
+        _orderRepositoryMock.Setup(r => r.GetOrderWithItemsById(testOrder.Id))
+            .ReturnsAsync(testOrder);
+        
+        _productRepositoryMock.Setup(r => r.GetObjectsByMultipleIdsAsync(It.IsAny<List<Guid>>()))
+            .ReturnsAsync(testProducts);
+
+        _sellerProfileRepositoryMock.Setup(r => r.GetUserIdBySellerProfileId(sellerProfileId))
+            .ReturnsAsync(sellerUserId);
+
+        var result = await _orderService.UpdateOrderStatusAsync(testOrder.Id, updateOrderStatusDto);
+
+        result.Should().BeTrue();
+        testOrder.status.Should().Be(OrderStatus.Processing);
+
+        _notificationRepositoryMock.Verify(r => r.CreateAsync(It.Is<Notification>(n => n.UserId == testUser.Id)), Times.Once);
+        _notificationRepositoryMock.Verify(r => r.CreateAsync(It.Is<Notification>(n => n.UserId == sellerUserId)), Times.Once);
+
+        _unitOfWorkMock.Verify(u => u.BeginTransactionAsync(), Times.Once);
+        _unitOfWorkMock.Verify(u => u.SaveChangesAsync(), Times.Once);
+        _unitOfWorkMock.Verify(u => u.CommitAsync(), Times.Once);
+    }
+
+    [Fact]
+    public async Task UpdateOrderStatus_IfOrderNotNotFound_ThrowsNotFoundException()
+    {
+        var userId = Guid.NewGuid();
+        var orderId = Guid.NewGuid();
+
+        var updateOrderStatusDto = new UpdateOrderStatusDto
+        {
+            Status = OrderStatus.Processing
+        };
+
+        _orderRepositoryMock.Setup(r => r.GetOrderWithItemsById(orderId))
+            .ReturnsAsync((Order?)null);
+
+        Func<Task> action = async () => await _orderService.UpdateOrderStatusAsync(orderId, updateOrderStatusDto);
+
+        await action.Should().ThrowAsync<NotFoundException>()
+            .WithMessage("Order not found");
+
+        _productRepositoryMock.Verify(r => r.GetObjectsByMultipleIdsAsync(It.IsAny<List<Guid>>()), Times.Never);
+        _sellerProfileRepositoryMock.Verify(r => r.GetUserIdBySellerProfileId(It.IsAny<Guid>()), Times.Never);
+        _notificationRepositoryMock.Verify(r => r.CreateAsync(It.IsAny<Notification>()), Times.Never);
+
+        _unitOfWorkMock.Verify(u => u.BeginTransactionAsync(), Times.Never);
+        _unitOfWorkMock.Verify(u => u.SaveChangesAsync(), Times.Never);
+        _unitOfWorkMock.Verify(u => u.CommitAsync(), Times.Never);
+
+        _cacheMock.Verify(c => c.RemoveDataAsync(It.IsAny<string>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task UpdateOrderStatus_WhenInvalidStateTransition_ThrowsBadRequestException()
+    {
+        var userId = Guid.NewGuid();
+
+        var testOrder = OrderTestHelper.CreateTestOrder(
+            userId: userId,
+            status: OrderStatus.Delivered
+        );
+
+        var updateOrderStatusDto = new UpdateOrderStatusDto
+        {
+            Status = OrderStatus.Processing
+        };
+
+        _orderRepositoryMock.Setup(r => r.GetOrderWithItemsById(testOrder.Id))
+            .ReturnsAsync(testOrder);
+
+        Func<Task> action = async () => await _orderService.UpdateOrderStatusAsync(testOrder.Id, updateOrderStatusDto);
+
+        await action.Should().ThrowAsync<BadRequestException>();
+
+        _productRepositoryMock.Verify(r => r.GetObjectsByMultipleIdsAsync(It.IsAny<List<Guid>>()), Times.Never);
+        _sellerProfileRepositoryMock.Verify(r => r.GetUserIdBySellerProfileId(It.IsAny<Guid>()), Times.Never);
+        _notificationRepositoryMock.Verify(r => r.CreateAsync(It.IsAny<Notification>()), Times.Never);
+
+        _unitOfWorkMock.Verify(u => u.BeginTransactionAsync(), Times.Never);
+        _unitOfWorkMock.Verify(u => u.SaveChangesAsync(), Times.Never);
+        _unitOfWorkMock.Verify(u => u.CommitAsync(), Times.Never);
+
+        _cacheMock.Verify(c => c.RemoveDataAsync(It.IsAny<string>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task UpdateOrderStatus_IfOrderStatusCancel_ProductStockReturning()
+    {
+        var sellerUserId = Guid.NewGuid();
+        var sellerProfileId = Guid.NewGuid();
+        var testUser = AuthTestHelper.CreateTestUser();
+
+        var testProducts = new List<Product>
+        {
+            ProductTestHelper.CreateTestProduct(SellerProfileId: sellerProfileId),
+            ProductTestHelper.CreateTestProduct(SellerProfileId: sellerProfileId)
+        };
+
+        var testOrder = OrderTestHelper.CreateTestOrder(userId: testUser.Id, status: OrderStatus.Paid);
+
+        var testOrderItems = new List<OrderItem>
+        {
+            OrderItemTestHelper.CreateTestOrderItem(orderId: testOrder.Id, productId: testProducts[0].Id),
+            OrderItemTestHelper.CreateTestOrderItem(orderId: testOrder.Id, productId: testProducts[1].Id)
+        };
+
+        testOrder.orderItems = testOrderItems;
+
+        var updateOrderStatusDto = new UpdateOrderStatusDto
+        {
+            Status = OrderStatus.Cancelled
+        };
+
+        _orderRepositoryMock.Setup(r => r.GetOrderWithItemsById(testOrder.Id))
+            .ReturnsAsync(testOrder);
+        
+        _productRepositoryMock.Setup(r => r.GetObjectsByMultipleIdsAsync(It.IsAny<List<Guid>>()))
+            .ReturnsAsync(testProducts);
+
+        _sellerProfileRepositoryMock.Setup(r => r.GetUserIdBySellerProfileId(sellerProfileId))
+            .ReturnsAsync(sellerUserId);
+
+        var result = await _orderService.UpdateOrderStatusAsync(testOrder.Id, updateOrderStatusDto);
+
+        result.Should().BeTrue();
+        testOrder.status.Should().Be(OrderStatus.Cancelled);
+
+        _notificationRepositoryMock.Verify(r => r.CreateAsync(It.Is<Notification>(n => n.UserId == testUser.Id)), Times.Once);
+        _notificationRepositoryMock.Verify(r => r.CreateAsync(It.Is<Notification>(n => n.UserId == sellerUserId)), Times.Once);
+
+        _unitOfWorkMock.Verify(u => u.BeginTransactionAsync(), Times.Once);
+        _unitOfWorkMock.Verify(u => u.SaveChangesAsync(), Times.Once);
+        _unitOfWorkMock.Verify(u => u.CommitAsync(), Times.Once);
+
+        _cacheMock.Verify(c => c.RemoveDataAsync(It.IsAny<string>()), Times.Exactly(15));
+    }
 }

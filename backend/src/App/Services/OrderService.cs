@@ -6,6 +6,7 @@ using App.Transactions;
 using App.Enum;
 using Microsoft.EntityFrameworkCore;
 using App.Services.Caching;
+using App.State;
 
 namespace App.Services;
 
@@ -588,8 +589,6 @@ public class OrderService : IOrderService
 
     public async Task<bool> UpdateOrderStatusAsync(Guid orderId, UpdateOrderStatusDto orderStatusDto)
     {
-        await _unitOfWork.BeginTransactionAsync();
-
         var order = await _orderRepository.GetOrderWithItemsById(orderId);
         
         if (order == null)
@@ -598,23 +597,9 @@ public class OrderService : IOrderService
             throw new NotFoundException("Order not found");
         }
 
-        if (order.status == OrderStatus.Cancelled || order.status == OrderStatus.Delivered)
-        {
-            _logger.LogWarning("Cannot change status of an order that is already {status}, order ID: {orderId}", order.status, orderId);
-            throw new BadRequestException($"Cannot change status of a {order.status} order.");
-        }
+        OrderStatusState.ValidateTransition(order.status, orderStatusDto.Status);
 
-        if (orderStatusDto.Status == OrderStatus.Cancelled && (order.status == OrderStatus.Shipped || order.status == OrderStatus.Delivered))
-        {
-            _logger.LogWarning("Cannot cancel order from status: {status}, order ID: {orderId}", order.status, orderId);
-            throw new BadRequestException("Cannot cancel an order that has already been shipped or delivered.");
-        }
-
-        if (orderStatusDto.Status != OrderStatus.Cancelled && order.status > orderStatusDto.Status)
-        {
-            _logger.LogWarning("Order status backward transition not available, order ID: {orderId}", orderId);
-            throw new BadRequestException("Order status transition is not available");
-        }
+        await _unitOfWork.BeginTransactionAsync();
         
         try
         {
@@ -670,9 +655,6 @@ public class OrderService : IOrderService
                 notificationMessageForSeller = $"Order was cancelled order ID: {orderId}";
                 notificationType = NotificationType.OrderCancelled;
 
-                await _unitOfWork.SaveChangesAsync();
-                await _unitOfWork.CommitAsync();
-                
                 await _cache.RemoveDataAsync(GetOrderCacheKey(orderId));
                 await _cache.RemoveDataAsync(GetOrdersWithStatusCacheKey(OrderStatus.Pending));
                 await _cache.RemoveDataAsync(GetOrdersWithStatusCacheKey(OrderStatus.PaymentPending));
@@ -692,8 +674,6 @@ public class OrderService : IOrderService
                 await _cache.RemoveDataAsync(GetProductsOutOfStockCacheyKey());
 
                 _logger.LogInformation("Products deleted from redis cache");
-
-                return true;
             }
 
             else if (orderStatusDto.Status == OrderStatus.Shipped)
