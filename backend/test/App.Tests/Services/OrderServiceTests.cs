@@ -1211,4 +1211,106 @@ public class OrderServiceTests
             TimeSpan.FromMinutes(5)
         ), Times.Once);
     }
+
+    [Fact]
+    public async Task GetOrderAdminAsync_WhenDataIsInCache_ReturnsCachedOrderWithoutHittingRepository()
+    {
+        var orderId = Guid.NewGuid();
+
+        var cachedOrder = new OrderResponseDto
+        {
+            Id = orderId,
+            userId = Guid.NewGuid(),
+            TotalAmount = 2500,
+            status = OrderStatus.Paid,
+            CreatedAt = DateTime.UtcNow,
+            orderItems = new List<OrderItemResponseDto>
+            {
+                new OrderItemResponseDto
+                {
+                    Id = Guid.NewGuid(),
+                    orderId = orderId,
+                    productId = Guid.NewGuid(),
+                    ProductName = "Test Product",
+                    Price = 2500,
+                    Quantity = 1
+                }
+            }
+        };
+
+        _cacheMock.Setup(c => c.GetDataAsync<OrderResponseDto>($"orders:{orderId}"))
+            .ReturnsAsync(cachedOrder);
+
+        var result = await _orderService.GetOrderAdminAsync(orderId);
+
+        result.Should().NotBeNull();
+        result.Should().BeEquivalentTo(cachedOrder);
+
+        _orderRepositoryMock.Verify(r => r.GetOrderWithItemsById(It.IsAny<Guid>()), Times.Never);
+        _cacheMock.Verify(c => c.SetDataAsync(It.IsAny<string>(), It.IsAny<OrderResponseDto>(), It.IsAny<TimeSpan>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task GetOrderAdminAsync_WhenCacheMissAndOrderExists_FetchesFromRepositoryMapsAndCaches()
+    {
+        var orderId = Guid.NewGuid();
+
+        var dbOrder = OrderTestHelper.CreateTestOrder(
+            Id: orderId,
+            userId: Guid.NewGuid(),
+            TotalAmount: 5000,
+            status: OrderStatus.Processing
+        );
+
+        var dbOrderItem = OrderItemTestHelper.CreateTestOrderItem(
+            orderId: orderId,
+            ProductName: "Gaming Console",
+            Price: 2500,
+            Quantity: 2
+        );
+        dbOrder.orderItems = new List<OrderItem> { dbOrderItem };
+
+        _cacheMock.Setup(c => c.GetDataAsync<OrderResponseDto>($"orders:{orderId}"))
+            .ReturnsAsync((OrderResponseDto?)null);
+
+        _orderRepositoryMock.Setup(r => r.GetOrderWithItemsById(orderId))
+            .ReturnsAsync(dbOrder);
+
+        var result = await _orderService.GetOrderAdminAsync(orderId);
+
+        result.Should().NotBeNull();
+        result.Id.Should().Be(orderId);
+        result.TotalAmount.Should().Be(5000);
+        result.status.Should().Be(OrderStatus.Processing);
+        result.orderItems.Should().HaveCount(1);
+        result.orderItems.First().ProductName.Should().Be("Gaming Console");
+
+        _orderRepositoryMock.Verify(r => r.GetOrderWithItemsById(orderId), Times.Once);
+
+        _cacheMock.Verify(c => c.SetDataAsync(
+            $"orders:{orderId}",
+            It.Is<OrderResponseDto>(dto => dto.Id == orderId && dto.TotalAmount == 5000),
+            TimeSpan.FromMinutes(5)
+        ), Times.Once);
+    }
+
+    [Fact]
+    public async Task GetOrderAdminAsync_WhenOrderNotFound_ThrowsNotFoundException()
+    {
+        var orderId = Guid.NewGuid();
+
+        _cacheMock.Setup(c => c.GetDataAsync<OrderResponseDto>($"orders:{orderId}"))
+            .ReturnsAsync((OrderResponseDto?)null);
+
+        _orderRepositoryMock.Setup(r => r.GetOrderWithItemsById(orderId))
+            .ReturnsAsync((Order?)null);
+
+        Func<Task> action = async () => await _orderService.GetOrderAdminAsync(orderId);
+
+        await action.Should().ThrowAsync<NotFoundException>()
+            .WithMessage("Order not found");
+
+        _orderRepositoryMock.Verify(r => r.GetOrderWithItemsById(orderId), Times.Once);
+        _cacheMock.Verify(c => c.SetDataAsync(It.IsAny<string>(), It.IsAny<OrderResponseDto>(), It.IsAny<TimeSpan>()), Times.Never);
+    }
 }
