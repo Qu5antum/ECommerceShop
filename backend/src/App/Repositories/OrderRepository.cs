@@ -14,7 +14,7 @@ public interface IOrderRepository : IBaseRepository<Order>
     Task<List<Order>> GetOrdersWithStatus(OrderStatus? status = null);
     Task<List<Order>> GetOrderWithDate(DateTime fromDate, DateTime toDate);
     Task<int> GetPendingOrdersCountAsync();
-    Task<List<OrderResponseWithOutItemsDto>> GetOrdersOfSellerAsync(Guid sellerId);
+    Task<List<OrderResponseWithOutItemsDto>> GetOrdersOfSellerAsync(Guid sellerId, int limit = 50, int offset = 0);
     Task<OrderResponseWithItemsAndUser?> GetOrderOfSellerAsync(Guid sellerId, Guid orderId);
 }
 
@@ -94,10 +94,11 @@ public class OrderRepository(AppDbContext context) : BaseRepository<Order>(conte
             .CountAsync();
     }
 
-    public async Task<List<OrderResponseWithOutItemsDto>> GetOrdersOfSellerAsync(Guid sellerId)
+    public async Task<List<OrderResponseWithOutItemsDto>> GetOrdersOfSellerAsync(Guid sellerId, int limit = 50, int offset = 0)
     {
         return await _context.Orders
             .AsNoTracking()
+            .OrderByDescending(o => o.CreatedAt)
             .Where(o => o.orderItems.Any(oi => oi.Product.SellerProfileId == sellerId))
             .Select(o => new OrderResponseWithOutItemsDto
             {
@@ -108,6 +109,8 @@ public class OrderRepository(AppDbContext context) : BaseRepository<Order>(conte
                 CreatedAt = o.CreatedAt,
                 UpdatedAt = o.UpdatedAt,
             })
+            .Skip(offset)
+            .Take(limit)
             .ToListAsync();
     }
 

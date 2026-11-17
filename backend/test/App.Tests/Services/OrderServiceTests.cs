@@ -685,4 +685,106 @@ public class OrderServiceTests
         _unitOfWorkMock.Verify(u => u.RollbackAsync(), Times.Once);
         _unitOfWorkMock.Verify(u => u.CommitAsync(), Times.Never);
     }
+
+    [Fact]
+    public async Task GetOrdersOfSellerAsync_WhenDataIsInCache_ReturnsCachedOrdersWithoutHittingRepository()
+    {
+        var userId = Guid.NewGuid();
+
+        var testSeller = SellerProfileTestHelper.CreateTestSellerProfile(userId: userId);
+
+        var cachedOrders = new List<OrderResponseWithOutItemsDto>
+        {
+            new OrderResponseWithOutItemsDto
+            {
+                Id = Guid.NewGuid(),
+                userId = Guid.NewGuid(),
+                TotalAmount = 750,
+                status = OrderStatus.Paid,
+                CreatedAt = DateTime.UtcNow
+            }
+        };
+
+        _sellerProfileRepositoryMock.Setup(r => r.GetSellerProfileByUserIdAsync(userId))
+            .ReturnsAsync(testSeller);
+
+        _cacheMock.Setup(c => c.GetDataAsync<List<OrderResponseWithOutItemsDto>>($"orderSeller:{userId}"))
+            .ReturnsAsync(cachedOrders);
+
+        var result = await _orderService.GetOrdersOfSellerAsync(userId, 50, 0);
+
+        result.Should().NotBeNull();
+        result.Should().BeEquivalentTo(cachedOrders);
+
+        _sellerProfileRepositoryMock.Verify(r => r.GetSellerProfileByUserIdAsync(userId), Times.Once);
+        _orderRepositoryMock.Verify(r => r.GetOrdersOfSellerAsync(It.IsAny<Guid>(), It.IsAny<int>(), It.IsAny<int>()), Times.Never);
+        _cacheMock.Verify(c => c.SetDataAsync(It.IsAny<string>(), It.IsAny<List<OrderResponseWithOutItemsDto>>(), It.IsAny<TimeSpan>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task GetOrdersOfSellerAsync_WhenCacheMiss_FetchesFromRepositoryMapsAndCaches()
+    {
+        var userId = Guid.NewGuid();
+
+        var testSeller = SellerProfileTestHelper.CreateTestSellerProfile(userId: userId);
+        var testOrder = OrderTestHelper.CreateTestOrder(TotalAmount: 1200, status: OrderStatus.Shipped);
+        var dbOrders = new List<OrderResponseWithOutItemsDto>
+        {
+            new OrderResponseWithOutItemsDto
+            {
+                Id = testOrder.Id,
+                userId = testOrder.userId,
+                TotalAmount = testOrder.TotalAmount,
+                status = testOrder.status,
+                CreatedAt = testOrder.CreatedAt,
+                UpdatedAt = testOrder.UpdatedAt
+            }
+        };
+
+        _sellerProfileRepositoryMock.Setup(r => r.GetSellerProfileByUserIdAsync(userId))
+            .ReturnsAsync(testSeller);
+
+        _cacheMock.Setup(c => c.GetDataAsync<List<OrderResponseWithOutItemsDto>>($"orderSeller:{userId}"))
+            .ReturnsAsync((List<OrderResponseWithOutItemsDto>?)null);
+
+        _orderRepositoryMock.Setup(r => r.GetOrdersOfSellerAsync(testSeller.Id))
+            .ReturnsAsync(dbOrders);
+
+        var result = await _orderService.GetOrdersOfSellerAsync(userId);
+
+        result.Should().NotBeNull();
+        result.Should().HaveCount(1);
+        
+        var dto = result.First();
+        dto.Id.Should().Be(testOrder.Id);
+        dto.userId.Should().Be(testOrder.userId);
+        dto.TotalAmount.Should().Be(1200);
+        dto.status.Should().Be(OrderStatus.Shipped);
+
+        _sellerProfileRepositoryMock.Verify(r => r.GetSellerProfileByUserIdAsync(userId), Times.Once);
+        _orderRepositoryMock.Verify(r => r.GetOrdersOfSellerAsync(testSeller.Id), Times.Once);
+
+        _cacheMock.Verify(c => c.SetDataAsync(
+            $"orderSeller:{userId}",
+            It.Is<List<OrderResponseWithOutItemsDto>>(list => list.Count == 1 && list[0].Id == testOrder.Id),
+            TimeSpan.FromMinutes(5)
+        ), Times.Once);
+    }
+
+    [Fact]
+    public async Task GetOrdersOfSellerAsync_WhenSellerNotFound_ThrowsNotFoundException()
+    {
+        var userId = Guid.NewGuid();
+
+        _sellerProfileRepositoryMock.Setup(r => r.GetSellerProfileByUserIdAsync(userId))
+            .ReturnsAsync((SellerProfile?)null);
+
+        Func<Task> action = async () => await _orderService.GetOrdersOfSellerAsync(userId, 50, 0);
+
+        await action.Should().ThrowAsync<NotFoundException>()
+            .WithMessage("Seller not found by user");
+
+        _orderRepositoryMock.Verify(r => r.GetOrdersOfSellerAsync(It.IsAny<Guid>(), It.IsAny<int>(), It.IsAny<int>()), Times.Never);
+        _cacheMock.Verify(c => c.GetDataAsync<List<OrderResponseWithOutItemsDto>>(It.IsAny<string>()), Times.Never);
+    }
 }

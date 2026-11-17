@@ -63,11 +63,11 @@ public class OrderController : ControllerBase
 
     [Authorize(Roles = "Seller")]
     [HttpGet("Orders/Seller")]
-    public async Task<IActionResult> GetOrdersOfSeller()
+    public async Task<IActionResult> GetOrdersOfSeller(int limit = 50, int offset = 0)
     {
         Guid userId = _helper.GetUserId();
 
-        var orders = await _service.GetOrdersOfSellerAsync(userId);
+        var orders = await _service.GetOrdersOfSellerAsync(userId, limit, offset);
 
         return Ok(orders);
     }
