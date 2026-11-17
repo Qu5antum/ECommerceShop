@@ -21,7 +21,6 @@ public interface IOrderService
     Task<bool> UpdateOrderStatusAsync(Guid orderId, UpdateOrderStatusDto orderStatusDto);
     Task<List<OrderResponseDto>> GetOrdersForAdminAsync(OrderStatus? status = null, int limit = 50, int offset = 0);
     Task<OrderResponseDto> GetOrderAdminAsync(Guid orderId);
-    Task<List<OrderResponseDto>> GetOrdersFromDateToDateAsync(DateTime fromDate, DateTime toDate);
     Task<OrderResponseWithItemsAndUser> GetOrderOfSellerWithItemAndUserAsync(Guid userId, Guid orderId);
 }
 
@@ -824,29 +823,5 @@ public class OrderService : IOrderService
         );
 
         return result;
-    }
-
-    public async Task<List<OrderResponseDto>> GetOrdersFromDateToDateAsync(DateTime fromDate, DateTime toDate)
-    {
-        var orders = await _orderRepository.GetOrderWithDate(fromDate, toDate);
-
-        return orders.Select(order => new OrderResponseDto
-        {
-            Id = order.Id,
-            userId = order.userId,
-            TotalAmount = order.TotalAmount,
-            status = order.status,
-            CreatedAt = order.CreatedAt,
-            UpdatedAt = order.UpdatedAt,
-            orderItems = order.orderItems.Select(item => new OrderItemResponseDto
-            {
-                Id = item.Id,
-                orderId = item.orderId,
-                productId = item.productId,
-                ProductName = item.ProductName,
-                Price = item.Price,
-                Quantity = item.Quantity
-            }).ToList()
-        }).ToList();
     }
 }

@@ -118,16 +118,4 @@ public class OrderController : ControllerBase
 
         return Ok(orders);
     }
-
-    [Authorize(Roles = "Moderator, Admin, Manager")]
-    [HttpGet("Admin/Date")]
-    public async Task<IActionResult> GetOrdersFromDateToDate(DateTime fromDate, DateTime toDate)
-    {
-        var utcFrom = DateTime.SpecifyKind(fromDate, DateTimeKind.Utc);
-        var utcTo = DateTime.SpecifyKind(toDate, DateTimeKind.Utc);
-
-        var products = await _service.GetOrdersFromDateToDateAsync(utcFrom, utcTo);
-
-        return Ok(products);
-    }
 }
