@@ -373,7 +373,7 @@ public class PaymentServiceTests
         _unitOfWorkMock.Verify(u => u.SaveChangesAsync(), Times.Once);
         _unitOfWorkMock.Verify(u => u.CommitAsync(), Times.Once);
 
-        _cacheMock.Verify(c => c.RemoveDataAsync(It.IsAny<string>()), Times.Exactly(5));
+        _cacheMock.Verify(c => c.RemoveDataAsync(It.IsAny<string>()), Times.Exactly(6));
     }
 
     [Fact]
@@ -526,5 +526,84 @@ public class PaymentServiceTests
             It.Is<List<PaymentResponseDto>>(list => list.Count == 1 && list[0].Amount == 1500),
             TimeSpan.FromMinutes(5)
         ), Times.Once);
+    }
+
+    [Fact]
+    public async Task GetPaymentAdminAsync_WhenDataIsInCache_ReturnsCachedPaymentWithoutHittingDatabase()
+    {
+        var paymentId = Guid.NewGuid();
+
+        var cachedPaymentDto = new PaymentResponseDto
+        {
+            Id = paymentId,
+            OrderId = Guid.NewGuid(),
+            Amount = 4500,
+            Status = PaymentStatus.Succeeded,
+            ProviderPaymentId = "mock_admin_123",
+            CreatedAt = DateTime.UtcNow
+        };
+
+        _cacheMock.Setup(c => c.GetDataAsync<PaymentResponseDto>($"payment:{paymentId}"))
+            .ReturnsAsync(cachedPaymentDto);
+
+        var result = await _paymentService.GetPaymentAdminAsync(paymentId);
+
+        result.Should().NotBeNull();
+        result.Should().BeEquivalentTo(cachedPaymentDto);
+
+        _helper.Verify(h => h.GetPaymentOr404(It.IsAny<Guid>()), Times.Never);
+        _cacheMock.Verify(c => c.SetDataAsync(It.IsAny<string>(), It.IsAny<PaymentResponseDto>(), It.IsAny<TimeSpan>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task GetPaymentAdminAsync_WhenCacheMiss_FetchesFromDbCachesAndReturnsPayment()
+    {
+        var paymentId = Guid.NewGuid();
+        var orderId = Guid.NewGuid();
+
+        var testPayment = PaymentTestHelper.CreateTestPayment(
+            Id: paymentId,
+            OrderId: orderId,
+            Amount: 5000,
+            paymentStatus: PaymentStatus.Pending
+        );
+
+        _cacheMock.Setup(c => c.GetDataAsync<PaymentResponseDto>($"payment:{paymentId}"))
+            .ReturnsAsync((PaymentResponseDto?)null);
+
+        _helper.Setup(h => h.GetPaymentOr404(paymentId))
+            .ReturnsAsync(testPayment);
+
+        var result = await _paymentService.GetPaymentAdminAsync(paymentId);
+
+        result.Should().NotBeNull();
+        result.Id.Should().Be(paymentId);
+        result.Amount.Should().Be(5000);
+
+        _helper.Verify(h => h.GetPaymentOr404(paymentId), Times.Once);
+
+        _cacheMock.Verify(c => c.SetDataAsync(
+            $"payment:{paymentId}",
+            It.Is<PaymentResponseDto>(dto => dto.Id == paymentId && dto.Amount == 5000),
+            TimeSpan.FromMinutes(5)
+        ), Times.Once);
+    }
+
+    [Fact]
+    public async Task GetPaymentAdminAsync_WhenPaymentNotFound_ThrowsNotFoundException()
+    {
+        var paymentId = Guid.NewGuid();
+
+        _cacheMock.Setup(c => c.GetDataAsync<PaymentResponseDto>($"payment:{paymentId}"))
+            .ReturnsAsync((PaymentResponseDto?)null);
+
+        _helper.Setup(h => h.GetPaymentOr404(paymentId))
+            .ThrowsAsync(new NotFoundException("Payment not found"));
+
+        Func<Task> action = async () => await _paymentService.GetPaymentAdminAsync(paymentId);
+
+        await action.Should().ThrowAsync<NotFoundException>();
+
+        _cacheMock.Verify(c => c.SetDataAsync(It.IsAny<string>(), It.IsAny<PaymentResponseDto>(), It.IsAny<TimeSpan>()), Times.Never);
     }
 }

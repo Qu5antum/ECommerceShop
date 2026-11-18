@@ -19,7 +19,6 @@ public interface IPaymentService
     Task<List<PaymentResponseDto>> GetPaymentsAdminAsync(PaymentStatus? status = null, int limit = 50, int offset = 0);
     Task<PaymentResponseDto> GetPaymentAdminAsync(Guid paymentId);
     Task<PaymentStatisticsDto> GetPaymentsStatisticAsync();
-    Task<List<PaymentResponseDto>> GetPaymentsFromDateToDate(DateTime fromDate, DateTime toDate);
 }
 
 
@@ -32,7 +31,12 @@ public class PaymentService : IPaymentService
     private readonly IUnitOfWork _unitOfWork;
     private readonly IRedisCacheService _cache;
 
-    private static string GetPaymentCacheKey(Guid paymentId, Guid orderId)
+    private static string GetPaymentCacheKey(Guid paymentId)
+    {
+        return $"payment:{paymentId}";
+    }
+
+    private static string GetPaymentWithOrderIdCacheKey(Guid paymentId, Guid orderId)
     {
         return $"payment:{paymentId}:order:{orderId}";
     }
@@ -167,7 +171,7 @@ public class PaymentService : IPaymentService
             throw new BadRequestException("Order does not belong to user");
         }
 
-        var cacheyKey = GetPaymentCacheKey(paymentId, orderId);
+        var cacheyKey = GetPaymentWithOrderIdCacheKey(paymentId, orderId);
 
         var cachedPayment = await _cache.GetDataAsync<PaymentResponseDto>(cacheyKey);
 
@@ -286,9 +290,10 @@ public class PaymentService : IPaymentService
 
             _logger.LogInformation("Payment status updated: {paymentId}", payment.Id);
 
-            await _cache.RemoveDataAsync(GetPaymentCacheKey(payment.Id, payment.OrderId));
+            await _cache.RemoveDataAsync(GetPaymentWithOrderIdCacheKey(payment.Id, payment.OrderId));
             await _cache.RemoveDataAsync(GetPaymentsCacheKey());
             await _cache.RemoveDataAsync(GetPaymentTotalStatisticsCacheKey());
+            await _cache.RemoveDataAsync(GetPaymentCacheKey(payment.Id));
             
             _logger.LogInformation("Payment deleted from redis cache: {paymentId}", payment.Id);
 
@@ -345,9 +350,7 @@ public class PaymentService : IPaymentService
 
     public async Task<PaymentResponseDto> GetPaymentAdminAsync(Guid paymentId)
     {
-        var payment = await _helper.GetPaymentOr404(paymentId);
-
-        var cacheKey = GetPaymentCacheKey(paymentId, payment.OrderId);
+        var cacheKey = GetPaymentCacheKey(paymentId);
 
         var cachedPayment = await _cache.GetDataAsync<PaymentResponseDto>(cacheKey);
 
@@ -356,6 +359,8 @@ public class PaymentService : IPaymentService
             _logger.LogInformation("Payment retrieved from redis cache: {paymentId}", paymentId);
             return cachedPayment;
         }
+
+        var payment = await _helper.GetPaymentOr404(paymentId);
 
         var result = new PaymentResponseDto
         {
@@ -398,21 +403,5 @@ public class PaymentService : IPaymentService
         );
 
         return stats;
-    }
-
-    public async Task<List<PaymentResponseDto>> GetPaymentsFromDateToDate(DateTime fromDate, DateTime toDate)
-    {
-        var payments = await _paymentRepository.GetPaymentWithDate(fromDate, toDate);
-
-        return payments.Select(payment => new PaymentResponseDto
-        {
-            Id = payment.Id,
-            OrderId = payment.OrderId,
-            Amount = payment.Amount,
-            Status = payment.Status,
-            ProviderPaymentId = payment.ProviderPaymentId,
-            CreatedAt = payment.CreatedAt,
-            UpdatedAt = payment.UpdatedAt
-        }).ToList();
     }
 }

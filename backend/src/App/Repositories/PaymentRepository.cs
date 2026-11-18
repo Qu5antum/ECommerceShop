@@ -14,7 +14,6 @@ public interface IPaymentRepository : IBaseRepository<Payment>
     Task<PaymentStatisticsDto> GetPaymentsStatisticsAsync();
     Task<int> GetPendingPaymentsCountAsync();
     Task<decimal> GetTotalRevenueAsync();
-    Task<List<Payment>> GetPaymentWithDate(DateTime fromDate, DateTime toDate);
 }
 
 
@@ -88,15 +87,5 @@ public class PaymentRepository(AppDbContext context) : BaseRepository<Payment>(c
         return await _context.Payments
             .Where(p => p.Status == PaymentStatus.Succeeded)
             .SumAsync(p => p.Amount);
-    }
-
-    public async Task<List<Payment>> GetPaymentWithDate(DateTime fromDate, DateTime toDate)
-    {
-        var endOfDay = toDate.Date.AddDays(1).AddTicks(-1);
-
-        return await _context.Payments
-            .AsNoTracking()
-            .Where(o => o.CreatedAt >= fromDate && o.CreatedAt <= endOfDay)
-            .ToListAsync();
     }
 }
