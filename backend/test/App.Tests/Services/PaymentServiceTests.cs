@@ -606,4 +606,64 @@ public class PaymentServiceTests
 
         _cacheMock.Verify(c => c.SetDataAsync(It.IsAny<string>(), It.IsAny<PaymentResponseDto>(), It.IsAny<TimeSpan>()), Times.Never);
     }
+
+    [Fact]
+    public async Task GetPaymentsStatisticAsync_WhenDataIsInCache_ReturnsCachedStatisticsWithoutHittingRepository()
+    {
+        var cachedStats = new PaymentStatisticsDto
+        {
+            Total = 150,
+            Successfull = 120,
+            Failed = 20,
+            Pending = 5,
+            Refunded = 5,
+            Revenue = 45000.50m
+        };
+
+        _cacheMock.Setup(c => c.GetDataAsync<PaymentStatisticsDto>("payments:total_statistic"))
+            .ReturnsAsync(cachedStats);
+
+        var result = await _paymentService.GetPaymentsStatisticAsync();
+
+        result.Should().NotBeNull();
+        result.Should().BeEquivalentTo(cachedStats);
+
+        _paymentRepositoryMock.Verify(r => r.GetPaymentsStatisticsAsync(), Times.Never);
+        _cacheMock.Verify(c => c.SetDataAsync(It.IsAny<string>(), It.IsAny<PaymentStatisticsDto>(), It.IsAny<TimeSpan>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task GetPaymentsStatisticAsync_WhenCacheMiss_FetchesFromRepositoryCachesAndReturnsStatistics()
+    {
+        var dbStats = new PaymentStatisticsDto
+        {
+            Total = 200,
+            Successfull = 180,
+            Failed = 10,
+            Pending = 5,
+            Refunded = 5,
+            Revenue = 75000.00m
+        };
+
+        _cacheMock.Setup(c => c.GetDataAsync<PaymentStatisticsDto>("payments:total_statistic"))
+            .ReturnsAsync((PaymentStatisticsDto?)null);
+
+        _paymentRepositoryMock.Setup(r => r.GetPaymentsStatisticsAsync())
+            .ReturnsAsync(dbStats);
+
+        var result = await _paymentService.GetPaymentsStatisticAsync();
+
+        result.Should().NotBeNull();
+        result.Total.Should().Be(200);
+        result.Successfull.Should().Be(180);
+        result.Revenue.Should().Be(75000.00m);
+
+        _paymentRepositoryMock.Verify(r => r.GetPaymentsStatisticsAsync(), Times.Once);
+
+        _cacheMock.Verify(c => c.SetDataAsync(
+            "payments:total_statistic",
+            It.Is<PaymentStatisticsDto>(dto => dto.Total == 200 && dto.Revenue == 75000.00m),
+            TimeSpan.FromMinutes(5)
+        ), Times.Once);
+    }
 }
