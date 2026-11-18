@@ -459,4 +459,72 @@ public class PaymentServiceTests
         _unitOfWorkMock.Verify(u => u.CommitAsync(), Times.Never);
         _cacheMock.Verify(c => c.RemoveDataAsync(It.IsAny<string>()), Times.Never);
     }
+
+    [Fact]
+    public async Task GetPaymentsAdminAsync_WhenDataIsInCache_ReturnsCachedPaymentsWithoutHittingRepository()
+    {
+        var status = PaymentStatus.Succeeded;
+
+        var cachedPayments = new List<PaymentResponseDto>
+        {
+            new PaymentResponseDto
+            {
+                Id = Guid.NewGuid(),
+                OrderId = Guid.NewGuid(),
+                Amount = 1500,
+                Status = PaymentStatus.Succeeded,
+                ProviderPaymentId = "mock_provider_123",
+                CreatedAt = DateTime.UtcNow
+            }
+        };
+
+        _cacheMock.Setup(c => c.GetDataAsync<List<PaymentResponseDto>>($"payments:{status}"))
+            .ReturnsAsync(cachedPayments);
+
+        var result = await _paymentService.GetPaymentsAdminAsync(status);
+
+        result.Should().NotBeNull();
+        result.Should().BeEquivalentTo(cachedPayments);
+
+        _paymentRepositoryMock.Verify(r => r.GetPaymetsByStatusAsync(It.IsAny<PaymentStatus?>(), It.IsAny<int>(), It.IsAny<int>()), Times.Never);
+        _cacheMock.Verify(c => c.SetDataAsync(It.IsAny<string>(), It.IsAny<List<PaymentResponseDto>>(), It.IsAny<TimeSpan>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task GetPaymentsAdminAsync_WhenCacheMiss_FetchesFromRepositoryAndCaches()
+    {
+        var dbPayments = new List<PaymentResponseDto>
+        {
+            new PaymentResponseDto
+            {
+                Id = Guid.NewGuid(),
+                OrderId = Guid.NewGuid(),
+                Amount = 1500,
+                Status = PaymentStatus.Pending,
+                ProviderPaymentId = "mock_provider_123",
+                CreatedAt = DateTime.UtcNow
+            }
+        };
+
+        _cacheMock.Setup(c => c.GetDataAsync<List<PaymentResponseDto>>("payments:all"))
+            .ReturnsAsync((List<PaymentResponseDto>?)null);
+
+        _paymentRepositoryMock.Setup(r => r.GetPaymetsByStatusAsync())
+            .ReturnsAsync(dbPayments);
+
+        var result = await _paymentService.GetPaymentsAdminAsync();
+
+        result.Should().NotBeNull();
+        result.Should().HaveCount(1);
+        result.First().Amount.Should().Be(1500);
+        result.First().Status.Should().Be(PaymentStatus.Pending);
+
+        _paymentRepositoryMock.Verify(r => r.GetPaymetsByStatusAsync(), Times.Once);
+
+        _cacheMock.Verify(c => c.SetDataAsync(
+            "payments:all",
+            It.Is<List<PaymentResponseDto>>(list => list.Count == 1 && list[0].Amount == 1500),
+            TimeSpan.FromMinutes(5)
+        ), Times.Once);
+    }
 }

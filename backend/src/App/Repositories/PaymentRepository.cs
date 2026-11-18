@@ -10,7 +10,7 @@ namespace App.Repositories;
 public interface IPaymentRepository : IBaseRepository<Payment>
 {
     Task<Payment?> GetPaymentWithProviderId(string paymentProviderId);
-    Task<List<Payment>> GetPaymetsByStatusAsync(PaymentStatus? status = null);
+    Task<List<PaymentResponseDto>> GetPaymetsByStatusAsync(PaymentStatus? status = null, int limit = 50, int offset = 0);
     Task<PaymentStatisticsDto> GetPaymentsStatisticsAsync();
     Task<int> GetPendingPaymentsCountAsync();
     Task<decimal> GetTotalRevenueAsync();
@@ -28,15 +28,31 @@ public class PaymentRepository(AppDbContext context) : BaseRepository<Payment>(c
             .FirstOrDefaultAsync(p => p.ProviderPaymentId == paymentProviderId);
     }
 
-    public async Task<List<Payment>> GetPaymetsByStatusAsync(PaymentStatus? status = null)
+    public async Task<List<PaymentResponseDto>> GetPaymetsByStatusAsync(PaymentStatus? status = null, int limit = 50, int offset = 0)
     {
-        var query = _context.Payments
+        IQueryable<Payment> query = _context.Payments
             .AsNoTracking();
 
         if (status.HasValue) 
             query = query.Where(p => p.Status == status);
         
-        var result = await query.ToListAsync();
+        query = query
+            .OrderByDescending(p => p.CreatedAt)
+            .ThenBy(p => p.Id)
+            .Skip(offset)
+            .Take(limit);
+
+        var result = await query.Select(p => new PaymentResponseDto
+        {
+            Id = p.Id,
+            OrderId = p.OrderId,
+            Amount = p.Amount,
+            Status = p.Status,
+            ProviderPaymentId = p.ProviderPaymentId,
+            CreatedAt = p.CreatedAt,
+            UpdatedAt = p.UpdatedAt
+        })
+        .ToListAsync();
 
         return result;
     }

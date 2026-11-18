@@ -16,7 +16,7 @@ public interface IPaymentService
     Task<PaymentResponseDto> CreatePaymentAsync(Guid userId, Guid orderId);
     Task<PaymentResponseDto> GetPaymentAsync(Guid userId, Guid orderId, Guid paymentId);
     Task<bool> ProcessWebhookAsync(PaymentWebhookDto webhookDto);
-    Task<List<PaymentResponseDto>> GetPaymentsAdminAsync(PaymentStatus? status = null);
+    Task<List<PaymentResponseDto>> GetPaymentsAdminAsync(PaymentStatus? status = null, int limit = 50, int offset = 0);
     Task<PaymentResponseDto> GetPaymentAdminAsync(Guid paymentId);
     Task<PaymentStatisticsDto> GetPaymentsStatisticAsync();
     Task<List<PaymentResponseDto>> GetPaymentsFromDateToDate(DateTime fromDate, DateTime toDate);
@@ -307,7 +307,7 @@ public class PaymentService : IPaymentService
         }
     }
 
-    public async Task<List<PaymentResponseDto>> GetPaymentsAdminAsync(PaymentStatus? status = null)
+    public async Task<List<PaymentResponseDto>> GetPaymentsAdminAsync(PaymentStatus? status = null, int limit = 50, int offset = 0)
     {
         var cacheKey = status.HasValue
             ? GetPaymentsWithStatusCacheKey(status.Value)
@@ -321,7 +321,7 @@ public class PaymentService : IPaymentService
             return cachedPayments;
         }
 
-        var products = await _paymentRepository.GetPaymetsByStatusAsync(status);
+        var products = await _paymentRepository.GetPaymetsByStatusAsync(status, limit, offset);
         
         var result = products.Select(payment => new PaymentResponseDto
         {
