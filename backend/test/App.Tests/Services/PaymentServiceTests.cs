@@ -342,4 +342,121 @@ public class PaymentServiceTests
 
         _cacheMock.Verify(c => c.SetDataAsync(It.IsAny<string>(), It.IsAny<PaymentResponseDto>(), It.IsAny<TimeSpan>()), Times.Never);
     }
+
+    [Fact]
+    public async Task ProccessWebhook_SuccessfullResponse_ReturnsOk()
+    {
+        var providerPaymentId = $"mock_{Guid.NewGuid()}";
+        var testOrder = OrderTestHelper.CreateTestOrder();
+        var testPayment = PaymentTestHelper.CreateTestPayment(OrderId: testOrder.Id, ProviderPaymentId: providerPaymentId);
+
+        var testWebhookDto = new PaymentWebhookDto
+        {
+            ProviderPaymentId = providerPaymentId,
+            Status = PaymentStatus.Succeeded
+        };
+
+        _paymentRepositoryMock.Setup(r => r.GetPaymentWithProviderId(testWebhookDto.ProviderPaymentId))
+            .ReturnsAsync(testPayment);
+
+        _helper.Setup(h => h.GetOrderOr404(testPayment.OrderId))
+            .ReturnsAsync(testOrder);
+
+        var result = await _paymentService.ProcessWebhookAsync(testWebhookDto);
+
+        result.Should().BeTrue();
+        testPayment.Status.Should().Be(PaymentStatus.Succeeded);
+
+        _notificationRepositoryMock.Verify(r => r.CreateAsync(It.IsAny<Notification>()), Times.Once);
+
+        _unitOfWorkMock.Verify(u => u.BeginTransactionAsync(), Times.Once);
+        _unitOfWorkMock.Verify(u => u.SaveChangesAsync(), Times.Once);
+        _unitOfWorkMock.Verify(u => u.CommitAsync(), Times.Once);
+
+        _cacheMock.Verify(c => c.RemoveDataAsync(It.IsAny<string>()), Times.Exactly(5));
+    }
+
+    [Fact]
+    public async Task ProccessWebhook_IfPaymentNotFoundByProvider_ThrowsNotFoundException()
+    {
+        var providerPaymentId = $"mock_{Guid.NewGuid()}";
+        var testOrder = OrderTestHelper.CreateTestOrder();
+        var testPayment = PaymentTestHelper.CreateTestPayment(OrderId: testOrder.Id);
+
+        var testWebhookDto = new PaymentWebhookDto
+        {
+            ProviderPaymentId = providerPaymentId,
+            Status = PaymentStatus.Succeeded
+        };
+
+        _paymentRepositoryMock.Setup(r => r.GetPaymentWithProviderId(testWebhookDto.ProviderPaymentId))
+            .ReturnsAsync((Payment?)null);
+
+        Func<Task> action = async () => await _paymentService.ProcessWebhookAsync(testWebhookDto);
+
+        _notificationRepositoryMock.Verify(r => r.CreateAsync(It.IsAny<Notification>()), Times.Never);
+
+        _unitOfWorkMock.Verify(u => u.BeginTransactionAsync(), Times.Never);
+        _unitOfWorkMock.Verify(u => u.SaveChangesAsync(), Times.Never);
+        _unitOfWorkMock.Verify(u => u.CommitAsync(), Times.Never);
+
+        _cacheMock.Verify(c => c.RemoveDataAsync(It.IsAny<string>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task ProcessWebhookAsync_WhenStatusTransitionIsInvalid_ThrowsBadRequestException()
+    {
+        var webhookDto = new PaymentWebhookDto
+        {
+            ProviderPaymentId = "mock_provider_123",
+            Status = PaymentStatus.Pending 
+        };
+
+        var payment = PaymentTestHelper.CreateTestPayment(
+            paymentStatus: PaymentStatus.Succeeded 
+        );
+
+        _paymentRepositoryMock.Setup(r => r.GetPaymentWithProviderId(webhookDto.ProviderPaymentId))
+            .ReturnsAsync(payment);
+
+        Func<Task> action = async () => await _paymentService.ProcessWebhookAsync(webhookDto);
+
+        await action.Should().ThrowAsync<BadRequestException>();
+
+        _helper.Verify(h => h.GetOrderOr404(It.IsAny<Guid>()), Times.Never);
+        _unitOfWorkMock.Verify(u => u.BeginTransactionAsync(), Times.Never);
+    }
+
+    [Fact]
+    public async Task ProcessWebhookAsync_WhenDbUpdateExceptionOccurs_RollsBackAndThrowsDatabaseException()
+    {
+        var webhookDto = new PaymentWebhookDto
+        {
+            ProviderPaymentId = "mock_provider_123",
+            Status = PaymentStatus.Succeeded
+        };
+
+        var orderId = Guid.NewGuid();
+        var payment = PaymentTestHelper.CreateTestPayment(OrderId: orderId, paymentStatus: PaymentStatus.Pending);
+        var order = OrderTestHelper.CreateTestOrder(Id: orderId, status: OrderStatus.Pending);
+
+        _paymentRepositoryMock.Setup(r => r.GetPaymentWithProviderId(webhookDto.ProviderPaymentId))
+            .ReturnsAsync(payment);
+
+        _helper.Setup(h => h.GetOrderOr404(orderId))
+            .ReturnsAsync(order);
+
+        _unitOfWorkMock.Setup(u => u.SaveChangesAsync())
+            .ThrowsAsync(new DbUpdateException("DB Error", new Exception()));
+
+        Func<Task> action = async () => await _paymentService.ProcessWebhookAsync(webhookDto);
+
+        await action.Should().ThrowAsync<DatabaseException>()
+            .WithMessage("Could not process payment webhook in the database.");
+
+        _unitOfWorkMock.Verify(u => u.BeginTransactionAsync(), Times.Once);
+        _unitOfWorkMock.Verify(u => u.RollbackAsync(), Times.Once);
+        _unitOfWorkMock.Verify(u => u.CommitAsync(), Times.Never);
+        _cacheMock.Verify(c => c.RemoveDataAsync(It.IsAny<string>()), Times.Never);
+    }
 }

@@ -6,6 +6,7 @@ using App.Repositories;
 using App.Services.Caching;
 using App.Transactions;
 using Microsoft.EntityFrameworkCore;
+using App.State;
 
 namespace App.Services;
 
@@ -214,8 +215,6 @@ public class PaymentService : IPaymentService
     
     public async Task<bool> ProcessWebhookAsync(PaymentWebhookDto webhookDto)
     {
-        await _unitOfWork.BeginTransactionAsync();
-
         var payment = await _paymentRepository.GetPaymentWithProviderId(webhookDto.ProviderPaymentId);
 
         if (payment == null)
@@ -224,19 +223,11 @@ public class PaymentService : IPaymentService
             throw new NotFoundException("Payment not found");
         }
 
-        if (webhookDto.Status == PaymentStatus.Pending)
-        {
-            _logger.LogInformation("Payment can't be marked as pending status for payment: {payemntId}, Provider ID: {provederId}", payment.Id, webhookDto.ProviderPaymentId);
-            throw new BadHttpRequestException("Payment can't be marked as pending status for payment");
-        }
-
-        if (payment.Status == PaymentStatus.Succeeded)
-        {
-            _logger.LogInformation("Payment already marked as Succeeded. Provider ID: {providerId}", webhookDto.ProviderPaymentId);
-            throw new BadRequestException("Payment already marked as Succeeded");
-        }
+        PaymentStatusState.ValidateTransition(payment.Status, webhookDto.Status);
 
         var order = await _helper.GetOrderOr404(payment.OrderId);
+
+        await _unitOfWork.BeginTransactionAsync();
 
         try
         {
