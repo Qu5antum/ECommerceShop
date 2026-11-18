@@ -31,9 +31,9 @@ public class PaymentService : IPaymentService
     private readonly IUnitOfWork _unitOfWork;
     private readonly IRedisCacheService _cache;
 
-    private static string GetPaymentCacheKey(Guid paymentId)
+    private static string GetPaymentCacheKey(Guid paymentId, Guid orderId)
     {
-        return $"payment:{paymentId}";
+        return $"payment:{paymentId}:order:{orderId}";
     }
 
     private static string GetPaymentsCacheKey()
@@ -158,9 +158,6 @@ public class PaymentService : IPaymentService
     public async Task<PaymentResponseDto> GetPaymentAsync(Guid userId, Guid orderId, Guid paymentId)
     {
         await _helper.GetUserOr404(userId);
-
-        var cacheyKey = GetPaymentCacheKey(paymentId);
-
         var order = await _helper.GetOrderOr404(orderId);
 
         if (order.userId != userId)
@@ -169,20 +166,28 @@ public class PaymentService : IPaymentService
             throw new BadRequestException("Order does not belong to user");
         }
 
+        var cacheyKey = GetPaymentCacheKey(paymentId, orderId);
+
+        var cachedPayment = await _cache.GetDataAsync<PaymentResponseDto>(cacheyKey);
+
+        if (cachedPayment is not null)
+        {
+            if (cachedPayment.OrderId != orderId)
+            {
+                _logger.LogWarning("Payment does not belong to order, payment ID: {paymentId}, order ID: {orderId}", paymentId, orderId);
+                throw new BadRequestException("Payment does not belong to order");
+            }
+
+            _logger.LogInformation("Payment retrieved from redis cache, user ID: {userId}, payment ID: {paymentId}", userId, paymentId);
+            return cachedPayment;
+        }
+
         var payment = await _helper.GetPaymentOr404(paymentId);
 
         if (payment.OrderId != orderId)
         {
             _logger.LogWarning("Payment does not belong to order, payment ID: {paymentId}, order ID: {orderId}", paymentId, orderId);
             throw new BadRequestException("Payment does not belong to order");
-        }
-
-        var cachedPayment = await _cache.GetDataAsync<PaymentResponseDto>(cacheyKey);
-
-        if (cachedPayment is not null)
-        {
-            _logger.LogInformation("Payment retrieved from redis cache, user ID: {userId}, payment ID: {paymentId}", userId, paymentId);
-            return cachedPayment;
         }
         
         var result = new PaymentResponseDto
@@ -290,7 +295,7 @@ public class PaymentService : IPaymentService
 
             _logger.LogInformation("Payment status updated: {paymentId}", payment.Id);
 
-            await _cache.RemoveDataAsync(GetPaymentCacheKey(payment.Id));
+            await _cache.RemoveDataAsync(GetPaymentCacheKey(payment.Id, payment.OrderId));
             await _cache.RemoveDataAsync(GetPaymentsCacheKey());
             await _cache.RemoveDataAsync(GetPaymentTotalStatisticsCacheKey());
             
@@ -351,7 +356,7 @@ public class PaymentService : IPaymentService
     {
         var payment = await _helper.GetPaymentOr404(paymentId);
 
-        var cacheKey = GetPaymentCacheKey(paymentId);
+        var cacheKey = GetPaymentCacheKey(paymentId, payment.OrderId);
 
         var cachedPayment = await _cache.GetDataAsync<PaymentResponseDto>(cacheKey);
 

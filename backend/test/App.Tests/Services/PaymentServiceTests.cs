@@ -164,4 +164,182 @@ public class PaymentServiceTests
         _unitOfWorkMock.Verify(u => u.CommitAsync(), Times.Never);
         _cacheMock.Verify(c => c.RemoveDataAsync(It.IsAny<string>()), Times.Never);
     }
+
+    [Fact]
+    public async Task GetPaymentAsync_WhenDataIsInCacheAndValid_ReturnsCachedPaymentWithoutHittingDatabase()
+    {
+        var userId = Guid.NewGuid();
+        var orderId = Guid.NewGuid();
+        var paymentId = Guid.NewGuid();
+
+        var testUser = AuthTestHelper.CreateTestUser(Id: userId);
+        var testOrder = OrderTestHelper.CreateTestOrder(Id: orderId, userId: userId);
+
+        var cachedPaymentDto = new PaymentResponseDto
+        {
+            Id = paymentId,
+            OrderId = orderId,
+            Amount = 1500,
+            Status = PaymentStatus.Succeeded,
+            ProviderPaymentId = "mock_cache_123",
+            CreatedAt = DateTime.UtcNow
+        };
+
+        _helper.Setup(h => h.GetUserOr404(userId))
+            .ReturnsAsync(testUser);
+
+        _helper.Setup(h => h.GetOrderOr404(orderId))
+            .ReturnsAsync(testOrder);
+
+        _cacheMock.Setup(c => c.GetDataAsync<PaymentResponseDto>($"payment:{paymentId}:order:{orderId}"))
+            .ReturnsAsync(cachedPaymentDto);
+
+        var result = await _paymentService.GetPaymentAsync(userId, orderId, paymentId);
+
+        result.Should().NotBeNull();
+        result.Should().BeEquivalentTo(cachedPaymentDto);
+
+        _helper.Verify(h => h.GetUserOr404(userId), Times.Once);
+        _helper.Verify(h => h.GetOrderOr404(orderId), Times.Once);
+        _helper.Verify(h => h.GetPaymentOr404(It.IsAny<Guid>()), Times.Never);
+        
+        _cacheMock.Verify(c => c.SetDataAsync(It.IsAny<string>(), It.IsAny<PaymentResponseDto>(), It.IsAny<TimeSpan>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task GetPaymentAsync_WhenCacheMissAndValidData_FetchesFromDbCachesAndReturnsPayment()
+    {
+        var userId = Guid.NewGuid();
+        var orderId = Guid.NewGuid();
+        var paymentId = Guid.NewGuid();
+
+        var testUser = AuthTestHelper.CreateTestUser(Id: userId);
+        var testOrder = OrderTestHelper.CreateTestOrder(Id: orderId, userId: userId);
+        var testPayment = PaymentTestHelper.CreateTestPayment(
+            Id: paymentId, 
+            OrderId: orderId, 
+            Amount: 3000,
+            paymentStatus: PaymentStatus.Pending
+        );
+
+        _helper.Setup(h => h.GetUserOr404(userId))
+            .ReturnsAsync(testUser);
+
+        _helper.Setup(h => h.GetOrderOr404(orderId))
+            .ReturnsAsync(testOrder);
+
+        _cacheMock.Setup(c => c.GetDataAsync<PaymentResponseDto>($"payment:{paymentId}:order:{orderId}"))
+            .ReturnsAsync((PaymentResponseDto?)null);
+
+        _helper.Setup(h => h.GetPaymentOr404(paymentId))
+            .ReturnsAsync(testPayment);
+
+        var result = await _paymentService.GetPaymentAsync(userId, orderId, paymentId);
+
+        result.Should().NotBeNull();
+        result.Id.Should().Be(paymentId);
+        result.OrderId.Should().Be(orderId);
+        result.Amount.Should().Be(3000);
+
+        _helper.Verify(h => h.GetPaymentOr404(paymentId), Times.Once);
+
+        _cacheMock.Verify(c => c.SetDataAsync(
+            $"payment:{paymentId}:order:{orderId}",
+            It.Is<PaymentResponseDto>(dto => dto.Id == paymentId && dto.Amount == 3000),
+            TimeSpan.FromMinutes(5)
+        ), Times.Once);
+    }
+
+    [Fact]
+    public async Task GetPaymentAsync_WhenOrderDoesNotBelongToUser_ThrowsBadRequestException()
+    {
+        var userId = Guid.NewGuid();
+        var otherUserId = Guid.NewGuid();
+        var orderId = Guid.NewGuid();
+        var paymentId = Guid.NewGuid();
+
+        var testUser = AuthTestHelper.CreateTestUser(Id: userId);
+        var foreignOrder = OrderTestHelper.CreateTestOrder(Id: orderId, userId: otherUserId);
+
+        _helper.Setup(h => h.GetUserOr404(userId))
+            .ReturnsAsync(testUser);
+
+        _helper.Setup(h => h.GetOrderOr404(orderId))
+            .ReturnsAsync(foreignOrder);
+
+        Func<Task> action = async () => await _paymentService.GetPaymentAsync(userId, orderId, paymentId);
+
+        await action.Should().ThrowAsync<BadRequestException>()
+            .WithMessage("Order does not belong to user");
+
+        _cacheMock.Verify(c => c.GetDataAsync<PaymentResponseDto>(It.IsAny<string>()), Times.Never);
+        _helper.Verify(h => h.GetPaymentOr404(It.IsAny<Guid>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task GetPaymentAsync_WhenCachedPaymentDoesNotBelongToOrder_ThrowsBadRequestException()
+    {
+        var userId = Guid.NewGuid();
+        var orderId = Guid.NewGuid();
+        var otherOrderId = Guid.NewGuid();
+        var paymentId = Guid.NewGuid();
+
+        var testUser = AuthTestHelper.CreateTestUser(Id: userId);
+        var testOrder = OrderTestHelper.CreateTestOrder(Id: orderId, userId: userId);
+
+        var cachedPaymentDto = new PaymentResponseDto
+        {
+            Id = paymentId,
+            OrderId = otherOrderId,
+            Amount = 1000
+        };
+
+        _helper.Setup(h => h.GetUserOr404(userId))
+            .ReturnsAsync(testUser);
+
+        _helper.Setup(h => h.GetOrderOr404(orderId))
+            .ReturnsAsync(testOrder);
+
+        _cacheMock.Setup(c => c.GetDataAsync<PaymentResponseDto>($"payment:{paymentId}:order:{orderId}"))
+            .ReturnsAsync(cachedPaymentDto);
+
+        Func<Task> action = async () => await _paymentService.GetPaymentAsync(userId, orderId, paymentId);
+
+        await action.Should().ThrowAsync<BadRequestException>()
+            .WithMessage("Payment does not belong to order");
+
+        _helper.Verify(h => h.GetPaymentOr404(It.IsAny<Guid>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task GetPaymentAsync_WhenPaymentFromDbDoesNotBelongToOrder_ThrowsBadRequestException()
+    {
+        var userId = Guid.NewGuid();
+        var orderId = Guid.NewGuid();
+        var otherOrderId = Guid.NewGuid();
+        var paymentId = Guid.NewGuid();
+
+        var testUser = AuthTestHelper.CreateTestUser(Id: userId);
+        var testOrder = OrderTestHelper.CreateTestOrder(Id: orderId, userId: userId);
+        var foreignPayment = PaymentTestHelper.CreateTestPayment(Id: paymentId, OrderId: otherOrderId);
+
+        _helper.Setup(h => h.GetUserOr404(userId))
+            .ReturnsAsync(testUser);
+
+        _helper.Setup(h => h.GetOrderOr404(orderId))
+            .ReturnsAsync(testOrder);
+
+        _cacheMock.Setup(c => c.GetDataAsync<PaymentResponseDto>($"payment:{paymentId}:order:{orderId}"))
+            .ReturnsAsync((PaymentResponseDto?)null);
+
+        _helper.Setup(h => h.GetPaymentOr404(paymentId))
+            .ReturnsAsync(foreignPayment);
+
+        Func<Task> action = async () => await _paymentService.GetPaymentAsync(userId, orderId, paymentId);
+
+        await action.Should().ThrowAsync<BadRequestException>()
+            .WithMessage("Payment does not belong to order");
+
+        _cacheMock.Verify(c => c.SetDataAsync(It.IsAny<string>(), It.IsAny<PaymentResponseDto>(), It.IsAny<TimeSpan>()), Times.Never);
+    }
 }
